@@ -44,24 +44,11 @@ React é obrigatório pelo enunciado. Vite pelo build rápido e configuração m
 **Escolhido:** o QR carrega o identificador **mais uma assinatura criptográfica** gerada com segredo do servidor. A portaria verifica a assinatura *e* o estado do ingresso no banco. Sem o segredo não há como forjar.
 **Detalhe:** o segredo do ingresso é separado do segredo do JWT. Comprometer a sessão de um usuário não deve permitir emitir ingressos.
 
-## D7 — Identidade visual: sala escura
+## D7 — Identidade visual
 
-**Descartado:** o padrão que sai pronto das ferramentas — fundo claro, gradiente
-roxo-azul, cards brancos arredondados, Inter em tudo. É reconhecível de longe e o
-enunciado pede explicitamente para fugir dele.
+*(a preencher — Sprint 1, T10)*
 
-**Escolhido:** interface escura, fundo quase preto, um único acento âmbar, tipografia
-com contraste de peso.
-
-**Por quê:** o TMDb entrega pôsteres em alta resolução, e pôster é a informação mais
-importante de uma sessão de cinema. Em fundo escuro a arte do filme vira a fonte de cor
-da tela, e a interface some para dar lugar a ela — é a razão pela qual Letterboxd e os
-serviços de streaming são escuros, e não uma questão de moda. Em fundo claro os pôsteres
-brigam entre si e o resultado fica ruidoso.
-
-**Consequência:** a cor da interface é quase toda neutra. O âmbar fica reservado para
-ação — comprar, confirmar, validar — de modo que o olho encontre o próximo passo sem
-procurar. Estado de erro é a única exceção.
+O desafio é explícito sobre fugir do visual genérico de projeto gerado por IA. Registrar aqui paleta, tipografia, referência adotada e o raciocínio.
 
 ## D8 — Catálogo atrás de um contrato de provedor
 

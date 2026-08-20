@@ -1,0 +1,213 @@
+{
+  "_comment": "Catalogo local, capturado de chamadas reais ao TMDb em 20/08/2026. Permite desenvolver, testar e demonstrar o sistema sem chave de API e sem depender de rede. Ver docs/decisoes.md, decisao D8.",
+  "items": [
+    {
+      "id": "969681",
+      "title": "Homem-Aranha: Um Novo Dia",
+      "original_title": "Spider-Man: Brand New Day",
+      "overview": "É um novo dia para Peter Parker. Combatendo o crime em tempo integral como Homem-Aranha em um mundo que não se lembra mais dele e lidando com a pressão de ver seus antigos amigos seguirem em frente sem sua presença, Peter passa por uma mudança que talvez nem ele tenha o poder de controlar. Mas essa transformação também pode ser a única coisa capaz de deter uma surpreendente nova ameaça à cidade e às pessoas que ele ama: um poderoso vilão que ninguém sequer consegue enxergar.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/x0nvYzQpyJc5pdT9lMnkMuYAg0O.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/7iwUUcKURMT7aKfCwMy6YnGtchD.jpg",
+      "rating": 7.9,
+      "runtime_minutes": 143,
+      "genres": [
+        "Ficção científica",
+        "Ação",
+        "Aventura"
+      ]
+    },
+    {
+      "id": "1368337",
+      "title": "A Odisseia",
+      "original_title": "The Odyssey",
+      "overview": "Acompanhe o rei grego Odisseu em sua perigosa jornada de 20 anos para voltar a Ítaca após a Guerra de Troia, enfrentando monstros e deuses enquanto sua esposa Penélope resiste em seu reino.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/muMwJAiMtReEHLKpKMWt2rMkYF7.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/r57L2UBLPKcHdZQYg8tagv9XqK2.jpg",
+      "rating": 8.0,
+      "runtime_minutes": 172,
+      "genres": [
+        "Aventura",
+        "Ação",
+        "Fantasia"
+      ]
+    },
+    {
+      "id": "1084244",
+      "title": "Toy Story 5",
+      "original_title": "Toy Story 5",
+      "overview": "O trabalho de Buzz, Woody, Jessie e do resto da gangue fica exponencialmente mais difícil quando eles enfrentam uma nova ameaça à diversão: a tecnologia.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/sssrBhdvDcczgMQYDc8oCoSuFEJ.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/8sSKdEmlmqF4kJUd28SqthXC4yZ.jpg",
+      "rating": 8.0,
+      "runtime_minutes": 100,
+      "genres": [
+        "Animação",
+        "Família",
+        "Comédia",
+        "Aventura"
+      ]
+    },
+    {
+      "id": "634649",
+      "title": "Homem-Aranha: Sem Volta Para Casa",
+      "original_title": "Spider-Man: No Way Home",
+      "overview": "Peter Parker é desmascarado e não consegue mais separar sua vida normal dos grandes riscos de ser um super-herói. Quando ele pede ajuda ao Doutor Estranho, os riscos se tornam ainda mais perigosos, e o forçam a descobrir o que realmente significa ser o Homem-Aranha...",
+      "release_year": 2021,
+      "poster_url": "https://image.tmdb.org/t/p/w500/xaKydnMw6wR1MBAjS5seGPVusbs.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/uyrOU4BDm2kbVxFsMiDFIHDhc4d.jpg",
+      "rating": 7.9,
+      "runtime_minutes": 149,
+      "genres": [
+        "Ação",
+        "Aventura",
+        "Ficção científica"
+      ]
+    },
+    {
+      "id": "1375646",
+      "title": "Zona Zero",
+      "original_title": "군체",
+      "overview": "De repente, um vírus que sofre mutações rápidas é liberado em uma conferência de biologia, forçando o isolamento imediato do local. A contaminação se espalha rapidamente, e os infectados não apenas atacam, eles evoluem de formas imprevisíveis e cada vez mais perigosas. Presos nesse confinamento, um grupo de sobreviventes precisa lutar pela própria vida enquanto, a cada minuto, as regras do jogo mudam.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/5tQ8kDNk00HPuVb43pZH1BmcNWQ.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/84FEpVVbSKYvKXDZJDZXOKBxCEm.jpg",
+      "rating": 8.1,
+      "runtime_minutes": 122,
+      "genres": [
+        "Ação",
+        "Terror",
+        "Ficção científica"
+      ]
+    },
+    {
+      "id": "1315772",
+      "title": "Minions & Monstros",
+      "original_title": "Minions & Monsters",
+      "overview": "Esta é a frenética, ridícula e totalmente verdadeira história de como os Minions conquistaram Hollywood, se tornaram estrelas de cinema, perderam tudo, libertaram monstros pelo mundo e, depois, se uniram para tentar salvar o planeta do caos que eles mesmos haviam acabado de criar.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/hTowtXrkCY7FJyoj4p91JckrJSE.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/kkcwhgSFd81QDlXo8ytrpHPQjhy.jpg",
+      "rating": 7.5,
+      "runtime_minutes": 87,
+      "genres": [
+        "Aventura",
+        "Animação",
+        "Comédia",
+        "Família",
+        "Fantasia"
+      ]
+    },
+    {
+      "id": "1339713",
+      "title": "Obsessão",
+      "original_title": "Obsession",
+      "overview": "Sem grandes pretensões, um romântico incurável compra um brinquedo que promete realizar desejos únicos. Ele quebra o artefato misterioso enquanto pede para conquistar a crush e consegue exatamente o que desejava, mas descobre que a consequência é sinistra.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/wUc6IDf5ChjM1UyQye21qFBeJY0.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/rZfmzpixLKLR3Hg2u0WgC7XLFl8.jpg",
+      "rating": 8.2,
+      "runtime_minutes": 100,
+      "genres": [
+        "Terror",
+        "Thriller"
+      ]
+    },
+    {
+      "id": "1284041",
+      "title": "A Última Casa",
+      "original_title": "The Last House",
+      "overview": "Uma família trancada misteriosamente na própria casa precisa se unir para sobreviver à escassez de recursos e à força sombria que a mantém presa.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/AqOwuZ4X0Ssi3LIsYqXNw52IIvW.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/1RhfevWmWCVHtEqxWBEjPOC5KG1.jpg",
+      "rating": 6.9,
+      "runtime_minutes": 110,
+      "genres": [
+        "Terror",
+        "Ficção científica",
+        "Thriller"
+      ]
+    },
+    {
+      "id": "1284465",
+      "title": "A Morte de Robin Hood",
+      "original_title": "The Death of Robin Hood",
+      "overview": "Atormentado pelas cicatrizes de uma vida marcada pelo crime, Robin Hood sobrevive por pouco àquela que acreditava ser sua batalha final. Gravemente ferido, ele é encontrado por uma mulher misteriosa que o recolhe das sombras e passa a cuidar de seus ferimentos. Com o corpo fora de combate, cada erro cometido no passado volta para assombrá-lo.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/o0QndnepFPWget2kdKpzh26RBYt.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/lh3BDkmWJh998n4fQcHYcVi7dpm.jpg",
+      "rating": 6.3,
+      "runtime_minutes": 123,
+      "genres": [
+        "Aventura",
+        "Drama",
+        "Ação"
+      ]
+    },
+    {
+      "id": "1101383",
+      "title": "O Fim da Rua",
+      "original_title": "The End of Oak Street",
+      "overview": "Após um misterioso evento cósmico abalar o bairro Oak Street e o transportar dos subúrbios para um lugar desconhecido, a família Platt descobre que sua sobrevivência vai depender da união entre todos para enfrentar um ambiente agora irreconhecível.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/4uuHvSqtAqbFFl0ZgOMx3xbGw1J.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/b9q9VmbXDvJmTziRqkwdEmFdwhr.jpg",
+      "rating": 6.5,
+      "runtime_minutes": 100,
+      "genres": [
+        "Ficção científica",
+        "Mistério",
+        "Thriller"
+      ]
+    },
+    {
+      "id": "1108427",
+      "title": "Moana",
+      "original_title": "Moana",
+      "overview": "Na Polinésia Antiga, quando uma terrível maldição contraída por Maui chega à ilha de um impetuoso chefe, sua filha obstinada responde ao chamado do Oceano para procurar o semideus e consertar as coisas. Adaptação live-action do filme de animação da Disney de 2016 'Moana'",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/eEsiTi19EYBluPQliS3CMnBgqTj.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/c6BPbkO5Npt1OdwttAxCFo06wtH.jpg",
+      "rating": 6.0,
+      "runtime_minutes": 115,
+      "genres": [
+        "Família",
+        "Fantasia",
+        "Comédia",
+        "Aventura"
+      ]
+    },
+    {
+      "id": "1275779",
+      "title": "Dia D",
+      "original_title": "Disclosure Day",
+      "overview": "O mundo entra em colapso quando uma meteorologista, em plena transmissão ao vivo, é dominada por uma força invisível, perdendo a fala e emitindo sons perturbadores. Enquanto fenômenos inexplicáveis e sinais de controle mental em massa se espalham, um informante tenta expor segredos governamentais guardados por décadas.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/pmff1wjKrgJi92PPr346lAifzlg.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/flxau5Iu7bChQHsESqvGZ3FQRaI.jpg",
+      "rating": 7.5,
+      "runtime_minutes": 146,
+      "genres": [
+        "Ficção científica",
+        "Thriller"
+      ]
+    },
+    {
+      "id": "1212763",
+      "title": "A Morte do Demônio: Em Chamas",
+      "original_title": "Evil Dead Burn",
+      "overview": "Após a perda do marido, uma mulher busca consolo com seus sogros em sua casa isolada. À medida que, um a um, eles são transformados em Deadites — transformando o encontro em uma reunião familiar infernal —, ela descobre que os votos que fez em vida... continuam vivos mesmo após a morte.",
+      "release_year": 2026,
+      "poster_url": "https://image.tmdb.org/t/p/w500/fteLdvfRnltfLjAEnsl5E3vImnW.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/o0jkkpcN81QqSl8DMLScBCXyUH9.jpg",
+      "rating": 7.9,
+      "runtime_minutes": 117,
+      "genres": [
+        "Terror"
+      ]
+    }
+  ]
+}

@@ -40,7 +40,14 @@ cp .env.example .env
 ```
 
 Edite o `.env` e preencha `TMDB_READ_TOKEN` com o seu token de leitura do
-[TMDb](https://www.themoviedb.org/settings/api). Em seguida:
+[TMDb](https://www.themoviedb.org/settings/api).
+
+Sem token a aplicação continua funcionando: o catálogo cai automaticamente para um
+provedor local com filmes reais capturados do TMDb, o que permite avaliar o sistema
+inteiro sem criar conta em serviço nenhum. Para forçar esse modo, use
+`CATALOG_PROVIDER=fixture`.
+
+Em seguida:
 
 ```bash
 alembic upgrade head
@@ -83,5 +90,5 @@ execução. O container do PostgreSQL precisa estar de pé.
 
 ## Estado atual
 
-**Pronto:** autenticação com três papéis, autorização por papel, seed, migrations, 13 testes.
-**Em andamento:** integração com o catálogo TMDb e interface do front-end.
+**Pronto:** autenticação com três papéis, autorização por papel, seed, migrations, catálogo TMDb e 26 testes.
+**Em andamento:** interface do front-end.
