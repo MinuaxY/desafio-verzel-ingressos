@@ -1,0 +1,78 @@
+/*
+ * Sistema visual — "sala escura". Ver docs/decisoes.md, decisão D7.
+ *
+ * O pôster é a informação mais importante de uma sessão de cinema, e o TMDb
+ * entrega arte em alta resolução. Em fundo escuro essa arte vira a fonte de
+ * cor da tela e a interface sai da frente; em fundo claro os pôsteres brigam
+ * entre si e o resultado fica ruidoso.
+ *
+ * Por isso a paleta da interface é quase toda neutra, num preto levemente
+ * quente — preto puro com branco puro vibra e cansa. O âmbar fica reservado
+ * para ação: comprar, confirmar, validar. Se algo está em âmbar, é o próximo
+ * passo. Erro é a única outra cor com licença para aparecer.
+ */
+
+:root {
+  /* Superfícies, do fundo para a frente */
+  --bg:          #0c0b0d;
+  --surface:     #151317;
+  --surface-2:   #1f1c21;
+  --surface-3:   #2a262c;
+  --border:      #302c33;
+  --border-soft: #232027;
+
+  /* Texto — branco quente, cor de papel, nunca #fff puro */
+  --text:        #f3efe8;
+  --text-muted:  #a49d95;
+  --text-faint:  #6f6862;
+
+  /* Ação. Uma cor só, e ela significa "clique aqui" */
+  --accent:       #e3a44b;
+  --accent-hover: #f0b463;
+  --accent-press: #c98d38;
+  --accent-weak:  rgba(227, 164, 75, 0.12);
+  --on-accent:    #1a1206;
+
+  /* Estados */
+  --danger:      #e05a52;
+  --danger-weak: rgba(224, 90, 82, 0.12);
+  --success:     #64ad78;
+  --success-weak: rgba(100, 173, 120, 0.12);
+
+  /* Tipografia. Bricolage tem caráter no display; Archivo é neutra sem ser
+     Inter, que é a fonte que todo projeto gerado usa. */
+  --font-display: "Bricolage Grotesque", "Archivo", system-ui, sans-serif;
+  --font-body:    "Archivo", system-ui, -apple-system, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+
+  /* Escala tipográfica, razão 1.25 */
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.25rem;
+  --text-xl:   1.563rem;
+  --text-2xl:  1.953rem;
+  --text-3xl:  2.441rem;
+
+  /* Espaçamento, base 4px */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+  --space-10: 4rem;
+
+  /* Raio — contido. Card muito arredondado é marca do visual genérico. */
+  --radius-sm: 3px;
+  --radius:    6px;
+  --radius-lg: 10px;
+
+  /* Sombra. No escuro, profundidade vem mais de borda que de sombra. */
+  --shadow:    0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+
+  --ring: 0 0 0 3px var(--accent-weak);
+  --transition: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+}

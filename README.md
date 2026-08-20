@@ -60,7 +60,18 @@ A API sobe em `http://localhost:8000`. A documentação interativa fica em
 
 ### 3. Front-end
 
-Ainda não implementado — Sprint 1 em andamento.
+Em outro terminal:
+
+```bash
+cd web
+npm install
+cp .env.example .env
+npm run dev
+```
+
+A aplicação abre em `http://localhost:5173`. A tela de entrada traz botões de acesso
+rápido para as três contas de demonstração, para percorrer o sistema sem digitar
+credencial.
 
 ## Usuários de teste
 
@@ -90,5 +101,7 @@ execução. O container do PostgreSQL precisa estar de pé.
 
 ## Estado atual
 
-**Pronto:** autenticação com três papéis, autorização por papel, seed, migrations, catálogo TMDb e 26 testes.
-**Em andamento:** interface do front-end.
+**Sprint 1 concluída.** Autenticação com três papéis, autorização por papel no back e no
+front, catálogo TMDb com provedor trocável, seed, migrations, sistema visual e 26 testes.
+
+**Próxima:** publicação de sessões pelo organizador e vitrine para o cliente.
