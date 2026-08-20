@@ -1,0 +1,14 @@
+# Normaliza finais de linha no repositorio.
+# O trabalho e feito no Windows, mas o deploy roda em Linux: gravar CRLF no
+# repositorio quebra scripts dentro de container de um jeito dificil de achar.
+* text=auto eol=lf
+
+# Binarios nao devem ser tocados
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
