@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
-from app.models.room import Room, Sector
+from app.models.room import Room, SeatAttribute, Sector
 
 
 class RoomRepository:
@@ -34,7 +34,13 @@ class RoomRepository:
         sectors: list[dict],
     ) -> Room:
         room = Room(organizer_id=organizer_id, name=name, location=location)
-        room.sectors = [Sector(**s) for s in sectors]
+        room.sectors = [
+            Sector(
+                **{k: v for k, v in dados.items() if k != "special_seats"},
+                special_seats=[SeatAttribute(**a) for a in dados.get("special_seats", [])],
+            )
+            for dados in sectors
+        ]
         self.db.add(room)
         self.db.commit()
         self.db.refresh(room)

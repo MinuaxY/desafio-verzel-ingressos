@@ -8,6 +8,7 @@ O setor é geometria — onde ficam as poltronas VIP dentro da sala. O preço n�
 mora aqui: é decisão da sessão, porque a mesma sala tem preço de terça e preço
 de sábado. Ver decisão D12.
 """
+import enum
 import uuid
 from datetime import datetime, timezone
 
@@ -15,6 +16,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Enum as SAEnum,
     ForeignKey,
     Integer,
     String,
@@ -23,6 +25,26 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+
+class SeatKind(str, enum.Enum):
+    """Natureza de uma poltrona.
+
+    Salas de espetáculo no Brasil precisam oferecer lugares acessíveis (Lei
+    10.098 e NBR 9050). Isso é característica da poltrona, e não enfeite de
+    interface: se a marcação vivesse só no front, o sistema não teria registro
+    de que aquele lugar é reservado a quem precisa dele.
+
+    A poltrona comum não vira registro — ausência já significa STANDARD.
+
+    O sistema **não valida elegibilidade**: não há como conferir laudo por aqui,
+    e cinemas reais checam na entrada. Ver decisão D16.
+    """
+
+    WHEELCHAIR = "WHEELCHAIR"              # espaço para cadeira de rodas
+    COMPANION = "COMPANION"                # acompanhante, ao lado do espaço
+    OBESE = "OBESE"                        # assento largo
+    REDUCED_MOBILITY = "REDUCED_MOBILITY"  # mobilidade reduzida, junto ao corredor
 
 # Limites de sanidade. Uma sala real não tem 200 fileiras, e o mapa de assentos
 # precisa caber numa tela.
@@ -75,6 +97,11 @@ class Sector(Base):
     display_order: Mapped[int] = mapped_column(Integer, default=0)
 
     room: Mapped["Room"] = relationship(back_populates="sectors")
+    special_seats: Mapped[list["SeatAttribute"]] = relationship(
+        back_populates="sector",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     __table_args__ = (
         UniqueConstraint("room_id", "name", name="uq_setor_sala_nome"),
@@ -102,3 +129,39 @@ class Sector(Base):
             for fileira in range(self.rows)
             for numero in range(1, self.seats_per_row + 1)
         ]
+
+    def has_seat(self, seat_code: str) -> bool:
+        """A poltrona existe na geometria deste setor?
+
+        Impede marcar como acessível uma poltrona que não existe — G1 num setor
+        que só vai até a fileira F.
+        """
+        codigo = seat_code.strip().upper()
+        if len(codigo) < 2 or not codigo[1:].isdigit():
+            return False
+        fileira = ord(codigo[0]) - ord("A")
+        numero = int(codigo[1:])
+        return 0 <= fileira < self.rows and 1 <= numero <= self.seats_per_row
+
+
+class SeatAttribute(Base):
+    """Poltrona com característica especial dentro de um setor.
+
+    Só existe registro para poltrona que foge do comum: uma sala de 88 lugares
+    com seis assentos acessíveis guarda seis linhas, não 88.
+    """
+
+    __tablename__ = "seat_attributes"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    sector_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sectors.id", ondelete="CASCADE"), index=True
+    )
+    seat_code: Mapped[str] = mapped_column(String(4))
+    kind: Mapped[SeatKind] = mapped_column(SAEnum(SeatKind, name="seat_kind"))
+
+    sector: Mapped["Sector"] = relationship(back_populates="special_seats")
+
+    __table_args__ = (
+        UniqueConstraint("sector_id", "seat_code", name="uq_assento_setor_codigo"),
+    )

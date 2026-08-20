@@ -143,6 +143,37 @@ setor. O assento vira registro no banco no momento da compra.
 parcial** em (sessão, setor, poltrona), ignorando pedidos recusados. O banco recusa a venda
 dupla por definição, e um pagamento negado libera a poltrona sem trabalho extra.
 
+## D16 — Poltronas acessíveis fazem parte do modelo
+
+**Origem:** pergunta do Paulo em 20/08 — "considerou assentos especiais para deficientes e
+obesos, ou isso fica para o front?". Não tinha considerado; era ponto cego.
+
+**Descartado:** tratar como assunto de interface, desenhando um ícone diferente no mapa.
+Isso seria decoração: sem registro no banco, o sistema não teria como saber que aquele
+lugar é reservado a quem precisa dele, e nenhuma regra futura poderia se apoiar nisso.
+
+**Escolhido:** a poltrona acessível é característica da **sala**, marcada por código no
+cadastro do setor. Quatro naturezas: espaço para cadeira de rodas, poltrona de
+acompanhante, assento largo e lugar de mobilidade reduzida.
+
+**Por quê:** salas de espetáculo no Brasil têm exigência legal de lugares acessíveis
+(Lei 10.098 e NBR 9050). Um sistema de cinema que ignora isso está incompleto como
+produto, não apenas como código. O enunciado também convida explicitamente a incluir o
+que melhoraria a proposta, desde que explicado.
+
+**Só a exceção vira registro:** poltrona comum não gera linha. A sala de 88 lugares do
+seed guarda 10 registros, não 88.
+
+**Trava:** a poltrona precisa existir na geometria do setor. Marcar a G1 num setor que vai
+até a fileira F criaria um lugar que o sistema acha que existe e a sala não tem.
+
+**Fora de escopo, e por quê:**
+- **Validar elegibilidade** — não há como conferir laudo pelo sistema, e cinemas reais
+  checam na entrada. Marcar sem verificar é o comportamento do mundo real.
+- **Meia-entrada** — abriria uma frente de regra de preço que não cabe no prazo.
+
+Ambos vão ao README como limite consciente, não como esquecimento.
+
 ---
 
 ## Decisões pendentes

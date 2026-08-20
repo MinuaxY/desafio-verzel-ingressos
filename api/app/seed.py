@@ -23,7 +23,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower().replace("-", "") != "utf8
 from app.catalog.fixture import FixtureProvider  # noqa: E402
 from app.core.security import hash_password
 from app.db import SessionLocal
-from app.models.room import Room, Sector
+from app.models.room import Room, SeatAttribute, SeatKind, Sector
 from app.models.session import Session, SessionSectorPrice, SessionStatus
 from app.models.user import Role, User
 
@@ -41,8 +41,35 @@ SALA = {
     "location": "Av. Paulista, 1000 — São Paulo",
     "sectors": [
         # display_order cresce da tela para o fundo da sala.
-        {"name": "Plateia", "rows": 6, "seats_per_row": 12, "display_order": 0},
-        {"name": "VIP", "rows": 2, "seats_per_row": 8, "display_order": 1},
+        {
+            "name": "Plateia",
+            "rows": 6,
+            "seats_per_row": 12,
+            "display_order": 0,
+            # Fileira A, junto ao acesso: dois espaços para cadeira de rodas,
+            # cada um com a poltrona do acompanhante ao lado, mais dois assentos
+            # largos. A fileira F fica no corredor, para mobilidade reduzida.
+            "special_seats": [
+                ("A1", SeatKind.WHEELCHAIR),
+                ("A2", SeatKind.COMPANION),
+                ("A3", SeatKind.WHEELCHAIR),
+                ("A4", SeatKind.COMPANION),
+                ("A11", SeatKind.OBESE),
+                ("A12", SeatKind.OBESE),
+                ("F1", SeatKind.REDUCED_MOBILITY),
+                ("F12", SeatKind.REDUCED_MOBILITY),
+            ],
+        },
+        {
+            "name": "VIP",
+            "rows": 2,
+            "seats_per_row": 8,
+            "display_order": 1,
+            "special_seats": [
+                ("A1", SeatKind.WHEELCHAIR),
+                ("A2", SeatKind.COMPANION),
+            ],
+        },
     ],
 }
 
@@ -103,12 +130,28 @@ def run() -> None:
                 organizer_id=organizador.id,
                 name=SALA["name"],
                 location=SALA["location"],
-                sectors=[Sector(**s) for s in SALA["sectors"]],
+                sectors=[
+                    Sector(
+                        name=s["name"],
+                        rows=s["rows"],
+                        seats_per_row=s["seats_per_row"],
+                        display_order=s["display_order"],
+                        special_seats=[
+                            SeatAttribute(seat_code=codigo, kind=tipo)
+                            for codigo, tipo in s["special_seats"]
+                        ],
+                    )
+                    for s in SALA["sectors"]
+                ],
             )
             db.add(sala)
             db.commit()
             db.refresh(sala)
-            criados.append(f"sala {sala.name} ({sala.capacity} lugares)")
+            acessiveis = sum(len(s.special_seats) for s in sala.sectors)
+            criados.append(
+                f"sala {sala.name} ({sala.capacity} lugares, "
+                f"{acessiveis} acessíveis)"
+            )
         else:
             existentes.append(f"sala {sala.name}")
 

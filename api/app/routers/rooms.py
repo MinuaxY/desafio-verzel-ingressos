@@ -8,7 +8,12 @@ from app.core.deps import require_role
 from app.db import get_db
 from app.models.user import Role, User
 from app.schemas.room import RoomIn, RoomOut
-from app.services.room_service import RoomNameAlreadyUsed, RoomNotFound, RoomService
+from app.services.room_service import (
+    RoomNameAlreadyUsed,
+    RoomNotFound,
+    RoomService,
+    SeatOutsideSector,
+)
 
 router = APIRouter(
     prefix="/rooms",
@@ -35,6 +40,11 @@ def criar(
         return RoomOut.model_validate(RoomService(db).criar(user.id, dados))
     except RoomNameAlreadyUsed:
         raise HTTPException(status.HTTP_409_CONFLICT, "Você já tem uma sala com esse nome")
+    except SeatOutsideSector as e:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"O setor {e.setor} não tem estas poltronas: {', '.join(e.codigos)}",
+        )
 
 
 @router.get("/{room_id}", response_model=RoomOut)
