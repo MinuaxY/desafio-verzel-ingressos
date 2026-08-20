@@ -87,6 +87,62 @@ passa a ser exigida no momento da **reserva**, não da navegação.
 foi publicado como sessão, não a busca no fornecedor externo — a chave da API externa
 não deve ser gasta por tráfego anônimo.
 
+## D11 — Sala reutilizável, com setores
+
+**Alternativa:** layout definido em cada sessão (fileiras e poltronas digitadas na criação).
+**Escolhido:** a sala é cadastrada uma vez, com seus setores, e reaproveitada por quantas
+sessões o organizador quiser.
+**Por quê:** com o layout na sessão, cada nova sessão exigiria redigitar a geometria — e,
+pior, duas sessões da mesma sala poderiam divergir por erro de digitação, sem nada no
+sistema impedindo. O custo é uma tabela e um CRUD a mais; a alternativa cobraria esse
+preço em dado inconsistente.
+**Consequência na interface:** o fluxo de criar sessão precisa de um atalho para cadastrar
+sala nova, para não obrigar o organizador a sair do caminho quando a sala não existe ainda.
+
+## D12 — Preço por setor, definido na sessão
+
+**Escolhido:** o setor pertence à **sala** e descreve geometria — onde ficam as poltronas
+VIP. O preço pertence à **sessão**.
+**Por quê:** a mesma sala tem preço de terça e preço de sábado. Guardar o valor no setor
+obrigaria a duplicar salas só para variar preço.
+**Trava associada:** publicar exige preço para **todos** os setores da sala. Sem isso a
+sessão iria ao ar com um setor sem valor, e o erro só apareceria quando alguém tentasse
+comprar aquela poltrona.
+
+## D13 — A sessão guarda uma cópia dos dados do filme
+
+**Descartado:** guardar só o id do TMDb e consultar a API a cada exibição.
+**Escolhido:** título, sinopse, pôster, duração e ano são copiados para a sessão no momento
+da criação, ao lado do id de origem.
+**Por quê:** ingresso é documento, não consulta ao vivo. Se o TMDb sair do ar, mudar o
+título traduzido ou trocar o pôster, o ingresso que alguém comprou precisa continuar
+mostrando o que foi vendido. Como efeito colateral, a vitrine não depende de rede externa
+para renderizar.
+**Custo aceito:** dado duplicado que não acompanha correções feitas no catálogo. É o
+comportamento desejado — o que foi vendido não deve mudar sozinho.
+
+## D14 — Dinheiro em centavos inteiros, tempo sempre com fuso
+
+**Dinheiro:** valores trafegam e são gravados como **centavos inteiros**, nunca float.
+`0.1 + 0.2` não dá `0.3` em ponto flutuante, e esse erro aparece no centavo depois que já
+existe ingresso emitido — quando corrigir significa mexer em dado vendido.
+
+**Tempo:** todo horário é gravado com fuso. Sessão de cinema é hora local, e o horário sem
+fuso é ambíguo. A API **recusa** horário sem fuso na entrada, em vez de assumir um e gravar
+errado.
+
+Ambas são baratas agora e caras depois: mudar exige reescrever dados existentes.
+
+## D15 — Assento derivado da geometria, não pré-criado
+
+**Descartado:** gerar uma linha por poltrona quando a sessão é criada — 88 registros por
+sessão que só interessam se alguém comprar.
+**Escolhido:** o código da poltrona (A1, A2, B1…) é derivado das fileiras e poltronas do
+setor. O assento vira registro no banco no momento da compra.
+**Consequência para a Sprint 3:** a garantia de não vender duas vezes será um **índice único
+parcial** em (sessão, setor, poltrona), ignorando pedidos recusados. O banco recusa a venda
+dupla por definição, e um pagamento negado libera a poltrona sem trabalho extra.
+
 ---
 
 ## Decisões pendentes
