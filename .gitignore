@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Ambiente
+.env
+*.local
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Editor / SO
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
