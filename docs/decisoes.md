@@ -61,6 +61,32 @@ O desafio é explícito sobre fugir do visual genérico de projeto gerado por IA
 
 O ambiente roda Python 3.14, versão em que a combinação `passlib` + `bcrypt` é conhecida por quebrar. Uso direto da biblioteca `bcrypt`, que é o que o `passlib` faria por baixo, sem a camada intermediária.
 
+## D10 — Vitrine pública e landing na raiz
+
+**Contexto:** hoje `/` apenas redireciona para o login, e toda a aplicação vive atrás de
+autenticação. A landing pretendida mostra cartazes das sessões em cartaz como prévia,
+com Entrar e Criar conta no canto superior direito.
+
+**Consequência que não é óbvia:** para exibir sessões a quem não tem conta, a listagem
+precisa ser **pública**. Isso muda uma premissa da Sprint 2, que nasceria restrita ao
+cliente autenticado.
+
+**Escolhido:** a vitrine de sessões publicadas é aberta desde a Sprint 2. Autenticação
+passa a ser exigida no momento da **reserva**, não da navegação.
+
+**Por quê:**
+- É como o domínio real funciona. Ingresso.com, Sympla e Eventim mostram o catálogo a
+  qualquer visitante e só pedem conta na hora de comprar. Exigir login para *olhar* é
+  atrito sem contrapartida.
+- O enunciado pede "navegação e busca pelos eventos publicados" sem condicionar a estar
+  autenticado.
+- Decidir agora custa nada; decidir na Sprint 5 significaria abrir endpoints já escritos
+  fechados, mexer em testes e refazer a navegação do front.
+
+**Atenção:** o catálogo TMDb continua restrito ao organizador (D8). Público é o que já
+foi publicado como sessão, não a busca no fornecedor externo — a chave da API externa
+não deve ser gasta por tráfego anônimo.
+
 ---
 
 ## Decisões pendentes
