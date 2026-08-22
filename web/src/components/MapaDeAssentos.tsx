@@ -33,7 +33,10 @@ export function MapaDeAssentos({
   const cheio = escolhidos.length >= maximo;
 
   return (
-    <div className="stack" style={{ gap: "var(--space-6)" }}>
+    // A sala tem a largura do conteúdo e é centralizada: assim a tela fica
+    // sobre as poltronas, e não sobre o container inteiro. Um mapa alinhado à
+    // esquerda com a tela ao centro não corresponde a sala nenhuma.
+    <div className="sala">
       <div className="tela" aria-hidden="true">
         <span>TELA</span>
       </div>
@@ -48,6 +51,9 @@ export function MapaDeAssentos({
           <div className="setor__grade" role="group" aria-label={`Poltronas do setor ${setor.name}`}>
             {agrupaPorFileira(setor).map(([fileira, assentos]) => (
               <div key={fileira} className="fileira">
+                {/* A letra aparece nas duas pontas, como em sala de verdade.
+                    Além de ser o costume, mantém as poltronas centradas — com
+                    a letra só à esquerda, a fileira inteira ficava deslocada. */}
                 <span className="fileira__letra" aria-hidden="true">
                   {fileira}
                 </span>
@@ -82,6 +88,9 @@ export function MapaDeAssentos({
                     </button>
                   );
                 })}
+                <span className="fileira__letra" aria-hidden="true">
+                  {fileira}
+                </span>
               </div>
             ))}
           </div>
