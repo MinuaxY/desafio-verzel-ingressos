@@ -94,6 +94,7 @@ export interface Sector {
   display_order: number;
   capacity: number;
   special_seats: SpecialSeat[];
+  aisles: number[];
 }
 
 export interface Room {
@@ -168,6 +169,8 @@ export interface SectorMap {
   seats_per_row: number;
   display_order: number;
   price_cents: number;
+  /** Posições depois das quais há corredor. [3, 9] = blocos de 3, 6 e 3. */
+  aisles: number[];
   seats: Seat[];
 }
 

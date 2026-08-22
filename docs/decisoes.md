@@ -318,6 +318,29 @@ O azul separa esse estado dos outros dois sem competir com o âmbar, que na inte
 significa ação. Os três estados ficam inconfundíveis: neutro escuro é livre, âmbar é escolhido,
 azul com gente é ocupado — e nenhum depende de distinguir matiz para ser lido.
 
+## D25 — Corredores são dado da sala, não regra visual
+
+**Pedido do Paulo em 22/08:** "corredores entre blocos seria o ideal, daria a impressão real
+de como é a sala para o cliente, mesmo vendo apenas o layout no site".
+
+**Descartado:** dividir os blocos por uma regra fixa no front — a cada N poltronas, por
+exemplo. Seria mais barato, mas produziria o mesmo desenho para salas diferentes, e o ponto
+é justamente representar a sala que existe.
+
+**Escolhido:** cada setor guarda as posições dos corredores. `[3, 9]` numa fileira de 12
+poltronas produz blocos de 3, 6 e 3. O organizador define no cadastro da sala, e o formulário
+mostra em tempo real como a fileira vai ficar dividida.
+
+**Por que importa:** o corredor é o que transforma uma grade em planta. Com ele, quem está
+comprando vê que a poltrona escolhida fica na ponta, junto da passagem — informação que muda
+a escolha do lugar, e que uma grade uniforme esconde.
+
+**No desenho:** o vão entre blocos é três vezes o vão entre poltronas vizinhas. Menos que isso
+o olho lê como espaçamento, não como passagem.
+
+**Trava:** corredor na posição 0 ou na última poltrona é recusado. Não separaria nada — seria
+um espaço na borda do bloco.
+
 ---
 
 ## Decisões pendentes

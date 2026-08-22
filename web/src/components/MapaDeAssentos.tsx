@@ -8,7 +8,7 @@ import { reais } from "../lib/formato";
  * Marcar poltrona vendida com símbolo abstrato — risco, hachura, X — sempre
  * exigiu um segundo de tradução. A figura de uma pessoa não exige nenhum: o
  * lugar está ocupado porque tem alguém nele. É o que os mapas de assento de
- * cinema usam, e por esse motivo.
+ * cinema usam, e por esse motivo. Ver decisão D24.
  */
 function Ocupante() {
   return (
@@ -28,10 +28,13 @@ export interface Escolha {
 /**
  * Mapa da sala.
  *
+ * A tela fica embaixo e as fileiras crescem para cima — é como se lê uma
+ * planta de sala, e é a convenção dos sites de cinema. A fileira A é a mais
+ * próxima da tela. Ver decisão D23.
+ *
  * As poltronas acessíveis são marcadas com sigla e borda tracejada, além da
  * cor: quem não distingue matiz precisa achá-las igual, e uma interface de
- * acessibilidade que depende de cor é inacessível por construção.
- * Ver decisão D16.
+ * acessibilidade que depende de cor é inacessível por construção. Ver D16.
  */
 export function MapaDeAssentos({
   setores,
@@ -49,11 +52,8 @@ export function MapaDeAssentos({
 
   const cheio = escolhidos.length >= maximo;
 
-  /* A tela fica embaixo, e as fileiras crescem para cima — é como se olha uma
-     planta de sala, e é a convenção dos sites de cinema. A fileira A é a mais
-     próxima da tela; quanto mais alto no desenho, mais ao fundo da sala.
-     Por isso os setores são desenhados do fundo para a frente, e as fileiras
-     de cada um em ordem decrescente. */
+  // Os setores são desenhados do fundo para a frente, e as fileiras de cada um
+  // em ordem decrescente, para que a fileira A termine junto da tela.
   const doFundoParaTela = [...setores].sort((a, b) => b.display_order - a.display_order);
 
   return (
@@ -76,52 +76,59 @@ export function MapaDeAssentos({
                   {/* A letra aparece nas duas pontas, como em sala de verdade.
                       Além de ser o costume, mantém as poltronas centradas — com
                       a letra só à esquerda, a fileira inteira ficava deslocada. */}
-                <span className="fileira__letra" aria-hidden="true">
-                  {fileira}
-                </span>
-                {assentos.map((assento) => {
-                  const marcado = selecionado(setor.id, assento.code);
-                  const bloqueado = assento.taken || (cheio && !marcado);
-                  const tipo = assento.kind ? ASSENTO[assento.kind] : null;
+                  <span className="fileira__letra" aria-hidden="true">
+                    {fileira}
+                  </span>
 
-                  return (
-                    <button
-                      key={assento.code}
-                      type="button"
-                      className={[
-                        "poltrona",
-                        assento.taken && "poltrona--ocupada",
-                        marcado && "poltrona--escolhida",
-                        assento.kind && "poltrona--acessivel",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      disabled={bloqueado}
-                      aria-pressed={marcado}
-                      aria-label={
-                        `Poltrona ${assento.code}, ${setor.name}` +
-                        (tipo ? `, ${tipo.rotulo}` : "") +
-                        (assento.taken ? ", ocupada" : `, ${reais(setor.price_cents)}`)
-                      }
-                      title={tipo?.rotulo}
-                      onClick={() => onAlternar(setor, assento)}
-                    >
-                      {/* Ocupada mostra a silhueta, não o número: o que
-                          interessa numa poltrona vendida é que já tem alguém
-                          nela. O número segue no rótulo do leitor de tela. */}
-                      {assento.taken ? (
-                        <Ocupante />
-                      ) : tipo ? (
-                        tipo.sigla
-                      ) : (
-                        assento.code.replace(/^[A-Z]/, "")
-                      )}
-                    </button>
-                  );
-                })}
-                <span className="fileira__letra" aria-hidden="true">
-                  {fileira}
-                </span>
+                  {emBlocos(assentos, setor.aisles).map((bloco, indice) => (
+                    <span className="bloco" key={indice}>
+                      {bloco.map((assento) => {
+                        const marcado = selecionado(setor.id, assento.code);
+                        const bloqueado = assento.taken || (cheio && !marcado);
+                        const tipo = assento.kind ? ASSENTO[assento.kind] : null;
+
+                        return (
+                          <button
+                            key={assento.code}
+                            type="button"
+                            className={[
+                              "poltrona",
+                              assento.taken && "poltrona--ocupada",
+                              marcado && "poltrona--escolhida",
+                              assento.kind && "poltrona--acessivel",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            disabled={bloqueado}
+                            aria-pressed={marcado}
+                            aria-label={
+                              `Poltrona ${assento.code}, ${setor.name}` +
+                              (tipo ? `, ${tipo.rotulo}` : "") +
+                              (assento.taken ? ", ocupada" : `, ${reais(setor.price_cents)}`)
+                            }
+                            title={tipo?.rotulo}
+                            onClick={() => onAlternar(setor, assento)}
+                          >
+                            {/* Ocupada mostra a silhueta, não o número: o que
+                                interessa numa poltrona vendida é que já tem
+                                alguém nela. O número segue no rótulo do leitor
+                                de tela. */}
+                            {assento.taken ? (
+                              <Ocupante />
+                            ) : tipo ? (
+                              tipo.sigla
+                            ) : (
+                              assento.code.replace(/^[A-Z]/, "")
+                            )}
+                          </button>
+                        );
+                      })}
+                    </span>
+                  ))}
+
+                  <span className="fileira__letra" aria-hidden="true">
+                    {fileira}
+                  </span>
                 </div>
               ))}
           </div>
@@ -145,6 +152,30 @@ function agrupaPorFileira(setor: SectorMap): [string, Seat[]][] {
     mapa.get(fileira)!.push(assento);
   }
   return [...mapa.entries()];
+}
+
+/**
+ * Divide a fileira nos blocos separados por corredor.
+ *
+ * Sem isso o mapa é uma grade uniforme; com isso vira planta de sala, e quem
+ * compra consegue ver que a poltrona escolhida fica na ponta, junto da
+ * passagem — informação que muda a escolha do lugar. Ver decisão D25.
+ */
+function emBlocos(assentos: Seat[], aisles: number[]): Seat[][] {
+  const cortes = [...new Set(aisles ?? [])]
+    .filter((c) => c > 0 && c < assentos.length)
+    .sort((a, b) => a - b);
+
+  if (cortes.length === 0) return [assentos];
+
+  const blocos: Seat[][] = [];
+  let inicio = 0;
+  for (const corte of cortes) {
+    blocos.push(assentos.slice(inicio, corte));
+    inicio = corte;
+  }
+  blocos.push(assentos.slice(inicio));
+  return blocos.filter((b) => b.length > 0);
 }
 
 function Legenda() {

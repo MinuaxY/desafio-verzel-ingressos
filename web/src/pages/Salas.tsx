@@ -11,10 +11,30 @@ interface SetorForm {
   name: string;
   rows: string;
   seats_per_row: string;
+  aisles: string;
   special: { seat_code: string; kind: SeatKind }[];
 }
 
-const SETOR_VAZIO: SetorForm = { name: "", rows: "6", seats_per_row: "12", special: [] };
+const SETOR_VAZIO: SetorForm = {
+  name: "",
+  rows: "6",
+  seats_per_row: "12",
+  aisles: "3, 9",
+  special: [],
+};
+
+/** Lê "3, 9" como [3, 9]. Aceita separador solto porque quem digita está
+ *  descrevendo uma sala, não preenchendo um formato. */
+function leCorredores(texto: string, poltronasPorFileira: number): number[] {
+  return [
+    ...new Set(
+      texto
+        .split(/[^\d]+/)
+        .map((n) => Number(n))
+        .filter((n) => n > 0 && n < poltronasPorFileira),
+    ),
+  ].sort((a, b) => a - b);
+}
 
 export function Salas() {
   const [salas, setSalas] = useState<Room[] | null>(null);
@@ -70,6 +90,7 @@ export function Salas() {
             seats_per_row: Number(s.seats_per_row),
             display_order: i,
             special_seats: s.special,
+            aisles: leCorredores(s.aisles, Number(s.seats_per_row) || 0),
           })),
         },
       });
@@ -172,6 +193,32 @@ export function Salas() {
                     onChange={(e) => atualizaSetor(i, { seats_per_row: e.target.value })}
                   />
                 </div>
+
+                <Campo
+                  label="Corredores"
+                  name={`corredores-${i}`}
+                  placeholder="3, 9"
+                  value={setor.aisles}
+                  onChange={(e) => atualizaSetor(i, { aisles: e.target.value })}
+                />
+                <p className="faint" style={{ fontSize: "var(--text-xs)", marginTop: "-8px" }}>
+                  Posições depois das quais há passagem. Com {setor.seats_per_row || "?"} poltronas
+                  e corredores em {leCorredores(setor.aisles, Number(setor.seats_per_row) || 0).join(", ") || "nenhum"},
+                  a fileira fica em blocos de{" "}
+                  {(() => {
+                    const total = Number(setor.seats_per_row) || 0;
+                    const cortes = leCorredores(setor.aisles, total);
+                    const blocos: number[] = [];
+                    let anterior = 0;
+                    for (const c of cortes) {
+                      blocos.push(c - anterior);
+                      anterior = c;
+                    }
+                    blocos.push(total - anterior);
+                    return blocos.filter((b) => b > 0).join(" · ");
+                  })()}
+                  . Deixe vazio para um bloco só.
+                </p>
 
                 <details className="acessiveis">
                   <summary>

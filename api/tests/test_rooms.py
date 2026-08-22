@@ -189,3 +189,86 @@ class TestNumeracaoContinua:
         base["sectors"][1]["special_seats"] = [{"seat_code": "D1", "kind": "WHEELCHAIR"}]
         base["name"] = "Sala Deslocada 2"
         assert client.post("/rooms", json=base, headers=headers).status_code == 201
+
+
+class TestCorredores:
+    """Corredores separam blocos de poltronas.
+
+    Sem eles o mapa e uma grade uniforme; com eles vira planta de sala, e quem
+    compra ve que o lugar escolhido fica na ponta, junto da passagem.
+    Ver decisao D25.
+    """
+
+    def test_corredores_sao_gravados(self, client):
+        sala = {
+            "name": "Sala Corredor",
+            "sectors": [
+                {"name": "Plateia", "rows": 3, "seats_per_row": 12, "aisles": [3, 9]},
+            ],
+        }
+        r = client.post("/rooms", json=sala, headers=auth(client, ORGANIZADOR))
+        assert r.status_code == 201
+        assert r.json()["sectors"][0]["aisles"] == [3, 9]
+
+    def test_sem_corredor_e_um_bloco_so(self, client):
+        sala = {
+            "name": "Sala Inteira",
+            "sectors": [{"name": "Plateia", "rows": 2, "seats_per_row": 8}],
+        }
+        r = client.post("/rooms", json=sala, headers=auth(client, ORGANIZADOR))
+        assert r.status_code == 201
+        assert r.json()["sectors"][0]["aisles"] == []
+
+    @pytest.mark.parametrize("posicao", [0, 12, 20, -1])
+    def test_corredor_fora_da_fileira_e_recusado(self, client, posicao):
+        """Corredor na posicao 0 ou na ultima poltrona nao separa nada — seria
+        um espaco na borda do bloco, nao uma passagem."""
+        sala = {
+            "name": f"Sala Invalida {posicao}",
+            "sectors": [
+                {"name": "Plateia", "rows": 2, "seats_per_row": 12, "aisles": [posicao]},
+            ],
+        }
+        r = client.post("/rooms", json=sala, headers=auth(client, ORGANIZADOR))
+        assert r.status_code == 422
+
+    def test_blocos_derivados_da_geometria(self):
+        """12 poltronas com corredores em 3 e 9 viram blocos de 3, 6 e 3."""
+        from app.models.room import Sector
+
+        assert Sector(rows=1, seats_per_row=12, aisles=[3, 9]).blocks == [3, 6, 3]
+        assert Sector(rows=1, seats_per_row=8, aisles=[4]).blocks == [4, 4]
+        assert Sector(rows=1, seats_per_row=10, aisles=[]).blocks == [10]
+        # Repetido e fora de ordem nao atrapalham.
+        assert Sector(rows=1, seats_per_row=10, aisles=[5, 5, 2]).blocks == [2, 3, 5]
+
+    def test_corredores_aparecem_no_mapa_publico(self, client):
+        from datetime import datetime, timedelta, timezone
+
+        from app.catalog.fixture import FixtureProvider
+
+        headers = auth(client, ORGANIZADOR)
+        sala = client.post(
+            "/rooms",
+            json={
+                "name": "Sala Mapa",
+                "sectors": [{"name": "Plateia", "rows": 2, "seats_per_row": 12, "aisles": [3, 9]}],
+            },
+            headers=headers,
+        ).json()
+
+        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
+        sessao = client.post(
+            "/organizer/sessions",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "starts_at": quando.isoformat(),
+                "prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 3000}],
+                "publish": True,
+            },
+            headers=headers,
+        ).json()
+
+        mapa = client.get(f"/sessions/{sessao['id']}/seats").json()
+        assert mapa["sectors"][0]["aisles"] == [3, 9]

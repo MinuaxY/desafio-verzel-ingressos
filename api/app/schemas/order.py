@@ -31,6 +31,7 @@ class SectorMapOut(BaseModel):
     seats_per_row: int
     display_order: int
     price_cents: int
+    aisles: list[int]
     seats: list[SeatOut]
 
 
@@ -226,6 +227,7 @@ def to_seat_map(sessao, ocupados: set) -> SeatMapOut:
                 seats_per_row=setor.seats_per_row,
                 display_order=setor.display_order,
                 price_cents=precos.get(setor.id, 0),
+                aisles=sorted(setor.aisles or []),
                 seats=assentos,
             )
         )

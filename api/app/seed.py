@@ -52,6 +52,9 @@ SALA = {
             "rows": 6,
             "seats_per_row": 12,
             "display_order": 0,
+            # Dois corredores, deixando blocos de 3, 6 e 3 — o desenho de sala
+            # media, com passagem lateral dos dois lados.
+            "aisles": [3, 9],
             # Posicao relativa ao setor: (fileira, poltrona, tipo). A letra e
             # calculada a partir do deslocamento da sala, e nao escrita a mao —
             # fixar "A1" quebrou quando as fileiras passaram a ser continuas e
@@ -77,6 +80,9 @@ SALA = {
             "rows": 2,
             "seats_per_row": 8,
             "display_order": 1,
+            # Bloco unico com passagem central: o VIP e mais estreito e fica
+            # ao fundo, alinhado ao miolo da plateia.
+            "aisles": [4],
             "special_seats": [
                 (0, 1, SeatKind.WHEELCHAIR),
                 (0, 2, SeatKind.COMPANION),
@@ -123,6 +129,7 @@ def _monta_setores() -> list[Sector]:
                 rows=s["rows"],
                 seats_per_row=s["seats_per_row"],
                 display_order=s["display_order"],
+                aisles=s.get("aisles", []),
                 special_seats=[
                     SeatAttribute(
                         seat_code=f"{chr(ord('A') + offset + fileira)}{numero}", kind=tipo

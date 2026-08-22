@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -96,6 +97,14 @@ class Sector(Base):
     # Ordem de exibição no mapa, da tela para o fundo da sala.
     display_order: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Corredores: posições depois das quais há passagem. [3, 9] numa fileira de
+    # 12 poltronas produz blocos de 3, 6 e 3.
+    #
+    # É dado da sala, e não regra visual fixa, porque cada sala tem os seus
+    # onde realmente estão — e é o corredor que faz o mapa parecer uma planta
+    # em vez de uma grade. Ver decisão D25.
+    aisles: Mapped[list[int]] = mapped_column(ARRAY(Integer), default=list)
+
     room: Mapped["Room"] = relationship(back_populates="sectors")
     special_seats: Mapped[list["SeatAttribute"]] = relationship(
         back_populates="sector",
@@ -134,6 +143,20 @@ class Sector(Base):
             if (s.display_order, s.name) < (self.display_order, self.name)
         ]
         return sum(s.rows for s in anteriores)
+
+    @property
+    def blocks(self) -> list[int]:
+        """Tamanho de cada bloco de poltronas na fileira, na ordem.
+
+        Com 12 poltronas e corredores em [3, 9], devolve [3, 6, 3].
+        """
+        cortes = sorted({c for c in (self.aisles or []) if 0 < c < self.seats_per_row})
+        tamanhos, anterior = [], 0
+        for corte in cortes:
+            tamanhos.append(corte - anterior)
+            anterior = corte
+        tamanhos.append(self.seats_per_row - anterior)
+        return tamanhos
 
     @property
     def row_letters(self) -> list[str]:

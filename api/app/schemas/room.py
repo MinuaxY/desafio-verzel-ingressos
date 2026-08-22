@@ -1,7 +1,7 @@
 """Contratos de sala e setor."""
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.room import MAX_FILEIRAS, MAX_POLTRONAS_POR_FILEIRA, SeatKind
 
@@ -32,6 +32,10 @@ class SectorIn(BaseModel):
         default_factory=list,
         description="Poltronas acessiveis. Ausencia significa poltrona comum.",
     )
+    aisles: list[int] = Field(
+        default_factory=list,
+        description="Corredores: posicoes depois das quais ha passagem. Ex.: [3, 9]",
+    )
 
     @field_validator("name")
     @classmethod
@@ -46,6 +50,18 @@ class SectorIn(BaseModel):
             raise ValueError("A mesma poltrona foi marcada mais de uma vez")
         return v
 
+    @model_validator(mode="after")
+    def corredores_dentro_da_fileira(self) -> "SectorIn":
+        """Corredor na posicao 0 ou na ultima poltrona nao separa nada — seria
+        um espaco na borda do bloco, nao uma passagem."""
+        fora = [c for c in self.aisles if not 0 < c < self.seats_per_row]
+        if fora:
+            raise ValueError(
+                f"Corredores precisam ficar entre 1 e {self.seats_per_row - 1}: "
+                f"{', '.join(map(str, fora))}"
+            )
+        return self
+
 
 class SectorOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -57,6 +73,7 @@ class SectorOut(BaseModel):
     display_order: int
     capacity: int
     special_seats: list[SpecialSeatOut]
+    aisles: list[int]
 
 
 class RoomIn(BaseModel):
