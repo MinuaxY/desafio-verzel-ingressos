@@ -95,6 +95,33 @@ class RoomIn(BaseModel):
         return v
 
 
+class RoomUpdate(BaseModel):
+    """Alteração parcial. Campo ausente fica como está.
+
+    `sectors` só é aceito enquanto a sala não tiver nenhuma sessão. Ver
+    decisão D29.
+    """
+
+    name: str | None = Field(None, min_length=1, max_length=80)
+    location: str | None = Field(None, max_length=160)
+    sectors: list[SectorIn] | None = Field(None, min_length=1)
+
+    @field_validator("name")
+    @classmethod
+    def limpa_nome(cls, v: str | None) -> str | None:
+        return v.strip() if v else v
+
+    @field_validator("sectors")
+    @classmethod
+    def nomes_de_setor_unicos(cls, v: list[SectorIn] | None) -> list[SectorIn] | None:
+        if v is None:
+            return v
+        nomes = [s.name.casefold() for s in v]
+        if len(nomes) != len(set(nomes)):
+            raise ValueError("Os setores da sala precisam ter nomes diferentes")
+        return v
+
+
 class RoomOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

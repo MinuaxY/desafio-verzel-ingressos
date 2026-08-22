@@ -51,3 +51,29 @@ class RoomRepository:
         self.db.commit()
         self.db.refresh(room)
         return room
+
+    def delete(self, room: Room) -> None:
+        self.db.delete(room)
+        self.db.commit()
+
+    def save(self, room: Room) -> Room:
+        self.db.commit()
+        self.db.refresh(room)
+        return room
+
+    def replace_sectors(self, room: Room, sectors: list[dict]) -> None:
+        """Troca a geometria inteira.
+
+        Os antigos são removidos e descarregados antes de inserir os novos: o
+        indice unico de (sala, nome do setor) recusaria a operacao se um nome
+        se repetisse entre a lista velha e a nova.
+        """
+        room.sectors.clear()
+        self.db.flush()
+        room.sectors = [
+            Sector(
+                **{k: v for k, v in dados.items() if k != "special_seats"},
+                special_seats=[SeatAttribute(**a) for a in dados.get("special_seats", [])],
+            )
+            for dados in sectors
+        ]

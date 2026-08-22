@@ -29,12 +29,18 @@ function pagina(itens: SessionListItem[]): SessionPage {
   return { items: itens, total: itens.length, page: 1, total_pages: 1 };
 }
 
-function respondeCom(corpo: unknown) {
-  const fetchFalso = vi.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    json: async () => corpo,
-  } as Response);
+/** A vitrine faz duas chamadas: a lista de sessões e os dias que têm sessão,
+ *  para a barra de datas. Um mock que responde a mesma coisa para as duas
+ *  entregaria uma página onde o componente espera uma lista. */
+function respondeCom(corpo: unknown, dias: { date: string; total: number }[] = []) {
+  const fetchFalso = vi.fn((url: string, opcoes?: RequestInit) =>
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => (String(url).includes("/sessions/days") ? dias : corpo),
+      _opcoes: opcoes,
+    } as unknown as Response),
+  );
   vi.stubGlobal("fetch", fetchFalso);
   return fetchFalso;
 }
@@ -98,8 +104,32 @@ describe("vitrine com sessões", () => {
     monta();
 
     await screen.findByText("A Odisseia");
-    const [, opcoes] = fetchFalso.mock.calls[0];
-    expect(opcoes.headers.Authorization).toBeUndefined();
+    for (const [, opcoes] of fetchFalso.mock.calls) {
+      const cabecalhos = (opcoes?.headers ?? {}) as Record<string, string>;
+      expect(cabecalhos.Authorization).toBeUndefined();
+    }
+  });
+});
+
+describe("barra de dias", () => {
+  it("aparece quando há dias com sessão", async () => {
+    const amanha = new Date();
+    amanha.setDate(amanha.getDate() + 1);
+    const iso = amanha.toISOString().slice(0, 10);
+
+    respondeCom(pagina([sessao()]), [{ date: iso, total: 1 }]);
+    monta();
+
+    await screen.findByText("A Odisseia");
+    expect(await screen.findByRole("button", { name: /todos/i })).toBeInTheDocument();
+  });
+
+  it("não aparece quando não há sessão nenhuma à frente", async () => {
+    respondeCom(pagina([sessao()]), []);
+    monta();
+
+    await screen.findByText("A Odisseia");
+    expect(screen.queryByRole("button", { name: /todos os dias/i })).not.toBeInTheDocument();
   });
 });
 
@@ -123,7 +153,9 @@ describe("busca", () => {
     await userEvent.click(screen.getByRole("button", { name: "Buscar" }));
 
     await waitFor(() => {
-      const urls = fetchFalso.mock.calls.map(([url]) => String(url));
+      const urls = fetchFalso.mock.calls
+        .map(([url]) => String(url))
+        .filter((u) => !u.includes("/days"));
       expect(urls.some((u) => u.includes("busca=toy"))).toBe(true);
     });
   });

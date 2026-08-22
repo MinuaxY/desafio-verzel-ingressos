@@ -379,6 +379,62 @@ operacional. A decisão correta seria anonimizar, e isso é discussão de produt
 substituem uma passada dedicada no fim. As quatro correções eram baratas e nenhuma teria
 aparecido sem alguém perguntar.
 
+## D27 — Repetir sessão: dias escolhidos, não regra
+
+**Pedido do Paulo em 22/08:** criar a mesma sessão em vários dias sem repetir o formulário
+inteiro.
+
+**Descartado:** uma regra do tipo "toda sexta até tal data". Programação de cinema não é
+regular — um filme roda de quinta a domingo numa semana e só no fim de semana na seguinte —,
+e uma regra que não cobre isso obrigaria a apagar depois o que ela criou a mais.
+
+**Escolhido:** o organizador marca os dias num calendário de quatro semanas, com atalhos para
+os casos comuns ("toda sexta", "sextas, sábados e domingos"). O dia do horário principal já
+vem marcado e travado: desmarcá-lo ali não cancelaria a sessão, só confundiria.
+
+**Conflito não aborta o lote.** Dia em que a sala já está ocupada é pulado, e volta na
+resposta com o motivo. Recusar tudo por causa de um dia jogaria fora o trabalho de escolher
+os outros nove. Quando **nada** é criado, a tela mostra a lista em vez de navegar — senão o
+organizador sairia achando que deu certo.
+
+**Teto de 60 datas:** sem limite, um engano criaria centenas de sessões.
+
+## D28 — Apagar de vez ou desativar depende do histórico
+
+**Pedido:** poder excluir salas e sessões, sem permitir excluir sala em uso.
+
+O caso não é um só, e tratar tudo como "excluir" perderia informação:
+
+**Sala sem nenhuma sessão** é apagada de verdade. Não há histórico a preservar, e deixá-la
+desativada só acumularia lixo na lista.
+
+**Sala que já teve sessão** é desativada. Some da lista de escolha, mas continua existindo:
+sessão passada aponta para ela, e quem comprou precisa continuar vendo onde foi.
+
+**Sala com sessão futura** não sai de jeito nenhum — há gente podendo comprar para ela agora.
+A resposta diz quantas sessões e o que fazer antes.
+
+**Sessão** segue a mesma lógica: rascunho sem ingresso é apagado; publicada sai do cartaz com
+despublicar; e sessão que já vendeu não some, porque quem comprou precisa continuar
+enxergando o que comprou — para essa, o caminho é cancelar.
+
+## D29 — Geometria da sala trava na primeira sessão
+
+**Escolhido:** nome e endereço são editáveis sempre. Fileiras, poltronas, corredores e
+poltronas acessíveis, **só enquanto a sala não tiver nenhuma sessão**.
+
+**Por quê:** o ingresso guarda o código da poltrona. Mudar o layout depois de vender faria a
+`F12` de alguém apontar para um lugar que não existe mais — e não há como corrigir isso sem
+escolher entre mover a pessoa de lugar sem avisar ou invalidar o ingresso.
+
+**A mesma razão vale para o horário da sessão:** não muda depois que alguém compra. O sistema
+não tem como avisar quem já tem ingresso, e trocar a hora por baixo dessa pessoa é pior que
+recusar a edição. Preço continua editável — vale para quem ainda vai comprar, e o ingresso
+emitido guarda o valor que foi pago.
+
+**Consequência na interface:** o formulário de edição de sala mostra só nome e endereço, e
+explica por que o layout não está ali. Esconder sem explicar pareceria falta.
+
 ---
 
 ## Decisões pendentes

@@ -3,9 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import { request } from "../lib/api";
 import { dataHora, duracao, faixaDePreco } from "../lib/formato";
-import type { SessionPage } from "../lib/tipos";
+import type { DayInCartaz, SessionPage } from "../lib/tipos";
 import { Carregando } from "../components/Carregando";
 import { Classificacao, SelosDaSessao } from "../components/Selos";
+import { BarraDeDias } from "../components/BarraDeDias";
 
 /**
  * Vitrine pública. Não exige conta: quem procura sessão precisa ver o que
@@ -14,27 +15,52 @@ import { Classificacao, SelosDaSessao } from "../components/Selos";
 export function EmCartaz() {
   const [params, setParams] = useSearchParams();
   const busca = params.get("busca") ?? "";
+  const dia = params.get("dia");
 
   const [termo, setTermo] = useState(busca);
   const [pagina, setPagina] = useState<SessionPage | null>(null);
+  const [dias, setDias] = useState<DayInCartaz[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
   useEffect(() => {
     setCarregando(true);
-    const query = busca ? `?busca=${encodeURIComponent(busca)}` : "";
-    request<SessionPage>(`/sessions${query}`, { auth: false })
+    const query = new URLSearchParams();
+    if (busca) query.set("busca", busca);
+    if (dia) query.set("dia", dia);
+    const sufixo = query.toString() ? `?${query}` : "";
+
+    request<SessionPage>(`/sessions${sufixo}`, { auth: false })
       .then((r) => {
         setPagina(r);
         setErro("");
       })
       .catch((e) => setErro(e.message))
       .finally(() => setCarregando(false));
+  }, [busca, dia]);
+
+  // A barra de datas acompanha a busca, mas não o dia escolhido: ela precisa
+  // continuar mostrando os outros dias para dar como voltar.
+  useEffect(() => {
+    const query = busca ? `?busca=${encodeURIComponent(busca)}` : "";
+    request<DayInCartaz[]>(`/sessions/days${query}`, { auth: false })
+      .then(setDias)
+      .catch(() => setDias([]));
   }, [busca]);
+
+  /** Mexe num filtro preservando o outro. */
+  function ajustar(mudanca: { busca?: string | null; dia?: string | null }) {
+    const novo = new URLSearchParams(params);
+    for (const [chave, valor] of Object.entries(mudanca)) {
+      if (valor) novo.set(chave, valor);
+      else novo.delete(chave);
+    }
+    setParams(novo);
+  }
 
   function buscar(e: React.FormEvent) {
     e.preventDefault();
-    setParams(termo.trim() ? { busca: termo.trim() } : {});
+    ajustar({ busca: termo.trim() || null });
   }
 
   return (
@@ -64,13 +90,19 @@ export function EmCartaz() {
               type="button"
               onClick={() => {
                 setTermo("");
-                setParams({});
+                ajustar({ busca: null });
               }}
             >
               Limpar
             </button>
           )}
         </form>
+
+        <BarraDeDias
+          dias={dias}
+          selecionado={dia}
+          onSelecionar={(d) => ajustar({ dia: d })}
+        />
       </header>
 
       {erro && (
@@ -84,12 +116,18 @@ export function EmCartaz() {
       ) : !pagina || pagina.items.length === 0 ? (
         <div className="vazio">
           <p style={{ fontWeight: 600 }}>
-            {busca ? `Nada em cartaz para "${busca}"` : "Nenhuma sessão em cartaz"}
+            {busca
+              ? `Nada em cartaz para "${busca}"`
+              : dia
+                ? "Nenhuma sessão neste dia"
+                : "Nenhuma sessão em cartaz"}
           </p>
           <p className="muted" style={{ fontSize: "var(--text-sm)" }}>
             {busca
               ? "Tente outro termo, ou veja tudo que está disponível."
-              : "Assim que o organizador publicar uma sessão, ela aparece aqui."}
+              : dia
+                ? "Escolha outro dia na barra acima."
+                : "Assim que o organizador publicar uma sessão, ela aparece aqui."}
           </p>
         </div>
       ) : (

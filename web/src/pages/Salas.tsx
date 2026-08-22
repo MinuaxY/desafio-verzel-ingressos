@@ -45,6 +45,11 @@ export function Salas() {
   const [nome, setNome] = useState("");
   const [local, setLocal] = useState("");
   const [setores, setSetores] = useState<SetorForm[]>([{ ...SETOR_VAZIO, name: "Plateia" }]);
+  // Sala em edição de nome/endereço. A geometria não entra aqui: ela trava
+  // depois da primeira sessão. Ver decisão D29.
+  const [editando, setEditando] = useState<Room | null>(null);
+  const [rascunho, setRascunho] = useState({ name: "", location: "" });
+  const [agindo, setAgindo] = useState("");
 
   function carregar() {
     request<Room[]>("/rooms")
@@ -106,6 +111,54 @@ export function Salas() {
     }
   }
 
+  function abrirEdicao(s: Room) {
+    setEditando(s);
+    setRascunho({ name: s.name, location: s.location ?? "" });
+    setCriando(false);
+    setErro("");
+  }
+
+  async function salvarEdicao(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editando) return;
+
+    setAgindo(editando.id);
+    setErro("");
+    try {
+      await request<Room>(`/rooms/${editando.id}`, {
+        method: "PATCH",
+        body: { name: rascunho.name, location: rascunho.location },
+      });
+      setEditando(null);
+      carregar();
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : "Não foi possível salvar.");
+    } finally {
+      setAgindo("");
+    }
+  }
+
+  async function remover(s: Room) {
+    if (
+      !window.confirm(
+        `Remover a sala ${s.name}? Se ela já tiver sido usada em alguma sessão, fica ` +
+          "guardada como inativa para o histórico não se perder.",
+      )
+    )
+      return;
+
+    setAgindo(s.id);
+    setErro("");
+    try {
+      await request(`/rooms/${s.id}`, { method: "DELETE" });
+      carregar();
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : "Não foi possível remover.");
+    } finally {
+      setAgindo("");
+    }
+  }
+
   if (!salas && !erro) return <Carregando texto="Carregando salas" />;
 
   return (
@@ -122,7 +175,7 @@ export function Salas() {
             Sessões
           </Link>
           <button className="btn btn--primary" type="button" onClick={() => setCriando((v) => !v)}>
-            {criando ? "Fechar" : "Cadastrar sala"}
+            {criando ? "Cancelar" : "Cadastrar sala"}
           </button>
         </div>
       </header>
@@ -131,6 +184,50 @@ export function Salas() {
         <p className="alert alert--error" role="alert">
           {erro}
         </p>
+      )}
+
+      {editando && (
+        <form className="etapa stack" style={{ gap: "var(--space-4)" }} onSubmit={salvarEdicao}>
+          <h2 className="etapa__titulo">Editar {editando.name}</h2>
+
+          <Campo
+            label="Nome da sala"
+            name="editar-nome"
+            required
+            value={rascunho.name}
+            onChange={(e) => setRascunho({ ...rascunho, name: e.target.value })}
+          />
+          <Campo
+            label="Endereço"
+            name="editar-local"
+            placeholder="Av. Paulista, 1000 — São Paulo"
+            value={rascunho.location}
+            onChange={(e) => setRascunho({ ...rascunho, location: e.target.value })}
+          />
+
+          <p className="faint" style={{ fontSize: "var(--text-xs)" }}>
+            O layout de poltronas não aparece aqui porque ele trava assim que a sala recebe a
+            primeira sessão — ingressos vendidos apontam para lugares específicos. Para uma
+            configuração diferente, cadastre outra sala.
+          </p>
+
+          <div className="rodape-acao">
+            <button
+              className="btn btn--ghost"
+              type="button"
+              onClick={() => setEditando(null)}
+            >
+              Cancelar
+            </button>
+            <button
+              className="btn btn--primary"
+              type="submit"
+              disabled={agindo === editando.id}
+            >
+              {agindo === editando.id ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
+        </form>
       )}
 
       {criando && (
@@ -302,7 +399,7 @@ export function Salas() {
         <ul className="lista-salas">
           {salas?.map((s) => (
             <li key={s.id} className="linha-sala">
-              <div className="stack" style={{ gap: "var(--space-1)" }}>
+              <div className="stack" style={{ gap: "var(--space-1)", flex: 1, minWidth: 0 }}>
                 <strong>{s.name}</strong>
                 {s.location && (
                   <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
@@ -315,6 +412,25 @@ export function Salas() {
                   {s.sectors.some((st) => st.special_seats.length > 0) &&
                     ` · ${s.sectors.reduce((n, st) => n + st.special_seats.length, 0)} acessíveis`}
                 </span>
+              </div>
+
+              <div className="linha-sessao__acoes">
+                <button
+                  className="btn btn--ghost btn--mini"
+                  type="button"
+                  disabled={agindo === s.id}
+                  onClick={() => abrirEdicao(s)}
+                >
+                  Editar
+                </button>
+                <button
+                  className="btn btn--ghost btn--mini btn--perigo"
+                  type="button"
+                  disabled={agindo === s.id}
+                  onClick={() => remover(s)}
+                >
+                  Remover
+                </button>
               </div>
             </li>
           ))}

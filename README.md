@@ -244,6 +244,33 @@ está incompleto como produto.
 
 ---
 
+## Gestão da programação
+
+Além de criar sessão a sessão, o organizador tem:
+
+**Repetir em vários dias.** No formulário de criação, os dias são marcados num calendário de
+quatro semanas, com atalhos para "toda sexta" e "sextas, sábados e domingos". Dia em que a
+sala já está ocupada é pulado, e a lista do que ficou de fora volta com o motivo — um
+conflito não descarta o resto da seleção.
+
+**Editar e remover.** Sessão em rascunho pode ser apagada; publicada sai do cartaz com
+despublicar; e sessão que já vendeu ingresso não some — para essa, o caminho é cancelar, e
+quem comprou continua enxergando o que aconteceu.
+
+Sala segue a mesma lógica: **sala nunca usada é apagada de verdade; sala com histórico é
+desativada**, porque sessão passada aponta para ela. **Sala com sessão futura não é
+removida** — há gente podendo comprar para ela agora.
+
+**O layout da sala trava na primeira sessão.** Nome e endereço continuam editáveis, mas
+fileiras, poltronas e corredores não: o ingresso guarda o código da poltrona, e mudar a
+geometria faria a `F12` de alguém apontar para um lugar que deixou de existir. Pela mesma
+razão, o horário de uma sessão não muda depois que alguém compra.
+
+Para o cliente, a vitrine tem **filtro por dia** — uma barra com as próximas duas semanas,
+onde dia sem sessão aparece desabilitado em vez de oferecer um clique que não leva a nada.
+
+---
+
 ## Segurança e dados pessoais
 
 Uma revisão dedicada foi feita no fim do projeto. O que segue é o resultado, incluindo o que
@@ -326,7 +353,7 @@ cd api
 python -m pytest -v
 ```
 
-**177 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
+**210 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
 cada execução — o container precisa estar de pé. Usar o mesmo SGBD da aplicação evita que um
 teste passe em SQLite e quebre em produção por causa de enum nativo ou índice parcial.
 
@@ -340,6 +367,7 @@ teste passe em SQLite e quebre em produção por causa de enum nativo ou índice
 | `test_catalog.py` | 13 | Provedor trocável, cache, tradução de erro |
 | `test_acessibilidade.py` | 12 | Marcação de poltronas, validação de geometria |
 | `test_exibicao.py` | 16 | Classificação indicativa, áudio e formato da sessão |
+| `test_melhorias.py` | 31 | Edição de sala, exclusão de sessão, criação em lote, filtro por dia |
 | `test_seguranca.py` | 14 | Limite de tentativas, cabeçalhos, erro sem estrutura interna |
 | `test_concorrencia.py` | 3 | Oito threads disputando a mesma poltrona |
 
@@ -350,7 +378,7 @@ cd web
 npm test
 ```
 
-**88 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
+**114 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
 `lib` em 95%, `components` em 83%, `auth` em 77%.
 
 | Arquivo | Testes | Cobre |
@@ -362,6 +390,8 @@ npm test
 | `EmCartaz.test.tsx` | 11 | Vitrine pública, busca, estado vazio, servidor fora do ar |
 | `Ingresso.test.tsx` | 9 | QR, código, compartilhamento, ingresso não pago |
 | `ProtectedRoute.test.tsx` | 7 | Acesso por papel, token inválido, espera pela sessão |
+| `EscolhaDeDias.test.tsx` | 12 | Repetição em vários dias, atalhos, dia principal travado |
+| `BarraDeDias.test.tsx` | 10 | Filtro por dia, dia sem sessão, data sem escorregar para UTC |
 
 ---
 

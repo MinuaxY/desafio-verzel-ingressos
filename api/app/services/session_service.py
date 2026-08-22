@@ -1,15 +1,26 @@
 """Regra de negócio das sessões."""
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
 from app.catalog.factory import get_catalog_provider
+from app.models.order import Ticket
 from app.models.session import Session, SessionSectorPrice, SessionStatus
 from app.repositories.room_repository import RoomRepository
 from app.repositories.session_repository import SessionRepository
-from app.schemas.session import SessionCreate, SessionUpdate
+from app.schemas.session import SessionCreate, SessionRepeat, SessionUpdate
 from app.services.room_service import RoomNotFound, RoomService
+
+# Fuso em que as datas escolhidas pelo organizador são interpretadas. "Dia 24
+# às 19h" é hora local de quem vai ao cinema. Ver decisão D27.
+FUSO_LOCAL = ZoneInfo("America/Sao_Paulo")
+
+# Teto para a criação em lote. Uma programação de cinema não passa de algumas
+# semanas, e sem limite um engano criaria centenas de sessões.
+MAX_DATAS_POR_LOTE = 60
 
 
 class MovieNotFound(Exception):
@@ -38,6 +49,15 @@ class SessionAlreadyCancelled(Exception):
     pass
 
 
+class SessionHasTickets(Exception):
+    """A sessão já vendeu ingresso: não pode ser apagada nem ter o horário
+    mudado por baixo de quem comprou."""
+
+
+class SessionIsPublished(Exception):
+    """Sessão publicada sai do cartaz com despublicar, não com exclusão."""
+
+
 class SessionService:
     def __init__(self, db: DbSession) -> None:
         self.db = db
@@ -51,6 +71,7 @@ class SessionService:
         self,
         *,
         busca: str | None = None,
+        dia: date | None = None,
         incluir_passadas: bool = False,
         page: int = 1,
         por_pagina: int = 12,
@@ -58,8 +79,23 @@ class SessionService:
         # Sessão que já começou não interessa a quem quer comprar.
         corte = None if incluir_passadas else datetime.now(timezone.utc)
         return self.sessions.list_published(
-            busca=busca, a_partir_de=corte, page=page, por_pagina=por_pagina
+            busca=busca, a_partir_de=corte, dia=dia, page=page, por_pagina=por_pagina
         )
+
+    def dias_em_cartaz(self, *, dias: int = 14, busca: str | None = None) -> dict[date, int]:
+        """Quantas sessões há em cada dia daqui para a frente.
+
+        A barra de datas precisa saber quais dias têm o que mostrar: oferecer
+        um dia vazio como se fosse opção é convidar o clique que não leva a
+        lugar nenhum.
+        """
+        agora = datetime.now(timezone.utc)
+        fim = datetime.combine(
+            agora.astimezone(FUSO_LOCAL).date() + timedelta(days=dias),
+            time.min,
+            tzinfo=FUSO_LOCAL,
+        )
+        return self.sessions.dias_com_sessao(a_partir_de=agora, ate=fim, busca=busca)
 
     def obter_publica(self, session_id: uuid.UUID) -> Session:
         sessao = self.sessions.get(session_id)
@@ -116,6 +152,66 @@ class SessionService:
         )
         return self.sessions.create(sessao, precos)
 
+    def criar_em_lote(self, organizer_id: uuid.UUID, dados: SessionRepeat) -> dict:
+        """Cria a mesma sessão em vários dias, no mesmo horário.
+
+        Dia em que a sala já está ocupada é **pulado**, e não aborta o lote:
+        obrigar a refazer a seleção inteira por causa de um dia ocupado joga
+        fora o trabalho de escolher os outros nove. O que ficou de fora volta
+        na resposta, com o motivo, para o organizador resolver esses casos.
+        Ver decisão D27.
+        """
+        criadas: list[Session] = []
+        puladas: list[dict] = []
+
+        for dia in sorted(set(dados.dates))[:MAX_DATAS_POR_LOTE]:
+            quando = datetime.combine(dia, dados.time_of_day, tzinfo=FUSO_LOCAL)
+
+            try:
+                criadas.append(
+                    self.criar(
+                        organizer_id,
+                        SessionCreate(
+                            catalog_id=dados.catalog_id,
+                            room_id=dados.room_id,
+                            starts_at=quando,
+                            audio=dados.audio,
+                            screen_format=dados.screen_format,
+                            prices=dados.prices,
+                            publish=dados.publish,
+                        ),
+                    )
+                )
+            except RoomBusy:
+                puladas.append({"date": dia, "reason": "Já havia sessão nessa sala nesse horário"})
+            except SessionInThePast:
+                puladas.append({"date": dia, "reason": "Data e horário já passaram"})
+
+        return {"created": criadas, "skipped": puladas}
+
+    def tem_ingressos(self, session_id: uuid.UUID) -> bool:
+        return (
+            self.db.scalar(select(Ticket.id).where(Ticket.session_id == session_id).limit(1))
+            is not None
+        )
+
+    def excluir(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> None:
+        """Apaga a sessão de vez — só rascunho, e só sem ingresso.
+
+        Sessão publicada sai do cartaz com despublicar; sessão que já vendeu
+        não some, porque quem comprou precisa continuar enxergando o que
+        comprou. Para essas o caminho é cancelar. Ver decisão D28.
+        """
+        sessao = self.obter_do_organizador(session_id, organizer_id)
+
+        if self.tem_ingressos(session_id):
+            raise SessionHasTickets
+        if sessao.status is SessionStatus.PUBLISHED:
+            raise SessionIsPublished
+
+        self.db.delete(sessao)
+        self.db.commit()
+
     def atualizar(
         self, session_id: uuid.UUID, organizer_id: uuid.UUID, dados: SessionUpdate
     ) -> Session:
@@ -123,6 +219,10 @@ class SessionService:
         self._exige_nao_cancelada(sessao)
 
         if dados.starts_at is not None and dados.starts_at != sessao.starts_at:
+            # Mudar a hora por baixo de quem já tem ingresso é pior que recusar
+            # a edição: o sistema não tem como avisar essas pessoas.
+            if self.tem_ingressos(session_id):
+                raise SessionHasTickets
             self._exige_futuro(dados.starts_at)
             if self.sessions.exists_at(sessao.room_id, dados.starts_at):
                 raise RoomBusy

@@ -3,10 +3,19 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError, request } from "../lib/api";
 import { duracao, reais } from "../lib/formato";
-import type { AudioType, CatalogItem, CatalogPage, Room, ScreenFormat, SessionDetail } from "../lib/tipos";
+import type {
+  AudioType,
+  BatchResult,
+  CatalogItem,
+  CatalogPage,
+  Room,
+  ScreenFormat,
+  SessionDetail,
+} from "../lib/tipos";
 import { AUDIO, FORMATO } from "../lib/tipos";
 import { Classificacao } from "../components/Selos";
 import { Campo } from "../components/Campo";
+import { EscolhaDeDias } from "../components/EscolhaDeDias";
 
 /** Converte "32,00" ou "32.00" em centavos, sem passar por float. */
 function paraCentavos(texto: string): number {
@@ -35,6 +44,9 @@ export function NovaSessao() {
   const [quando, setQuando] = useState("");
   const [audio, setAudio] = useState<AudioType>("SUBTITLED");
   const [formato, setFormato] = useState<ScreenFormat>("TWO_D");
+  // Dias extras, além do horário principal. Vazio = uma sessão só.
+  const [diasExtras, setDiasExtras] = useState<string[]>([]);
+  const [pulados, setPulados] = useState<{ date: string; reason: string }[]>([]);
   const [precos, setPrecos] = useState<Record<string, string>>({});
 
   const [erro, setErro] = useState("");
@@ -71,24 +83,60 @@ export function NovaSessao() {
     if (!filme || !sala || !quando) return;
 
     setErro("");
+    setPulados([]);
     setSalvando(true);
+
+    const valores = sala.sectors.map((s) => ({
+      sector_id: s.id,
+      price_cents: paraCentavos(precos[s.id] ?? ""),
+    }));
+
     try {
-      const sessao = await request<SessionDetail>("/organizer/sessions", {
+      // Sem dias extras, uma sessão só — o caminho comum não paga o preço da
+      // funcionalidade que existe para o caso menos frequente.
+      if (diasExtras.length === 0) {
+        const sessao = await request<SessionDetail>("/organizer/sessions", {
+          method: "POST",
+          body: {
+            catalog_id: filme.id,
+            room_id: sala.id,
+            starts_at: comFuso(quando),
+            audio,
+            screen_format: formato,
+            prices: valores,
+            publish: publicar,
+          },
+        });
+        navigate("/organizador", { state: { criada: sessao.id } });
+        return;
+      }
+
+      // Com dias extras, o horário principal entra junto no lote.
+      const [dataPrincipal, horaPrincipal] = quando.split("T");
+      const resultado = await request<BatchResult>("/organizer/sessions/batch", {
         method: "POST",
         body: {
           catalog_id: filme.id,
           room_id: sala.id,
-          starts_at: comFuso(quando),
+          dates: [...new Set([dataPrincipal, ...diasExtras])],
+          time_of_day: `${horaPrincipal}:00`.slice(0, 8),
           audio,
           screen_format: formato,
-          prices: sala.sectors.map((s) => ({
-            sector_id: s.id,
-            price_cents: paraCentavos(precos[s.id] ?? ""),
-          })),
+          prices: valores,
           publish: publicar,
         },
       });
-      navigate("/organizador", { state: { criada: sessao.id } });
+
+      // Alguns dias podem ter sido pulados por conflito. Se nada foi criado,
+      // fica na tela para o organizador ver o motivo em vez de sair achando
+      // que deu certo.
+      if (resultado.skipped.length > 0 && resultado.created.length === 0) {
+        setPulados(resultado.skipped);
+        return;
+      }
+      navigate("/organizador", {
+        state: { criadas: resultado.created.length, pulados: resultado.skipped },
+      });
     } catch (err) {
       setErro(err instanceof ApiError ? err.message : "Não foi possível criar a sessão.");
     } finally {
@@ -288,6 +336,15 @@ export function NovaSessao() {
             onChange={(e) => setQuando(e.target.value)}
           />
 
+          {quando && (
+            <EscolhaDeDias
+              baseISO={quando.split("T")[0]}
+              hora={quando.split("T")[1] ?? ""}
+              selecionados={diasExtras}
+              onMudar={setDiasExtras}
+            />
+          )}
+
           {sala ? (
             <div className="stack" style={{ gap: "var(--space-3)" }}>
               {sala.sectors.map((s) => (
@@ -325,7 +382,30 @@ export function NovaSessao() {
         </div>
       </div>
 
+      {pulados.length > 0 && (
+        <div className="alert alert--error" role="alert">
+          <div className="stack" style={{ gap: "var(--space-2)" }}>
+            <strong>Nenhuma sessão foi criada</strong>
+            <ul style={{ paddingLeft: "var(--space-5)", fontSize: "var(--text-sm)" }}>
+              {pulados.map((p) => (
+                <li key={p.date}>
+                  {p.date.split("-").reverse().join("/")} — {p.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       <div className="rodape-acao">
+        <button
+          className="btn btn--ghost"
+          type="button"
+          disabled={salvando}
+          onClick={() => navigate("/organizador")}
+        >
+          Cancelar
+        </button>
         <button
           className="btn btn--ghost"
           type="button"
@@ -340,7 +420,11 @@ export function NovaSessao() {
           disabled={!pronto || salvando}
           onClick={(e) => criar(e, true)}
         >
-          {salvando ? "Salvando…" : "Publicar sessão"}
+          {salvando
+            ? "Salvando…"
+            : diasExtras.length > 0
+              ? `Publicar ${diasExtras.length + 1} sessões`
+              : "Publicar sessão"}
         </button>
       </div>
 

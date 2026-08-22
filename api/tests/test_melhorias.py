@@ -1,0 +1,474 @@
+"""Edição de sala, exclusão de sessão, criação em lote e filtro por dia."""
+from datetime import date, datetime, timedelta, timezone
+
+import pytest
+
+from app.catalog.factory import get_catalog_provider
+from app.catalog.fixture import FixtureProvider
+from app.config import get_settings
+
+ORGANIZADOR = {
+    "name": "Org", "email": "org@melh.dev", "password": "senhaforte123", "role": "ORGANIZER",
+}
+OUTRO = {
+    "name": "Org2", "email": "org2@melh.dev", "password": "senhaforte123", "role": "ORGANIZER",
+}
+CLIENTE = {
+    "name": "Cli", "email": "cli@melh.dev", "password": "senhaforte123", "role": "CUSTOMER",
+}
+
+SALA = {
+    "name": "Sala Melhorias",
+    "location": "Centro",
+    "sectors": [{"name": "Plateia", "rows": 2, "seats_per_row": 6, "aisles": [3]}],
+}
+
+
+@pytest.fixture(autouse=True)
+def usa_fixture_provider(monkeypatch):
+    monkeypatch.setenv("CATALOG_PROVIDER", "fixture")
+    monkeypatch.setenv("TMDB_READ_TOKEN", "")
+    get_settings.cache_clear()
+    get_catalog_provider.cache_clear()
+    yield
+    get_settings.cache_clear()
+    get_catalog_provider.cache_clear()
+
+
+def auth(client, dados):
+    token = client.post("/auth/register", json=dados).json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+def cria_sala(client, headers, nome="Sala Melhorias"):
+    return client.post("/rooms", json={**SALA, "name": nome}, headers=headers).json()
+
+
+def cria_sessao(client, headers, sala, *, dias=2, hora=20, publicar=False):
+    quando = (datetime.now(timezone.utc) + timedelta(days=dias)).replace(
+        hour=hora, minute=0, second=0, microsecond=0
+    )
+    return client.post(
+        "/organizer/sessions",
+        json={
+            "catalog_id": FixtureProvider().items[0].id,
+            "room_id": sala["id"],
+            "starts_at": quando.isoformat(),
+            "prices": [{"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]],
+            "publish": publicar,
+        },
+        headers=headers,
+    )
+
+
+# ==========================================================================
+# Edicao de sala
+# ==========================================================================
+
+
+class TestEdicaoDeSala:
+    def test_muda_nome_e_endereco(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        r = client.patch(
+            f"/rooms/{sala['id']}",
+            json={"name": "Sala Renomeada", "location": "Zona Sul"},
+            headers=headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["name"] == "Sala Renomeada"
+        assert r.json()["location"] == "Zona Sul"
+
+    def test_campo_ausente_fica_como_esta(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        r = client.patch(f"/rooms/{sala['id']}", json={"name": "Só o nome"}, headers=headers)
+        assert r.json()["location"] == "Centro"
+
+    def test_nome_repetido_e_recusado(self, client):
+        headers = auth(client, ORGANIZADOR)
+        cria_sala(client, headers, "Sala A")
+        outra = cria_sala(client, headers, "Sala B")
+
+        r = client.patch(f"/rooms/{outra['id']}", json={"name": "Sala A"}, headers=headers)
+        assert r.status_code == 409
+
+    def test_manter_o_proprio_nome_nao_e_conflito(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        r = client.patch(
+            f"/rooms/{sala['id']}", json={"name": sala["name"], "location": "Nova"}, headers=headers
+        )
+        assert r.status_code == 200
+
+    def test_geometria_muda_enquanto_a_sala_e_nova(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        r = client.patch(
+            f"/rooms/{sala['id']}",
+            json={
+                "sectors": [
+                    {"name": "Plateia", "rows": 4, "seats_per_row": 8, "aisles": [4]},
+                    {"name": "VIP", "rows": 1, "seats_per_row": 4, "display_order": 1},
+                ]
+            },
+            headers=headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["capacity"] == 36
+        assert [s["name"] for s in r.json()["sectors"]] == ["Plateia", "VIP"]
+
+    def test_geometria_trava_depois_da_primeira_sessao(self, client):
+        """Ingresso vendido aponta para uma poltrona específica; mudar o layout
+        faria aquele lugar deixar de existir. Ver decisão D29."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala)
+
+        r = client.patch(
+            f"/rooms/{sala['id']}",
+            json={"sectors": [{"name": "Plateia", "rows": 9, "seats_per_row": 9}]},
+            headers=headers,
+        )
+        assert r.status_code == 409
+        assert "layout" in r.json()["detail"]
+
+    def test_nome_continua_editavel_com_sessao(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala)
+
+        r = client.patch(f"/rooms/{sala['id']}", json={"name": "Sala 1 (reformada)"}, headers=headers)
+        assert r.status_code == 200
+
+    def test_geometria_invalida_e_recusada(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        r = client.patch(
+            f"/rooms/{sala['id']}",
+            json={
+                "sectors": [
+                    {
+                        "name": "Plateia",
+                        "rows": 2,
+                        "seats_per_row": 6,
+                        "special_seats": [{"seat_code": "Z9", "kind": "WHEELCHAIR"}],
+                    }
+                ]
+            },
+            headers=headers,
+        )
+        assert r.status_code == 422
+
+    def test_sala_de_outro_responde_404(self, client):
+        sala = cria_sala(client, auth(client, ORGANIZADOR))
+        r = client.patch(f"/rooms/{sala['id']}", json={"name": "X"}, headers=auth(client, OUTRO))
+        assert r.status_code == 404
+
+
+# ==========================================================================
+# Exclusao de sessao
+# ==========================================================================
+
+
+class TestExclusaoDeSessao:
+    def test_rascunho_sem_ingresso_e_apagado(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala).json()
+
+        assert client.delete(f"/organizer/sessions/{sessao['id']}", headers=headers).status_code == 204
+        assert client.get(f"/organizer/sessions/{sessao['id']}", headers=headers).status_code == 404
+
+    def test_sessao_publicada_nao_e_apagada(self, client):
+        """Sai do cartaz com despublicar, não com exclusão."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        r = client.delete(f"/organizer/sessions/{sessao['id']}", headers=headers)
+        assert r.status_code == 409
+        assert "Despublique" in r.json()["detail"]
+
+    def test_sessao_com_ingresso_nao_e_apagada(self, client):
+        """Quem comprou precisa continuar enxergando o que comprou."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        cliente = auth(client, CLIENTE)
+        client.post(
+            "/orders",
+            json={
+                "session_id": sessao["id"],
+                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A1"}],
+            },
+            headers=cliente,
+        )
+        client.post(f"/organizer/sessions/{sessao['id']}/unpublish", headers=headers)
+
+        r = client.delete(f"/organizer/sessions/{sessao['id']}", headers=headers)
+        assert r.status_code == 409
+        assert "ingressos" in r.json()["detail"]
+
+    def test_sessao_de_outro_responde_404(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala).json()
+
+        r = client.delete(f"/organizer/sessions/{sessao['id']}", headers=auth(client, OUTRO))
+        assert r.status_code == 404
+
+
+class TestEdicaoDeSessaoComIngresso:
+    def test_horario_nao_muda_com_ingresso_vendido(self, client):
+        """O sistema não tem como avisar quem já comprou."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        client.post(
+            "/orders",
+            json={
+                "session_id": sessao["id"],
+                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A1"}],
+            },
+            headers=auth(client, CLIENTE),
+        )
+
+        novo = (datetime.now(timezone.utc) + timedelta(days=5)).replace(microsecond=0)
+        r = client.patch(
+            f"/organizer/sessions/{sessao['id']}",
+            json={"starts_at": novo.isoformat()},
+            headers=headers,
+        )
+        assert r.status_code == 409
+
+    def test_preco_continua_editavel_com_ingresso(self, client):
+        """Preço novo vale para quem ainda vai comprar; não mexe no que já foi
+        vendido, porque o ingresso guarda o valor pago."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        client.post(
+            "/orders",
+            json={
+                "session_id": sessao["id"],
+                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A1"}],
+            },
+            headers=auth(client, CLIENTE),
+        )
+
+        r = client.patch(
+            f"/organizer/sessions/{sessao['id']}",
+            json={"prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 4500}]},
+            headers=headers,
+        )
+        assert r.status_code == 200
+        assert r.json()["min_price_cents"] == 4500
+
+
+# ==========================================================================
+# Criacao em lote
+# ==========================================================================
+
+
+def dias_a_frente(*offsets: int) -> list[str]:
+    hoje = datetime.now(timezone.utc).date()
+    return [(hoje + timedelta(days=o)).isoformat() for o in offsets]
+
+
+class TestCriacaoEmLote:
+    def corpo(self, sala, datas, hora="19:00:00", **extra):
+        return {
+            "catalog_id": FixtureProvider().items[0].id,
+            "room_id": sala["id"],
+            "dates": datas,
+            "time_of_day": hora,
+            "prices": [{"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]],
+            **extra,
+        }
+
+    def test_cria_uma_sessao_por_dia(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        r = client.post(
+            "/organizer/sessions/batch",
+            json=self.corpo(sala, dias_a_frente(2, 3, 4)),
+            headers=headers,
+        )
+        assert r.status_code == 201
+        assert len(r.json()["created"]) == 3
+        assert r.json()["skipped"] == []
+
+    def test_todas_com_o_mesmo_horario_e_filme(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        criadas = client.post(
+            "/organizer/sessions/batch",
+            json=self.corpo(sala, dias_a_frente(2, 5), hora="21:30:00"),
+            headers=headers,
+        ).json()["created"]
+
+        titulos = {s["movie"]["title"] for s in criadas}
+        assert len(titulos) == 1
+        for s in criadas:
+            assert s["starts_at"].endswith(("00:30:00Z", "21:30:00Z"))
+
+    def test_dias_ocupados_sao_pulados_e_reportados(self, client):
+        """Um dia ocupado não joga fora o trabalho de escolher os outros."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        # Ocupa o dia 3 no mesmo horário.
+        client.post(
+            "/organizer/sessions/batch",
+            json=self.corpo(sala, dias_a_frente(3)),
+            headers=headers,
+        )
+
+        r = client.post(
+            "/organizer/sessions/batch",
+            json=self.corpo(sala, dias_a_frente(2, 3, 4)),
+            headers=headers,
+        )
+        corpo = r.json()
+        assert len(corpo["created"]) == 2
+        assert len(corpo["skipped"]) == 1
+        assert corpo["skipped"][0]["date"] == dias_a_frente(3)[0]
+        assert "sess" in corpo["skipped"][0]["reason"].lower()
+
+    def test_data_no_passado_e_pulada(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        r = client.post(
+            "/organizer/sessions/batch",
+            json=self.corpo(sala, dias_a_frente(-3, 2)),
+            headers=headers,
+        )
+        corpo = r.json()
+        assert len(corpo["created"]) == 1
+        assert len(corpo["skipped"]) == 1
+        assert "passaram" in corpo["skipped"][0]["reason"]
+
+    def test_datas_repetidas_viram_uma_so(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        um_dia = dias_a_frente(2)
+
+        r = client.post(
+            "/organizer/sessions/batch",
+            json=self.corpo(sala, um_dia * 3),
+            headers=headers,
+        )
+        assert len(r.json()["created"]) == 1
+
+    def test_pode_publicar_o_lote_inteiro(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        criadas = client.post(
+            "/organizer/sessions/batch",
+            json=self.corpo(sala, dias_a_frente(2, 3), publish=True),
+            headers=headers,
+        ).json()["created"]
+
+        assert all(s["status"] == "PUBLISHED" for s in criadas)
+        assert client.get("/sessions").json()["total"] == 2
+
+    def test_sem_data_e_recusado(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        r = client.post(
+            "/organizer/sessions/batch", json=self.corpo(sala, []), headers=headers
+        )
+        assert r.status_code == 422
+
+    def test_cliente_nao_cria_lote(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        r = client.post(
+            "/organizer/sessions/batch",
+            json=self.corpo(sala, dias_a_frente(2)),
+            headers=auth(client, CLIENTE),
+        )
+        assert r.status_code == 403
+
+
+# ==========================================================================
+# Filtro por dia na vitrine
+# ==========================================================================
+
+
+class TestFiltroPorDia:
+    def test_lista_so_as_sessoes_do_dia(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala, dias=2, hora=19, publicar=True)
+        cria_sessao(client, headers, sala, dias=5, hora=19, publicar=True)
+
+        assert client.get("/sessions").json()["total"] == 2
+
+        alvo = client.get("/sessions").json()["items"][0]["starts_at"][:10]
+        so_um_dia = client.get("/sessions", params={"dia": alvo}).json()
+        assert so_um_dia["total"] == 1
+
+    def test_dia_sem_sessao_devolve_vazio(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala, dias=2, publicar=True)
+
+        vazio = (date.today() + timedelta(days=9)).isoformat()
+        assert client.get("/sessions", params={"dia": vazio}).json()["total"] == 0
+
+    def test_filtro_por_dia_combina_com_busca(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala, dias=2, publicar=True)
+
+        alvo = client.get("/sessions").json()["items"][0]
+        dia = alvo["starts_at"][:10]
+
+        assert client.get("/sessions", params={"dia": dia, "busca": alvo["title"][:5]}).json()["total"] == 1
+        assert client.get("/sessions", params={"dia": dia, "busca": "zzzz"}).json()["total"] == 0
+
+    def test_dia_invalido_e_recusado(self, client):
+        assert client.get("/sessions", params={"dia": "ontem"}).status_code == 422
+
+
+class TestDiasEmCartaz:
+    def test_lista_os_dias_com_sessao_e_a_contagem(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala, dias=2, hora=16, publicar=True)
+        cria_sessao(client, headers, sala, dias=2, hora=21, publicar=True)
+        cria_sessao(client, headers, sala, dias=6, hora=19, publicar=True)
+
+        dias = client.get("/sessions/days").json()
+        assert len(dias) == 2
+        assert sorted(d["total"] for d in dias) == [1, 2]
+
+    def test_rascunho_nao_conta(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala, dias=2, publicar=False)
+
+        assert client.get("/sessions/days").json() == []
+
+    def test_e_publico(self, client):
+        assert client.get("/sessions/days").status_code == 200
+
+    def test_a_rota_nao_e_confundida_com_um_id(self, client):
+        """'days' viria antes de '{session_id}' no roteador; se a ordem estiver
+        errada, esta chamada devolve 422 tentando ler 'days' como UUID."""
+        r = client.get("/sessions/days")
+        assert r.status_code == 200
+        assert isinstance(r.json(), list)

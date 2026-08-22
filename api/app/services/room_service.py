@@ -1,11 +1,14 @@
 """Regra de negócio das salas."""
 import uuid
+from datetime import datetime, timezone
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.models.room import MAX_FILEIRAS, Room
+from app.models.session import Session, SessionStatus
 from app.repositories.room_repository import RoomRepository
-from app.schemas.room import RoomIn
+from app.schemas.room import RoomIn, RoomUpdate
 
 
 class RoomNameAlreadyUsed(Exception):
@@ -28,6 +31,23 @@ class RoomTooTall(Exception):
         super().__init__(str(total))
 
 
+class RoomInUse(Exception):
+    """A sala tem sessão futura: não sai do ar enquanto houver o que exibir."""
+
+    def __init__(self, sessoes: int) -> None:
+        self.sessoes = sessoes
+        super().__init__(str(sessoes))
+
+
+class RoomLayoutLocked(Exception):
+    """A sala já foi usada: a geometria não muda mais.
+
+    Mexer em fileiras, poltronas ou corredores depois de haver sessão faria a
+    poltrona F12 de alguém deixar de existir. Nome e endereço continuam
+    editáveis. Ver decisão D29.
+    """
+
+
 class SeatOutsideSector(Exception):
     """Marcaram como acessível uma poltrona que não existe na geometria."""
 
@@ -39,6 +59,7 @@ class SeatOutsideSector(Exception):
 
 class RoomService:
     def __init__(self, db: DbSession) -> None:
+        self.db = db
         self.rooms = RoomRepository(db)
 
     def listar(self, organizer_id: uuid.UUID) -> list[Room]:
@@ -104,7 +125,81 @@ class RoomService:
                     raise SeatOutsideSector(setor.name, fora)
             offset += setor.rows
 
-    def desativar(self, room_id: uuid.UUID, organizer_id: uuid.UUID) -> Room:
-        # Desativa em vez de apagar: sessões passadas apontam para a sala, e o
-        # histórico de quem comprou precisa continuar fazendo sentido.
-        return self.rooms.deactivate(self.obter_do_organizador(room_id, organizer_id))
+    # -- edição --------------------------------------------------------------
+
+    def sessoes_da_sala(self, room_id: uuid.UUID) -> tuple[int, int]:
+        """Quantas sessões a sala tem no total, e quantas ainda vão acontecer."""
+        total = (
+            self.db.scalar(select(func.count()).select_from(Session).where(Session.room_id == room_id))
+            or 0
+        )
+        futuras = (
+            self.db.scalar(
+                select(func.count())
+                .select_from(Session)
+                .where(
+                    Session.room_id == room_id,
+                    Session.starts_at > datetime.now(timezone.utc),
+                    Session.status != SessionStatus.CANCELLED,
+                )
+            )
+            or 0
+        )
+        return total, futuras
+
+    def atualizar(self, room_id: uuid.UUID, organizer_id: uuid.UUID, dados: RoomUpdate) -> Room:
+        """Nome e endereço, sempre. Geometria, só enquanto a sala for nova.
+
+        Trocar o layout depois de existir sessão faria a poltrona vendida
+        apontar para um lugar que não existe mais. Ver decisão D29.
+        """
+        sala = self.obter_do_organizador(room_id, organizer_id)
+
+        if dados.name is not None and dados.name != sala.name:
+            existente = self.rooms.get_by_name(organizer_id, dados.name)
+            if existente is not None and existente.id != sala.id:
+                raise RoomNameAlreadyUsed
+            sala.name = dados.name
+
+        if dados.location is not None:
+            sala.location = dados.location or None
+
+        if dados.sectors is not None:
+            total, _ = self.sessoes_da_sala(room_id)
+            if total > 0:
+                raise RoomLayoutLocked
+
+            molde = RoomIn(name=sala.name, location=sala.location, sectors=dados.sectors)
+            self._valida_altura(molde)
+            self._valida_assentos_especiais(molde)
+            self.rooms.replace_sectors(sala, [s.model_dump() for s in dados.sectors])
+
+        return self.rooms.save(sala)
+
+    # -- remoção -------------------------------------------------------------
+
+    def remover(self, room_id: uuid.UUID, organizer_id: uuid.UUID) -> Room | None:
+        """Apaga a sala se ela nunca serviu; desativa se já serviu.
+
+        Sala com sessão futura não sai de jeito nenhum — há gente podendo
+        comprar para ela agora.
+
+        A distinção entre apagar e desativar existe porque sessão passada
+        aponta para a sala, e o histórico de quem comprou precisa continuar
+        fazendo sentido. Sala que nunca teve sessão não tem histórico a
+        preservar, e deixá-la desativada só acumularia lixo na lista.
+        Ver decisão D28.
+
+        Devolve a sala desativada, ou None quando ela foi apagada.
+        """
+        sala = self.obter_do_organizador(room_id, organizer_id)
+        total, futuras = self.sessoes_da_sala(room_id)
+
+        if futuras > 0:
+            raise RoomInUse(futuras)
+
+        if total == 0:
+            self.rooms.delete(sala)
+            return None
+
+        return self.rooms.deactivate(sala)

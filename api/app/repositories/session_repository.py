@@ -1,11 +1,16 @@
 """Acesso a dados de sessão. Sem regra de negócio."""
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Date, Select, cast, func, or_, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.models.session import Session, SessionSectorPrice, SessionStatus
+
+# O fuso em que as datas são apresentadas e filtradas. Sessão de cinema é hora
+# local: quem procura "sexta" quer a noite de sexta na cidade, não o intervalo
+# UTC correspondente.
+FUSO_EXIBICAO = "America/Sao_Paulo"
 
 
 class SessionRepository:
@@ -21,6 +26,8 @@ class SessionRepository:
         *,
         busca: str | None,
         a_partir_de: datetime | None,
+        dia: date | None = None,
+        fuso: str = FUSO_EXIBICAO,
     ) -> Select:
         if busca:
             termo = f"%{busca.strip()}%"
@@ -29,6 +36,13 @@ class SessionRepository:
             )
         if a_partir_de:
             consulta = consulta.where(Session.starts_at >= a_partir_de)
+        if dia:
+            # A comparação é feita no fuso de exibição, não em UTC. Uma sessão
+            # de sexta às 21h30 em São Paulo é sábado 00h30 em UTC — filtrar
+            # pela data crua colocaria ela no dia errado para quem procura.
+            consulta = consulta.where(
+                cast(func.timezone(fuso, Session.starts_at), Date) == dia
+            )
         return consulta
 
     def list_published(
@@ -36,11 +50,12 @@ class SessionRepository:
         *,
         busca: str | None = None,
         a_partir_de: datetime | None = None,
+        dia: date | None = None,
         page: int = 1,
         por_pagina: int = 12,
     ) -> tuple[list[Session], int]:
         base = select(Session).where(Session.status == SessionStatus.PUBLISHED)
-        base = self._filtrar(base, busca=busca, a_partir_de=a_partir_de)
+        base = self._filtrar(base, busca=busca, a_partir_de=a_partir_de, dia=dia)
 
         total = self.db.scalar(select(func.count()).select_from(base.subquery())) or 0
 
@@ -50,6 +65,34 @@ class SessionRepository:
             )
         )
         return itens, total
+
+    def dias_com_sessao(
+        self, *, a_partir_de: datetime, ate: datetime, busca: str | None = None
+    ) -> dict[date, int]:
+        """Quantas sessões há em cada dia, para a barra de datas da vitrine.
+
+        Uma consulta agregada em vez de uma por dia: a barra mostra duas
+        semanas, e catorze idas ao banco para desenhar um filtro seria caro
+        para o que a informação vale.
+        """
+        coluna = cast(func.timezone(FUSO_EXIBICAO, Session.starts_at), Date)
+
+        consulta = (
+            select(coluna.label("dia"), func.count().label("total"))
+            .where(
+                Session.status == SessionStatus.PUBLISHED,
+                Session.starts_at >= a_partir_de,
+                Session.starts_at < ate,
+            )
+            .group_by(coluna)
+        )
+        if busca:
+            termo = f"%{busca.strip()}%"
+            consulta = consulta.where(
+                or_(Session.movie_title.ilike(termo), Session.movie_overview.ilike(termo))
+            )
+
+        return {linha.dia: linha.total for linha in self.db.execute(consulta)}
 
     def list_by_organizer(self, organizer_id: uuid.UUID) -> list[Session]:
         return list(

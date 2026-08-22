@@ -109,22 +109,98 @@ class TestIsolamentoEntreOrganizadores:
         assert r.status_code == 404
 
 
-class TestDesativacao:
-    def test_desativar_remove_da_listagem(self, client):
+class TestRemocao:
+    """Apagar de vez ou desativar depende do historico da sala.
+
+    Sala que nunca serviu nao tem historico a preservar, e deixa-la desativada
+    so acumularia lixo na lista. Sala que ja teve sessao fica, porque sessao
+    passada aponta para ela. Ver decisao D28.
+    """
+
+    def test_sala_sem_sessao_e_apagada(self, client):
         headers = auth(client, ORGANIZADOR)
         criada = client.post("/rooms", json=SALA, headers=headers).json()
 
-        r = client.delete(f"/rooms/{criada['id']}", headers=headers)
-        assert r.status_code == 200
-        assert r.json()["active"] is False
+        assert client.delete(f"/rooms/{criada['id']}", headers=headers).status_code == 204
+        assert client.get(f"/rooms/{criada['id']}", headers=headers).status_code == 404
         assert client.get("/rooms", headers=headers).json() == []
 
-    def test_sala_desativada_continua_acessivel_por_id(self, client):
-        """A sala não é apagada: sessões passadas apontam para ela."""
+    def test_sala_com_sessao_passada_e_desativada(self, client):
+        """Nao some: quem comprou precisa continuar vendo onde a sessao foi."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.catalog.fixture import FixtureProvider
+        from app.models.session import Session
+        from tests.conftest import TestSession
+
         headers = auth(client, ORGANIZADOR)
-        criada = client.post("/rooms", json=SALA, headers=headers).json()
-        client.delete(f"/rooms/{criada['id']}", headers=headers)
-        assert client.get(f"/rooms/{criada['id']}", headers=headers).status_code == 200
+        sala = client.post("/rooms", json=SALA, headers=headers).json()
+
+        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
+        sessao = client.post(
+            "/organizer/sessions",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "starts_at": quando.isoformat(),
+                "prices": [
+                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                ],
+            },
+            headers=headers,
+        ).json()
+
+        # Envelhece a sessao em vez de esperar dois dias.
+        db = TestSession()
+        try:
+            import uuid as _uuid
+
+            registro = db.get(Session, _uuid.UUID(sessao["id"]))
+            registro.starts_at = datetime.now(timezone.utc) - timedelta(days=1)
+            db.commit()
+        finally:
+            db.close()
+
+        r = client.delete(f"/rooms/{sala['id']}", headers=headers)
+        assert r.status_code == 200
+        assert r.json()["active"] is False
+
+        # Continua acessivel por id, e some da lista de escolha.
+        assert client.get(f"/rooms/{sala['id']}", headers=headers).status_code == 200
+        assert client.get("/rooms", headers=headers).json() == []
+
+    def test_sala_com_sessao_futura_nao_sai(self, client):
+        """Ha gente podendo comprar para ela agora."""
+        from datetime import datetime, timedelta, timezone
+
+        from app.catalog.fixture import FixtureProvider
+
+        headers = auth(client, ORGANIZADOR)
+        sala = client.post("/rooms", json=SALA, headers=headers).json()
+        quando = (datetime.now(timezone.utc) + timedelta(days=3)).replace(microsecond=0)
+        client.post(
+            "/organizer/sessions",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "starts_at": quando.isoformat(),
+                "prices": [
+                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                ],
+                "publish": True,
+            },
+            headers=headers,
+        )
+
+        r = client.delete(f"/rooms/{sala['id']}", headers=headers)
+        assert r.status_code == 409
+        assert "futura" in r.json()["detail"]
+        assert client.get("/rooms", headers=headers) .json() != []
+
+    def test_sala_de_outro_nao_e_removida(self, client):
+        criada = client.post("/rooms", json=SALA, headers=auth(client, ORGANIZADOR)).json()
+        r = client.delete(f"/rooms/{criada['id']}", headers=auth(client, OUTRO_ORGANIZADOR))
+        assert r.status_code == 404
 
 
 class TestNumeracaoContinua:

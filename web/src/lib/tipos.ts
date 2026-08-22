@@ -149,6 +149,18 @@ export interface SessionListItem {
   max_price_cents: number | null;
 }
 
+/** Um dia da barra de datas da vitrine, com quantas sessões tem. */
+export interface DayInCartaz {
+  date: string;
+  total: number;
+}
+
+/** Resultado da criação em lote: o que entrou e o que ficou de fora. */
+export interface BatchResult {
+  created: SessionDetail[];
+  skipped: { date: string; reason: string }[];
+}
+
 export interface SessionPage {
   items: SessionListItem[];
   total: number;

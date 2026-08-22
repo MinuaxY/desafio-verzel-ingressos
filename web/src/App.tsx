@@ -16,6 +16,7 @@ import { MeusIngressos } from "./pages/MeusIngressos";
 import { IngressoCompartilhado } from "./pages/IngressoCompartilhado";
 import { Organizador } from "./pages/Organizador";
 import { NovaSessao } from "./pages/NovaSessao";
+import { EditarSessao } from "./pages/EditarSessao";
 import { Salas } from "./pages/Salas";
 
 /* A portaria carrega o leitor de QR, que sozinho pesa mais que o resto da
@@ -99,6 +100,14 @@ export default function App() {
               element={
                 <ProtectedRoute permitido={["ORGANIZER"]}>
                   <NovaSessao />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/organizador/sessao/:id"
+              element={
+                <ProtectedRoute permitido={["ORGANIZER"]}>
+                  <EditarSessao />
                 </ProtectedRoute>
               }
             />

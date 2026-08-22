@@ -4,7 +4,7 @@ Valores monetários trafegam em **centavos inteiros** (`price_cents`). O front
 formata para exibir. Ver decisão D14.
 """
 import uuid
-from datetime import datetime
+from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -44,6 +44,39 @@ class SessionCreate(BaseModel):
         if len(ids) != len(set(ids)):
             raise ValueError("Há mais de um preço para o mesmo setor")
         return v
+
+
+class SessionRepeat(BaseModel):
+    """Criação em lote: a mesma sessão em vários dias, no mesmo horário.
+
+    As datas vêm escolhidas uma a uma, e não como regra do tipo "toda sexta
+    até tal dia". Programação de cinema não é regular — um filme roda de
+    quinta a domingo numa semana e só no fim de semana na seguinte —, e uma
+    regra que não cobre isso obrigaria a apagar depois o que ela criou a mais.
+    Ver decisão D27.
+    """
+
+    catalog_id: str = Field(min_length=1, max_length=40)
+    room_id: uuid.UUID
+    dates: list[date] = Field(min_length=1, max_length=60)
+    time_of_day: time = Field(description="Horário local da sessão, ex.: 19:00")
+    audio: AudioType = AudioType.SUBTITLED
+    screen_format: ScreenFormat = ScreenFormat.TWO_D
+    prices: list[SectorPriceIn] = Field(min_length=1)
+    publish: bool = False
+
+    @field_validator("prices")
+    @classmethod
+    def um_preco_por_setor(cls, v: list[SectorPriceIn]) -> list[SectorPriceIn]:
+        ids = [p.sector_id for p in v]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Há mais de um preço para o mesmo setor")
+        return v
+
+
+class SkippedDate(BaseModel):
+    date: date
+    reason: str
 
 
 class SessionUpdate(BaseModel):
@@ -119,6 +152,20 @@ class SessionPage(BaseModel):
     total: int
     page: int
     total_pages: int
+
+
+class BatchResult(BaseModel):
+    """O que o lote criou, e o que ficou de fora com o motivo."""
+
+    created: list[SessionOut]
+    skipped: list[SkippedDate]
+
+
+class DayInCartaz(BaseModel):
+    """Um dia da barra de datas, com quantas sessões tem."""
+
+    date: date
+    total: int
 
 
 # --------------------------------------------------------------------------

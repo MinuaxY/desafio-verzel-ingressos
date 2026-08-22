@@ -26,6 +26,26 @@ export function Organizador() {
 
   useEffect(carregar, []);
 
+  async function excluir(s: SessionDetail) {
+    if (
+      !window.confirm(
+        `Excluir a sessão de ${s.movie.title}? Isso apaga o rascunho de vez.`,
+      )
+    )
+      return;
+
+    setAgindo(s.id);
+    setErro("");
+    try {
+      await request(`/organizer/sessions/${s.id}`, { method: "DELETE" });
+      setSessoes((atual) => atual?.filter((x) => x.id !== s.id) ?? null);
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : "Não foi possível excluir.");
+    } finally {
+      setAgindo("");
+    }
+  }
+
   async function acao(id: string, caminho: string, confirmacao?: string) {
     if (confirmacao && !window.confirm(confirmacao)) return;
 
@@ -107,6 +127,15 @@ export function Organizador() {
                 </div>
 
                 <div className="linha-sessao__acoes">
+                  {s.status !== "CANCELLED" && (
+                    <Link
+                      className="btn btn--ghost btn--mini"
+                      to={`/organizador/sessao/${s.id}`}
+                    >
+                      Editar
+                    </Link>
+                  )}
+
                   {s.status === "PUBLISHED" && (
                     <>
                       <Link className="btn btn--ghost btn--mini" to={`/sessao/${s.id}`}>
@@ -124,14 +153,27 @@ export function Organizador() {
                   )}
 
                   {s.status === "DRAFT" && (
-                    <button
-                      className="btn btn--primary btn--mini"
-                      type="button"
-                      disabled={ocupado}
-                      onClick={() => acao(s.id, "publish")}
-                    >
-                      Publicar
-                    </button>
+                    <>
+                      <button
+                        className="btn btn--primary btn--mini"
+                        type="button"
+                        disabled={ocupado}
+                        onClick={() => acao(s.id, "publish")}
+                      >
+                        Publicar
+                      </button>
+                      {/* Excluir só aparece em rascunho: publicada sai do
+                          cartaz com despublicar, e sessão com ingresso
+                          vendido não some. Ver decisão D28. */}
+                      <button
+                        className="btn btn--ghost btn--mini btn--perigo"
+                        type="button"
+                        disabled={ocupado}
+                        onClick={() => excluir(s)}
+                      >
+                        Excluir
+                      </button>
+                    </>
                   )}
 
                   {s.status !== "CANCELLED" && (
