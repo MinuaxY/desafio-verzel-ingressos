@@ -183,7 +183,39 @@ def run() -> None:
                 .first()
             )
             if ja_existe:
-                existentes.append(f"sessão {filme.title}")
+                # A sessão já existe, mas pode ter nascido antes de alguma
+                # coluna existir — foi o que aconteceu com a classificação
+                # indicativa, adicionada depois que o ambiente publicado já
+                # tinha dados. Completar aqui evita que a demonstração fique
+                # com campo vazio, e não sobrescreve nada que já esteja
+                # preenchido.
+                remendos = []
+                if ja_existe.movie_age_rating is None and filme.age_rating:
+                    ja_existe.movie_age_rating = filme.age_rating
+                    remendos.append("classificação")
+                if ja_existe.movie_backdrop_url is None and filme.backdrop_url:
+                    ja_existe.movie_backdrop_url = filme.backdrop_url
+                    remendos.append("arte")
+
+                # Áudio e formato não têm estado "vazio": a migration deu a
+                # todas as sessões antigas o padrão do banco. Só ajusta quando
+                # a sessão ainda está exatamente nesse padrão e o seed previa
+                # outra coisa — assim uma escolha deliberada do organizador
+                # nunca é sobrescrita.
+                no_padrao = (
+                    ja_existe.audio is AudioType.SUBTITLED
+                    and ja_existe.screen_format is ScreenFormat.TWO_D
+                )
+                if no_padrao and (audio, formato) != (AudioType.SUBTITLED, ScreenFormat.TWO_D):
+                    ja_existe.audio = audio
+                    ja_existe.screen_format = formato
+                    remendos.append("exibição")
+
+                if remendos:
+                    db.commit()
+                    criados.append(f"sessão {filme.title} — completada ({', '.join(remendos)})")
+                else:
+                    existentes.append(f"sessão {filme.title}")
                 continue
 
             sessao = Session(
