@@ -117,31 +117,54 @@ class Sector(Base):
         return self.rows * self.seats_per_row
 
     @property
+    def row_offset(self) -> int:
+        """Quantas fileiras da sala vêm antes deste setor.
+
+        As fileiras são contínuas na sala inteira, e não reiniciadas a cada
+        setor: numa sala com Plateia de 6 fileiras e VIP de 2, o VIP é G e H,
+        não A e B de novo. Duas fileiras "A" na mesma sala confundem quem
+        procura o lugar, e fariam o ingresso dizer "A1" para dois assentos
+        diferentes. Ver decisão D23.
+        """
+        if self.room is None:
+            return 0
+        anteriores = [
+            s
+            for s in self.room.sectors
+            if (s.display_order, s.name) < (self.display_order, self.name)
+        ]
+        return sum(s.rows for s in anteriores)
+
+    @property
+    def row_letters(self) -> list[str]:
+        inicio = self.row_offset
+        return [chr(ord("A") + inicio + i) for i in range(self.rows)]
+
+    @property
     def seat_codes(self) -> list[str]:
-        """Códigos das poltronas do setor: A1, A2, ... B1, B2.
+        """Códigos das poltronas: G1, G2, … H8, já com o deslocamento da sala.
 
         Derivados da geometria em vez de gravados: pré-criar uma linha por
         poltrona encheria o banco de registros que só interessam quando
         alguém compra. Ver decisão D15.
         """
         return [
-            f"{chr(ord('A') + fileira)}{numero}"
-            for fileira in range(self.rows)
+            f"{letra}{numero}"
+            for letra in self.row_letters
             for numero in range(1, self.seats_per_row + 1)
         ]
 
     def has_seat(self, seat_code: str) -> bool:
         """A poltrona existe na geometria deste setor?
 
-        Impede marcar como acessível uma poltrona que não existe — G1 num setor
-        que só vai até a fileira F.
+        Impede marcar como acessível uma poltrona que não existe — Z9 num setor
+        que vai só até a fileira H.
         """
         codigo = seat_code.strip().upper()
         if len(codigo) < 2 or not codigo[1:].isdigit():
             return False
-        fileira = ord(codigo[0]) - ord("A")
         numero = int(codigo[1:])
-        return 0 <= fileira < self.rows and 1 <= numero <= self.seats_per_row
+        return codigo[0] in self.row_letters and 1 <= numero <= self.seats_per_row
 
 
 class SeatAttribute(Base):

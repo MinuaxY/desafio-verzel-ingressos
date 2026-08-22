@@ -276,6 +276,48 @@ não ler apresentação.
 **A prévia usa dados reais**, não ilustração: o pôster da próxima sessão é a arte da abertura.
 Material de verdade convence mais que imagem genérica, e já estava disponível.
 
+## D23 — A sala tem numeração contínua, e a tela fica embaixo
+
+**Origem:** o Paulo apontou que o mapa não estava centralizado com a tela e que o VIP não
+parecia estar em lugar nenhum da sala. Mandou como referência o mapa do UCI/Ingresso.com.
+
+**O que o desenho anterior errava:** os setores eram retângulos empilhados, cada um começando
+na fileira A. Uma sala com Plateia A–F e VIP A–B tinha **duas fileiras A**, e o ingresso diria
+"A1" para dois assentos diferentes. Não era problema de layout: era o modelo não corresponder
+a uma sala.
+
+**Escolhido:**
+- As fileiras correm pela sala inteira. Plateia A–F, VIP G–H. O deslocamento de cada setor é
+  calculado a partir dos setores anteriores, não escrito nos dados — mudar o tamanho de um
+  setor não obriga a reescrever os códigos do seguinte.
+- A tela fica **embaixo**, e as fileiras crescem para cima. É como se lê uma planta de sala, e
+  é a convenção dos sites de cinema. A fileira A é a mais próxima da tela.
+- O VIP fica no fundo, longe da tela — que é onde ficam os lugares premium num cinema.
+- A sala tem a largura do próprio conteúdo e é centralizada, para a tela ficar sobre as
+  poltronas e não sobre o container.
+
+**Trava nova:** a soma das fileiras de todos os setores não pode passar de 26. As fileiras são
+nomeadas por letra, e sem esse limite o setor seguinte à fileira Z receberia caracteres que
+não são letras.
+
+**O que isso quebrou, e por que foi bom:** dois testes usavam "A1" no setor VIP e passaram a
+falhar. Era o comportamento correto mudando — e a suíte avisou antes de qualquer pessoa ver.
+
+## D24 — Poltrona ocupada mostra quem está sentado
+
+**Quatro tentativas.** Transparente com opacidade baixa sumia na legenda, onde a amostra
+aparece sozinha. Cor chapada não resolveu: qualquer cinza fica perto do fundo da página ou
+perto da poltrona livre. Hachura ficou tímida demais para leitura de relance, que é como um
+mapa de assentos é usado. O X funcionava, mas ainda pedia um segundo de tradução.
+
+**Escolhido:** a silhueta de uma pessoa sentada, sobre azul-acinzentado — o que o UCI faz, e
+agora entendo por quê. A figura não precisa ser interpretada: o lugar está ocupado porque tem
+alguém nele.
+
+O azul separa esse estado dos outros dois sem competir com o âmbar, que na interface inteira
+significa ação. Os três estados ficam inconfundíveis: neutro escuro é livre, âmbar é escolhido,
+azul com gente é ocupado — e nenhum depende de distinguir matiz para ser lido.
+
 ---
 
 ## Decisões pendentes

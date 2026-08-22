@@ -159,9 +159,11 @@ class TestReserva:
         assert r.json()["tickets"][0]["status"] == "RESERVED"
 
     def test_total_soma_os_setores(self, client, cenario):
+        # A Plateia ocupa A a C, entao o VIP comeca em D: as fileiras sao
+        # continuas na sala, nao reiniciadas por setor. Ver decisao D23.
         r = reserva(client, cenario, [
             {"sector_id": cenario["plateia"], "seat_code": "A3"},
-            {"sector_id": cenario["vip"], "seat_code": "A1"},
+            {"sector_id": cenario["vip"], "seat_code": "D1"},
         ])
         assert r.json()["total_cents"] == 8000
 
@@ -293,13 +295,13 @@ class TestCarteira:
         reserva(client, cenario, [{"sector_id": cenario["plateia"], "seat_code": "A3"}])
 
         pago = reserva(
-            client, cenario, [{"sector_id": cenario["vip"], "seat_code": "A2"}]
+            client, cenario, [{"sector_id": cenario["vip"], "seat_code": "D2"}]
         ).json()
         client.post(f"/orders/{pago['id']}/pay", json=CARTAO_OK, headers=cenario["cliente"])
 
         ingressos = client.get("/me/tickets", headers=cenario["cliente"]).json()
         assert len(ingressos) == 1
-        assert ingressos[0]["seat_code"] == "A2"
+        assert ingressos[0]["seat_code"] == "D2"
         assert ingressos[0]["movie_title"]
         assert ingressos[0]["code"]
 

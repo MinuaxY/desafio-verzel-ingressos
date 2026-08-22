@@ -125,3 +125,67 @@ class TestDesativacao:
         criada = client.post("/rooms", json=SALA, headers=headers).json()
         client.delete(f"/rooms/{criada['id']}", headers=headers)
         assert client.get(f"/rooms/{criada['id']}", headers=headers).status_code == 200
+
+
+class TestNumeracaoContinua:
+    """As fileiras correm pela sala inteira, nao reiniciam a cada setor.
+
+    Duas fileiras "A" na mesma sala confundem quem procura o lugar, e fariam o
+    ingresso dizer "A1" para dois assentos diferentes. Ver decisao D23.
+    """
+
+    def test_setor_seguinte_continua_o_alfabeto(self, client):
+        sala = client.post("/rooms", json=SALA, headers=auth(client, ORGANIZADOR)).json()
+        plateia, vip = sala["sectors"]
+        assert (plateia["rows"], vip["rows"]) == (5, 2)
+        # Plateia A-E, entao o VIP comeca em F.
+        assert plateia["name"] == "Plateia"
+        assert vip["name"] == "VIP"
+
+    def test_sala_nao_pode_passar_do_alfabeto(self, client):
+        """As fileiras sao nomeadas por letra: somadas, nao cabem mais que 26."""
+        gigante = {
+            "name": "Sala Gigante",
+            "sectors": [
+                {"name": "Baixo", "rows": 20, "seats_per_row": 10, "display_order": 0},
+                {"name": "Alto", "rows": 10, "seats_per_row": 10, "display_order": 1},
+            ],
+        }
+        r = client.post("/rooms", json=gigante, headers=auth(client, ORGANIZADOR))
+        assert r.status_code == 422
+        assert "26" in r.json()["detail"]
+
+    def test_no_limite_exato_e_aceito(self, client):
+        limite = {
+            "name": "Sala no Limite",
+            "sectors": [
+                {"name": "Baixo", "rows": 20, "seats_per_row": 4, "display_order": 0},
+                {"name": "Alto", "rows": 6, "seats_per_row": 4, "display_order": 1},
+            ],
+        }
+        r = client.post("/rooms", json=limite, headers=auth(client, ORGANIZADOR))
+        assert r.status_code == 201
+
+    def test_acessivel_do_segundo_setor_usa_a_letra_deslocada(self, client):
+        """Marcar "A1" no segundo setor deve falhar: aquela fileira e do
+        primeiro. O codigo correto usa a letra deslocada."""
+        base = {
+            "name": "Sala Deslocada",
+            "sectors": [
+                {"name": "Plateia", "rows": 3, "seats_per_row": 5, "display_order": 0},
+                {
+                    "name": "VIP",
+                    "rows": 2,
+                    "seats_per_row": 4,
+                    "display_order": 1,
+                    "special_seats": [{"seat_code": "A1", "kind": "WHEELCHAIR"}],
+                },
+            ],
+        }
+        headers = auth(client, ORGANIZADOR)
+        r = client.post("/rooms", json=base, headers=headers)
+        assert r.status_code == 422
+
+        base["sectors"][1]["special_seats"] = [{"seat_code": "D1", "kind": "WHEELCHAIR"}]
+        base["name"] = "Sala Deslocada 2"
+        assert client.post("/rooms", json=base, headers=headers).status_code == 201

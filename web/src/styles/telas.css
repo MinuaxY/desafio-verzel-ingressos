@@ -99,15 +99,17 @@
   margin: 0 auto;
 }
 
+/* A tela fica embaixo do mapa, curvada como a de uma sala vista de cima, com
+   o brilho subindo em direcao as poltronas. */
 .tela {
   text-align: center;
-  padding: var(--space-2);
+  padding: var(--space-3) var(--space-2);
   font-size: var(--text-xs);
   letter-spacing: 0.4em;
   color: var(--text-faint);
-  background: linear-gradient(to bottom, var(--surface-3), transparent);
-  border-top: 2px solid var(--surface-3);
-  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  background: linear-gradient(to top, var(--surface-3), transparent);
+  border-bottom: 2px solid var(--surface-3);
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
 }
 
 .setor {
@@ -163,33 +165,28 @@
 .poltrona:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
 .poltrona--escolhida { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 
-/* Assento vendido: hachurado.
+/* Assento vendido: silhueta de quem esta sentado, sobre azul-acinzentado.
  *
- * Duas tentativas anteriores falharam pelo mesmo motivo. Transparente com
- * opacidade baixa funcionava no mapa, por contraste com as vizinhas, mas sumia
- * na legenda, onde a amostra aparece sozinha. Trocar por uma cor chapada
- * tambem nao resolveu: qualquer cinza escolhido fica perto do fundo da pagina
- * ou perto da poltrona livre.
+ * Tres tentativas antes desta erraram pela mesma razao — tentavam marcar a
+ * ausencia com abstracao. Transparente sumia na legenda; hachura ficou timida;
+ * o X funcionava, mas ainda pedia um segundo de traducao.
  *
- * A hachura resolve os dois de uma vez. Nao depende de acertar um tom entre
- * dois vizinhos, se distingue por textura em vez de matiz, e e como mapas de
- * assento de verdade marcam lugar vendido.
+ * A figura de uma pessoa nao pede nenhum, e o azul separa o estado das outras
+ * duas cores da tela sem competir com o ambar, que aqui significa acao. Os
+ * tres estados ficam inconfundiveis: neutro escuro e livre, ambar e escolhido,
+ * azul com gente e ocupado.
  */
 .poltrona--ocupada {
-  background:
-    repeating-linear-gradient(
-      -45deg,
-      var(--surface-3) 0 2px,
-      var(--surface) 2px 5px
-    );
-  border-color: var(--surface-3);
-  color: var(--text-faint);
+  background: #4a5568;
+  border-color: #5a6678;
+  color: #c3ccd9;
   cursor: not-allowed;
-  /* O numero da poltrona ocupada nao interessa; o que interessa e que ela
-     esta fora. O risco reforca isso sem depender de cor. */
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
 }
+
+/* Sem hover: nao ha o que fazer com uma poltrona vendida, e responder ao mouse
+   sugeriria que ha. */
+.poltrona--ocupada:hover { border-color: #5a6678; color: #c3ccd9; }
+.poltrona--ocupada svg { pointer-events: none; }
 
 /* Acessivel tem borda tracejada e sigla, alem da cor: quem nao distingue
    matiz precisa achar a poltrona do mesmo jeito. Ver decisao D16. */

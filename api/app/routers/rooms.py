@@ -12,6 +12,7 @@ from app.services.room_service import (
     RoomNameAlreadyUsed,
     RoomNotFound,
     RoomService,
+    RoomTooTall,
     SeatOutsideSector,
 )
 
@@ -40,6 +41,12 @@ def criar(
         return RoomOut.model_validate(RoomService(db).criar(user.id, dados))
     except RoomNameAlreadyUsed:
         raise HTTPException(status.HTTP_409_CONFLICT, "Você já tem uma sala com esse nome")
+    except RoomTooTall as e:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"A sala tem {e.total} fileiras somando todos os setores, e o limite é 26 "
+            "— as fileiras são nomeadas por letra.",
+        )
     except SeatOutsideSector as e:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,

@@ -52,18 +52,24 @@ SALA = {
             "rows": 6,
             "seats_per_row": 12,
             "display_order": 0,
-            # Fileira A, junto ao acesso: dois espaços para cadeira de rodas,
-            # cada um com a poltrona do acompanhante ao lado, mais dois assentos
-            # largos. A fileira F fica no corredor, para mobilidade reduzida.
+            # Posicao relativa ao setor: (fileira, poltrona, tipo). A letra e
+            # calculada a partir do deslocamento da sala, e nao escrita a mao —
+            # fixar "A1" quebrou quando as fileiras passaram a ser continuas e
+            # o VIP virou G e H.
+            #
+            # Primeira fileira, junto ao acesso: dois espacos para cadeira de
+            # rodas, cada um com a poltrona do acompanhante ao lado, mais dois
+            # assentos largos. A ultima fileira fica no corredor, para
+            # mobilidade reduzida.
             "special_seats": [
-                ("A1", SeatKind.WHEELCHAIR),
-                ("A2", SeatKind.COMPANION),
-                ("A3", SeatKind.WHEELCHAIR),
-                ("A4", SeatKind.COMPANION),
-                ("A11", SeatKind.OBESE),
-                ("A12", SeatKind.OBESE),
-                ("F1", SeatKind.REDUCED_MOBILITY),
-                ("F12", SeatKind.REDUCED_MOBILITY),
+                (0, 1, SeatKind.WHEELCHAIR),
+                (0, 2, SeatKind.COMPANION),
+                (0, 3, SeatKind.WHEELCHAIR),
+                (0, 4, SeatKind.COMPANION),
+                (0, 11, SeatKind.OBESE),
+                (0, 12, SeatKind.OBESE),
+                (5, 1, SeatKind.REDUCED_MOBILITY),
+                (5, 12, SeatKind.REDUCED_MOBILITY),
             ],
         },
         {
@@ -72,8 +78,8 @@ SALA = {
             "seats_per_row": 8,
             "display_order": 1,
             "special_seats": [
-                ("A1", SeatKind.WHEELCHAIR),
-                ("A2", SeatKind.COMPANION),
+                (0, 1, SeatKind.WHEELCHAIR),
+                (0, 2, SeatKind.COMPANION),
             ],
         },
     ],
@@ -97,6 +103,37 @@ HORARIOS = [
     (3, 16, 0, AudioType.DUBBED, ScreenFormat.THREE_D),
     (5, 20, 15, AudioType.SUBTITLED, ScreenFormat.TWO_D),
 ]
+
+
+def _monta_setores() -> list[Sector]:
+    """Constroi os setores com as letras corretas.
+
+    As fileiras sao continuas na sala: com a Plateia ocupando A a F, o VIP
+    comeca em G. O deslocamento e acumulado aqui em vez de escrito nos dados,
+    para que mudar o tamanho de um setor nao exija reescrever os codigos do
+    seguinte.
+    """
+    setores: list[Sector] = []
+    offset = 0
+
+    for s in SALA["sectors"]:
+        setores.append(
+            Sector(
+                name=s["name"],
+                rows=s["rows"],
+                seats_per_row=s["seats_per_row"],
+                display_order=s["display_order"],
+                special_seats=[
+                    SeatAttribute(
+                        seat_code=f"{chr(ord('A') + offset + fileira)}{numero}", kind=tipo
+                    )
+                    for fileira, numero, tipo in s["special_seats"]
+                ],
+            )
+        )
+        offset += s["rows"]
+
+    return setores
 
 
 def _proximo(dias: int, hora: int, minuto: int) -> datetime:
@@ -138,19 +175,7 @@ def run() -> None:
                 organizer_id=organizador.id,
                 name=SALA["name"],
                 location=SALA["location"],
-                sectors=[
-                    Sector(
-                        name=s["name"],
-                        rows=s["rows"],
-                        seats_per_row=s["seats_per_row"],
-                        display_order=s["display_order"],
-                        special_seats=[
-                            SeatAttribute(seat_code=codigo, kind=tipo)
-                            for codigo, tipo in s["special_seats"]
-                        ],
-                    )
-                    for s in SALA["sectors"]
-                ],
+                sectors=_monta_setores(),
             )
             db.add(sala)
             db.commit()

@@ -2,6 +2,23 @@ import { ASSENTO } from "../lib/tipos";
 import type { SectorMap, Seat } from "../lib/tipos";
 import { reais } from "../lib/formato";
 
+/**
+ * Silhueta de quem já está sentado.
+ *
+ * Marcar poltrona vendida com símbolo abstrato — risco, hachura, X — sempre
+ * exigiu um segundo de tradução. A figura de uma pessoa não exige nenhum: o
+ * lugar está ocupado porque tem alguém nele. É o que os mapas de assento de
+ * cinema usam, e por esse motivo.
+ */
+function Ocupante() {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="5" r="3.1" fill="currentColor" />
+      <path d="M2.4 15c0-3.4 2.5-5.6 5.6-5.6s5.6 2.2 5.6 5.6Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export interface Escolha {
   sectorId: string;
   code: string;
@@ -32,16 +49,19 @@ export function MapaDeAssentos({
 
   const cheio = escolhidos.length >= maximo;
 
+  /* A tela fica embaixo, e as fileiras crescem para cima — é como se olha uma
+     planta de sala, e é a convenção dos sites de cinema. A fileira A é a mais
+     próxima da tela; quanto mais alto no desenho, mais ao fundo da sala.
+     Por isso os setores são desenhados do fundo para a frente, e as fileiras
+     de cada um em ordem decrescente. */
+  const doFundoParaTela = [...setores].sort((a, b) => b.display_order - a.display_order);
+
   return (
     // A sala tem a largura do conteúdo e é centralizada: assim a tela fica
     // sobre as poltronas, e não sobre o container inteiro. Um mapa alinhado à
     // esquerda com a tela ao centro não corresponde a sala nenhuma.
     <div className="sala">
-      <div className="tela" aria-hidden="true">
-        <span>TELA</span>
-      </div>
-
-      {setores.map((setor) => (
+      {doFundoParaTela.map((setor) => (
         <div key={setor.id} className="setor">
           <div className="setor__cabecalho">
             <h3 className="setor__nome">{setor.name}</h3>
@@ -49,11 +69,13 @@ export function MapaDeAssentos({
           </div>
 
           <div className="setor__grade" role="group" aria-label={`Poltronas do setor ${setor.name}`}>
-            {agrupaPorFileira(setor).map(([fileira, assentos]) => (
-              <div key={fileira} className="fileira">
-                {/* A letra aparece nas duas pontas, como em sala de verdade.
-                    Além de ser o costume, mantém as poltronas centradas — com
-                    a letra só à esquerda, a fileira inteira ficava deslocada. */}
+            {agrupaPorFileira(setor)
+              .reverse()
+              .map(([fileira, assentos]) => (
+                <div key={fileira} className="fileira">
+                  {/* A letra aparece nas duas pontas, como em sala de verdade.
+                      Além de ser o costume, mantém as poltronas centradas — com
+                      a letra só à esquerda, a fileira inteira ficava deslocada. */}
                 <span className="fileira__letra" aria-hidden="true">
                   {fileira}
                 </span>
@@ -84,18 +106,31 @@ export function MapaDeAssentos({
                       title={tipo?.rotulo}
                       onClick={() => onAlternar(setor, assento)}
                     >
-                      {tipo ? tipo.sigla : assento.code.replace(/^[A-Z]/, "")}
+                      {/* Ocupada mostra a silhueta, não o número: o que
+                          interessa numa poltrona vendida é que já tem alguém
+                          nela. O número segue no rótulo do leitor de tela. */}
+                      {assento.taken ? (
+                        <Ocupante />
+                      ) : tipo ? (
+                        tipo.sigla
+                      ) : (
+                        assento.code.replace(/^[A-Z]/, "")
+                      )}
                     </button>
                   );
                 })}
                 <span className="fileira__letra" aria-hidden="true">
                   {fileira}
                 </span>
-              </div>
-            ))}
+                </div>
+              ))}
           </div>
         </div>
       ))}
+
+      <div className="tela" aria-hidden="true">
+        <span>TELA</span>
+      </div>
 
       <Legenda />
     </div>
@@ -124,7 +159,9 @@ function Legenda() {
         Escolhida
       </span>
       <span className="legenda__item">
-        <span className="poltrona poltrona--ocupada poltrona--amostra" aria-hidden="true" />
+        <span className="poltrona poltrona--ocupada poltrona--amostra" aria-hidden="true">
+          <Ocupante />
+        </span>
         Ocupada
       </span>
       {Object.entries(ASSENTO).map(([chave, { rotulo, sigla }]) => (
