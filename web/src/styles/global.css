@@ -63,12 +63,27 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/*
+ * Um link com cara de botão é botão, e precisa se comportar como tal.
+ *
+ * O estado de repouso já funciona: `.btn--primary` (0,1,0) vence `a` (0,0,1).
+ * O hover é que quebrava — `a:hover` (0,1,1) vencia, pintando o texto de âmbar
+ * sobre o fundo âmbar e sumindo com o rótulo. Declarar a cor junto do hover do
+ * botão (0,3,0) resolve, sem precisar de seletor extra por tipo de elemento.
+ */
+a.btn,
+a.btn:hover { text-decoration: none; }
+
 .btn--primary { background: var(--accent); color: var(--on-accent); }
-.btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
-.btn--primary:active:not(:disabled) { background: var(--accent-press); }
+.btn--primary:hover:not(:disabled) { background: var(--accent-hover); color: var(--on-accent); }
+.btn--primary:active:not(:disabled) { background: var(--accent-press); color: var(--on-accent); }
 
 .btn--ghost { background: transparent; border-color: var(--border); color: var(--text); }
-.btn--ghost:hover:not(:disabled) { background: var(--surface-2); border-color: var(--surface-3); }
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--surface-3);
+  color: var(--text);
+}
 
 .btn--block { width: 100%; }
 
