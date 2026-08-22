@@ -80,9 +80,12 @@ SALA = {
             "rows": 2,
             "seats_per_row": 8,
             "display_order": 1,
-            # Bloco unico com passagem central: o VIP e mais estreito e fica
-            # ao fundo, alinhado ao miolo da plateia.
-            "aisles": [4],
+            # Sem corredor: bloco unico, centralizado sobre o miolo da
+            # plateia. Dividir oito lugares em 4+4 criaria uma passagem que
+            # nao coincide com nenhuma das duas da plateia, e tres corredores
+            # desalinhados fazem o olho ler bagunca mesmo com os centros
+            # iguais. Um bloco solido no centro le como area VIP.
+            "aisles": [],
             "special_seats": [
                 (0, 1, SeatKind.WHEELCHAIR),
                 (0, 2, SeatKind.COMPANION),
