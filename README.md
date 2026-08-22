@@ -246,6 +246,8 @@ está incompleto como produto.
 
 ## Testes
 
+### Back-end
+
 ```bash
 cd api
 python -m pytest -v
@@ -266,6 +268,26 @@ teste passe em SQLite e quebre em produção por causa de enum nativo ou índice
 | `test_acessibilidade.py` | 12 | Marcação de poltronas, validação de geometria |
 | `test_exibicao.py` | 16 | Classificação indicativa, áudio e formato da sessão |
 | `test_concorrencia.py` | 3 | Oito threads disputando a mesma poltrona |
+
+### Front-end
+
+```bash
+cd web
+npm test
+```
+
+**88 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
+`lib` em 95%, `components` em 83%, `auth` em 77%.
+
+| Arquivo | Testes | Cobre |
+|---|---|---|
+| `MapaDeAssentos.test.tsx` | 22 | Orientação da sala, corredores, estados da poltrona, limite de seleção |
+| `api.test.ts` | 12 | Tradução de erro do FastAPI, token, falha de rede |
+| `formato.test.ts` | 15 | Moeda em centavos, faixa de preço, duração, prazo da reserva |
+| `tipos.test.ts` | 12 | Classificação indicativa, rótulos, naturezas de poltrona |
+| `EmCartaz.test.tsx` | 11 | Vitrine pública, busca, estado vazio, servidor fora do ar |
+| `Ingresso.test.tsx` | 9 | QR, código, compartilhamento, ingresso não pago |
+| `ProtectedRoute.test.tsx` | 7 | Acesso por papel, token inválido, espera pela sessão |
 
 ---
 
@@ -307,9 +329,10 @@ conhece HTTP.
 
 O que **não** está pronto, ou está pronto pela metade:
 
-- **Não há testes automatizados de front-end.** Todo o front foi verificado manualmente no
-  navegador, incluindo o fluxo completo de compra e as quatro respostas da portaria. Com mais
-  tempo, o primeiro alvo seria o mapa de assentos.
+- **Os testes de front-end cobrem lógica e componentes, não as páginas inteiras.** O mapa de
+  assentos, o ingresso, a rota protegida e a vitrine têm teste; o checkout, a portaria e o
+  painel do organizador foram verificados manualmente no navegador, de ponta a ponta. Com mais
+  tempo, o próximo alvo seria o fluxo de pagamento.
 - **O cache do catálogo é em memória**, então vale por instância. Com mais de um processo,
   cada um teria o próprio. Trocar por Redis seria o passo seguinte.
 - **A limpeza de reservas vencidas roda no caminho de quem usa**, não em tarefa agendada. O
