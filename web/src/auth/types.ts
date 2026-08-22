@@ -16,7 +16,7 @@ export interface TokenResponse {
 /** Para onde cada papel vai depois de entrar. */
 export const HOME_POR_PAPEL: Record<Role, string> = {
   ORGANIZER: "/organizador",
-  CUSTOMER: "/eventos",
+  CUSTOMER: "/em-cartaz",
   GATE: "/portaria",
 };
 
