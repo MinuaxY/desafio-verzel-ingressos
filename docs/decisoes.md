@@ -174,6 +174,64 @@ até a fileira F criaria um lugar que o sistema acha que existe e a sala não te
 
 Ambos vão ao README como limite consciente, não como esquecimento.
 
+## D17 — Link de compartilhamento com token próprio
+
+**Contexto:** o enunciado pede que o cliente compartilhe um ingresso por link.
+
+**Escolhido:** o ingresso ganha um `share_token` opaco, diferente do código assinado do QR.
+A página aberta pelo link mostra o ingresso **e o QR**.
+
+**O que isto não é:** não é uma segunda camada de proteção. Quem abre o link consegue
+entrar com o ingresso — e precisa conseguir: comprar três lugares e mandar um para cada
+amigo é o caso de uso, e um link que não passasse na portaria não serviria para nada.
+
+**Por que separar, então:** para que o código de entrada não trafegue na URL, onde ficaria
+registrado em histórico de navegador, log de servidor e cabeçalho de origem. O token na
+barra de endereço é descartável; o código assinado vai no corpo da resposta.
+
+## D18 — Pagamento simulado decidido pelo número do cartão
+
+**Descartado:** sortear aprovação e recusa. Quem estivesse avaliando não conseguiria
+provocar a recusa de propósito, e metade do fluxo que o enunciado pede explicitamente
+ficaria invisível.
+
+**Escolhido:** o desfecho vem do número do cartão, como nos ambientes de teste dos
+provedores de verdade. Qualquer número válido aprova; dois números específicos sempre
+recusam, um por "cartão recusado" e outro por "saldo insuficiente". Os números vão no
+README.
+
+**Consequência:** a recusa é demonstrável em um clique, e o teste que a cobre é
+determinístico.
+
+## D19 — A portaria sempre responde 200
+
+**Descartado:** devolver 404 para ingresso inexistente e 409 para já utilizado.
+
+**Escolhido:** a validação responde 200 com o veredito no corpo — `VALID`, `INVALID`,
+`ALREADY_USED` ou `WRONG_SESSION`.
+
+**Por quê:** "este ingresso já foi usado" é uma resposta bem-sucedida a uma pergunta
+legítima, não uma falha de requisição. Com código de erro, a tela da portaria trataria o
+caso mais importante do fluxo como exceção, e o operador veria uma mensagem de erro
+genérica em vez do veredito.
+
+**Detalhe de ordem:** sessão errada é verificada **antes** de reuso. Quem entrou
+legitimamente numa sala e apareceu na porta errada precisa ouvir "sessão errada", e não
+"já utilizado".
+
+## D20 — Reserva expira e devolve o assento
+
+**Problema:** um pedido que ninguém paga prenderia a poltrona para sempre.
+
+**Escolhido:** o pedido nasce com prazo. Passado o prazo sem pagamento, os ingressos viram
+cancelados e o pedido, expirado — e o índice único parcial faz a poltrona voltar ao estoque
+sem nenhuma limpeza adicional.
+
+**Onde a limpeza roda:** no caminho de quem usa, antes de qualquer leitura ou escrita de
+disponibilidade, e não em tarefa agendada. O projeto não tem processo de fundo, e depender
+de um seria depender de algo que a avaliação não vai ligar. O custo é um UPDATE que quase
+sempre não encontra nada.
+
 ---
 
 ## Decisões pendentes

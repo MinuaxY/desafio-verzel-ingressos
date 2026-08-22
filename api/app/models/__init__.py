@@ -1,4 +1,12 @@
 """Agrega os models para que o Alembic enxergue todas as tabelas."""
+from app.models.order import (  # noqa: F401
+    MINUTOS_PARA_PAGAR,
+    OCUPAM_ASSENTO,
+    Order,
+    OrderStatus,
+    Ticket,
+    TicketStatus,
+)
 from app.models.room import (  # noqa: F401
     MAX_FILEIRAS,
     MAX_POLTRONAS_POR_FILEIRA,
@@ -13,6 +21,10 @@ from app.models.user import Role, User  # noqa: F401
 __all__ = [
     "MAX_FILEIRAS",
     "MAX_POLTRONAS_POR_FILEIRA",
+    "MINUTOS_PARA_PAGAR",
+    "OCUPAM_ASSENTO",
+    "Order",
+    "OrderStatus",
     "Role",
     "Room",
     "SeatAttribute",
@@ -21,5 +33,7 @@ __all__ = [
     "Session",
     "SessionSectorPrice",
     "SessionStatus",
+    "Ticket",
+    "TicketStatus",
     "User",
 ]
