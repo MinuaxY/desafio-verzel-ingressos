@@ -22,4 +22,6 @@ fi
 # tráfego, sem erro nenhum no log.
 PORTA="${PORT:-8000}"
 echo "→ subindo em 0.0.0.0:${PORTA}"
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORTA}" --proxy-headers --forwarded-allow-ips='*'
+# --no-server-header: o cabecalho "server: uvicorn" so entrega a stack a
+# quem estiver procurando alvo, e nao serve para mais nada.
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORTA}" --proxy-headers --forwarded-allow-ips='*' --no-server-header

@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.core.seguranca_http import instalar as instalar_seguranca
 from app.routers import auth, catalog, gate, orders, rooms, sessions
 
 settings = get_settings()
@@ -12,6 +13,8 @@ app = FastAPI(
     description="Plataforma de sessões de cinema e ingressos. Desafio Elite Dev.",
     version="0.1.0",
 )
+
+instalar_seguranca(app)
 
 app.add_middleware(
     CORSMiddleware,

@@ -244,6 +244,79 @@ está incompleto como produto.
 
 ---
 
+## Segurança e dados pessoais
+
+Uma revisão dedicada foi feita no fim do projeto. O que segue é o resultado, incluindo o que
+**não** foi resolvido.
+
+### O que está protegido
+
+| | |
+|---|---|
+| **Senhas** | bcrypt, nunca em texto. Hash calculado no servidor |
+| **Autorização** | Verificada por papel em cada rota, com 403 distinto de 401, e coberta por testes |
+| **Enumeração de contas** | Senha errada e e-mail inexistente devolvem exatamente a mesma resposta |
+| **Recursos de terceiros** | Sala de outro organizador responde 404, não 403: confirmar a existência já entregaria informação |
+| **Ingresso** | QR assinado com HMAC-SHA256 e segredo próprio, comparado em tempo constante |
+| **Segredos** | Fora do repositório; em produção são gerados pela plataforma e ninguém os vê |
+| **Força bruta** | Cinco tentativas de login por minuto, por IP **e** e-mail |
+| **Cabeçalhos** | `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, e HSTS sob HTTPS |
+| **Mensagens de erro** | Validação devolve só local e motivo, sem o parser por dentro nem o valor enviado |
+| **CORS** | Restrito às origens declaradas; verificado contra produção |
+| **Injeção de SQL** | Consultas via SQLAlchemy, sem concatenação |
+| **Contêiner** | A API roda com usuário sem privilégio |
+
+**Dado de pagamento não é retido.** O número do cartão chega, decide o desfecho e é
+descartado — não existe coluna de cartão em tabela nenhuma, e nada disso vai para log.
+
+### O que não foi resolvido, e por quê
+
+**O token fica no `localStorage`, não em cookie `httpOnly`.** Cookie seria mais seguro contra
+XSS, mas aqui há uma razão concreta contra: o front está na Vercel e a API no Render, em
+domínios diferentes. Cookie entre domínios exige `SameSite=None`, o que **reabre CSRF** e
+passaria a exigir token anti-CSRF. Trocaria uma exposição por outra, e exigiria refazer a
+autenticação inteira num projeto já validado. Fica registrado como o primeiro item a mudar se
+o sistema fosse a público — junto com pôr front e API no mesmo domínio.
+
+**Não há revogação de token.** Sair apaga o token do navegador, mas o servidor aceitaria
+aquele token até expirar, em oito horas. Revogar de verdade exige lista compartilhada entre
+instâncias, e o projeto não tem esse armazenamento.
+
+**O limite de tentativas vive em memória**, então vale por instância. Com mais de um processo,
+cada um contaria por si — mesma limitação do cache do catálogo, mesma resposta: Redis seria o
+passo seguinte.
+
+**As contas de demonstração têm senha pública neste README.** É proposital, para a avaliação
+ser possível sem cadastro — mas significa que, no ambiente publicado, qualquer pessoa pode
+entrar como organizador e criar ou cancelar sessões.
+
+**A documentação da API está aberta em produção** (`/docs`). Desejável aqui, para a avaliação;
+em sistema real, ficaria atrás de autenticação.
+
+### LGPD
+
+**A favor:** coleta mínima — nome, e-mail e hash de senha, nada além do necessário para o
+sistema funcionar. Dado de pagamento não é retido. Nenhum dado pessoal aparece em URL.
+
+**O que não existe, e um sistema em produção precisaria ter:**
+
+- Política de privacidade e base legal declarada
+- Registro de consentimento
+- Direitos do titular: acesso, correção, **exclusão** e portabilidade — hoje o usuário não
+  consegue apagar a própria conta
+- Prazo de retenção e política de descarte
+- Registro de quem acessou dado pessoal
+
+Isso não foi implementado porque exclusão de conta feita pela metade é pior que ausente: sem
+política de retenção definida, apagar um usuário levaria junto ingressos já validados, que são
+registro operacional. A decisão certa seria anonimizar em vez de apagar — e essa é uma
+discussão de produto, não de código.
+
+Como o sistema não vai a público e não trata dado real, a ausência desse aparato é aceitável
+aqui. Aparece nesta lista porque omitir seria pior.
+
+---
+
 ## Testes
 
 ### Back-end
@@ -253,7 +326,7 @@ cd api
 python -m pytest -v
 ```
 
-**163 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
+**177 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
 cada execução — o container precisa estar de pé. Usar o mesmo SGBD da aplicação evita que um
 teste passe em SQLite e quebre em produção por causa de enum nativo ou índice parcial.
 
@@ -267,6 +340,7 @@ teste passe em SQLite e quebre em produção por causa de enum nativo ou índice
 | `test_catalog.py` | 13 | Provedor trocável, cache, tradução de erro |
 | `test_acessibilidade.py` | 12 | Marcação de poltronas, validação de geometria |
 | `test_exibicao.py` | 16 | Classificação indicativa, áudio e formato da sessão |
+| `test_seguranca.py` | 14 | Limite de tentativas, cabeçalhos, erro sem estrutura interna |
 | `test_concorrencia.py` | 3 | Oito threads disputando a mesma poltrona |
 
 ### Front-end

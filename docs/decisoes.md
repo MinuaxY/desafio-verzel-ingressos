@@ -341,6 +341,44 @@ o olho lê como espaçamento, não como passagem.
 **Trava:** corredor na posição 0 ou na última poltrona é recusado. Não separaria nada — seria
 um espaço na borda do bloco.
 
+## D26 — Revisão de segurança no fim, e o que ficou de fora
+
+**Origem:** pergunta do Paulo em 22/08 — "você avaliou segurança de dados, LGPD, segurança de
+rota?". Havia decisões de segurança espalhadas pelo projeto, mas **nenhuma revisão
+sistemática**. São coisas diferentes.
+
+**O que a revisão encontrou e foi corrigido:**
+
+- **Login sem limite de tentativas.** O achado mais relevante: nenhuma senha resiste a
+  tentativas ilimitadas. Cinco por minuto, contadas por **IP e e-mail juntos** — só por IP
+  puniria uma rede compartilhada inteira quando uma pessoa erra a senha; só por e-mail
+  deixaria alguém bloquear a conta de outra pessoa de propósito.
+- **Nenhum cabeçalho de segurança.** Entraram `nosniff`, `X-Frame-Options`,
+  `Referrer-Policy` e `Permissions-Policy`; HSTS só sob HTTPS, porque em `localhost` o
+  navegador o ignoraria — ou pior, prenderia a máquina de quem avalia em https.
+- **Erro de validação devolvia o parser por dentro**, com `ctx` e `input` — este último
+  devolvendo de volta o que a pessoa enviou. Passa a devolver só local e motivo.
+- **A resposta anunciava `server: uvicorn`**, que só entrega a stack a quem procura alvo.
+
+**O que ficou de fora, e a razão:**
+
+**Token em `localStorage` em vez de cookie `httpOnly`.** Cookie seria mais seguro contra XSS,
+mas front e API estão em domínios diferentes — Vercel e Render. Cookie entre domínios exige
+`SameSite=None`, o que **reabre CSRF** e passaria a exigir token anti-CSRF. Trocaria uma
+exposição por outra, e exigiria refazer a autenticação num projeto já validado. A correção de
+verdade começa por pôr front e API no mesmo domínio.
+
+**Revogação de token.** Exige lista compartilhada entre instâncias, que o projeto não tem.
+
+**Aparato de LGPD** — política, consentimento, direitos do titular. Não foi implementado
+porque **exclusão de conta feita pela metade é pior que ausente**: sem política de retenção
+definida, apagar um usuário levaria junto ingressos já validados, que são registro
+operacional. A decisão correta seria anonimizar, e isso é discussão de produto.
+
+**O que aprendi com isso:** decisões pontuais de segurança durante o desenvolvimento não
+substituem uma passada dedicada no fim. As quatro correções eram baratas e nenhuma teria
+aparecido sem alguém perguntar.
+
 ---
 
 ## Decisões pendentes
