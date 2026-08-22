@@ -1,0 +1,41 @@
+# Infraestrutura da API no Render, declarada em arquivo em vez de cliques no
+# painel: quem for reproduzir o deploy ve exatamente o que foi configurado.
+#
+# O front nao esta aqui — vai para a Vercel, que serve estatico melhor.
+services:
+  - type: web
+    name: verzel-ingressos-api
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: verzel-ingressos-db
+          property: connectionString
+      # Gerados pelo Render e nunca vistos por ninguem. Os valores do .env
+      # local sao de desenvolvimento e nao servem em producao.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TICKET_SECRET
+        generateValue: true
+      # Preencher no painel com a URL da Vercel, depois que o front subir.
+      - key: CORS_ORIGINS
+        sync: false
+      # Sem token, o catalogo cai no provedor local e a aplicacao funciona.
+      - key: TMDB_READ_TOKEN
+        sync: false
+      - key: CATALOG_PROVIDER
+        value: tmdb
+      # Cria as contas e sessoes de demonstracao na primeira subida.
+      - key: SEED_ON_START
+        value: "true"
+
+databases:
+  - name: verzel-ingressos-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"

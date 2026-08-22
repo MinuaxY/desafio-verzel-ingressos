@@ -1,3 +1,14 @@
+# Aplicação completa em um comando.
+#
+#   docker compose up --build
+#
+# Sobe banco, API e front. O front fica em http://localhost:5173 e a API em
+# http://localhost:8000/docs. As migrations e o seed rodam sozinhos na partida
+# da API, então o sistema já nasce navegável.
+#
+# Para desenvolver, use `docker compose up -d db` e rode API e front na mão —
+# o rebuild da imagem a cada alteração custaria mais que o ganho.
+
 services:
   db:
     image: postgres:16-alpine
@@ -15,6 +26,38 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  api:
+    build: ./api
+    container_name: verzel_api
+    depends_on:
+      db:
+        # Espera o banco aceitar conexão. Sem isto a API tentaria migrar
+        # contra um Postgres ainda subindo e morreria na primeira tentativa.
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://verzel:verzel@db:5432/verzel_ingressos
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-nao-usar-em-producao}
+      TICKET_SECRET: ${TICKET_SECRET:-dev-ticket-secret-nao-usar-em-producao}
+      CORS_ORIGINS: http://localhost:5173
+      # Sem token, o catálogo cai no provedor local e a aplicação funciona
+      # igual. Defina TMDB_READ_TOKEN no ambiente para usar a API real.
+      CATALOG_PROVIDER: ${CATALOG_PROVIDER:-tmdb}
+      TMDB_READ_TOKEN: ${TMDB_READ_TOKEN:-}
+      SEED_ON_START: "true"
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_API_URL: http://localhost:8000
+    container_name: verzel_web
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
 
 volumes:
   pgdata:

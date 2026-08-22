@@ -42,18 +42,40 @@ Sem Tailwind e sem biblioteca de componentes. O CSS é próprio, com tokens — 
 
 ## Como executar
 
-**Pré-requisitos:** Docker, Python 3.11+ e Node 18+.
+### Caminho rápido: tudo em um comando
 
-### 1. Banco de dados
+**Pré-requisito:** Docker.
 
 ```bash
-docker compose up -d
+docker compose up --build
 ```
 
-Sobe o PostgreSQL 16 na porta 5432, com usuário, senha e base `verzel`/`verzel`/`verzel_ingressos`.
+Sobe banco, API e front. As migrations e os dados de demonstração são aplicados sozinhos na
+partida. Quando terminar, acesse:
+
+- **http://localhost:5173** — a aplicação
+- **http://localhost:8000/docs** — a API, navegável
+
+Para derrubar, `docker compose down`. Para zerar o banco junto, `docker compose down -v`.
+
+---
+
+### Caminho de desenvolvimento
+
+Use este se for mexer no código: recarga automática, sem rebuild de imagem a cada alteração.
+
+**Pré-requisitos:** Docker, Python 3.11+ e Node 18+.
+
+#### 1. Banco de dados
+
+```bash
+docker compose up -d db
+```
+
+Sobe só o PostgreSQL 16, na porta 5432, com usuário, senha e base `verzel`/`verzel`/`verzel_ingressos`.
 Espere o container ficar `healthy` — dá para conferir com `docker compose ps`.
 
-### 2. Back-end
+#### 2. Back-end
 
 ```bash
 cd api
@@ -79,7 +101,7 @@ A API sobe em **http://localhost:8000**, com documentação interativa em
 > sistema funciona inteiro. Para usar a API de verdade, crie um token em
 > [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) e preencha o `.env`.
 
-### 3. Front-end
+#### 3. Front-end
 
 Em outro terminal:
 
@@ -108,9 +130,10 @@ Criadas pelo `python -m app.seed`. **Senha de todas: `verzel123`**
 A tela de entrada tem **botões de acesso rápido** para os três papéis — não é preciso digitar
 credencial para percorrer o sistema.
 
+Rodar o seed de novo não duplica nada: a checagem é por filme e sala, não por horário.
+
 O seed também cria uma sala de **88 lugares** (Plateia 6×12 e VIP 2×8), com **10 poltronas
-acessíveis** marcadas, e **4 sessões publicadas** em horários futuros. Rodar o seed de novo
-não duplica nada.
+acessíveis** marcadas, e **4 sessões publicadas** em horários futuros.
 
 ---
 

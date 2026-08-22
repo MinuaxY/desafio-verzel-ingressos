@@ -160,9 +160,21 @@ def run() -> None:
 
         for filme, (dias, hora, minuto) in zip(filmes, HORARIOS):
             quando = _proximo(dias, hora, minuto)
-            if db.query(Session).filter(
-                Session.room_id == sala.id, Session.starts_at == quando
-            ).first():
+
+            # A comparação é por filme, não por horário. Os horários são
+            # relativos a agora, então rodar o seed noutro dia produziria
+            # horários diferentes, nada bateria e as sessões seriam duplicadas
+            # — foi o que aconteceu antes desta correção.
+            ja_existe = (
+                db.query(Session)
+                .filter(
+                    Session.room_id == sala.id,
+                    Session.catalog_id == filme.id,
+                    Session.starts_at > datetime.now(FUSO_LOCAL),
+                )
+                .first()
+            )
+            if ja_existe:
                 existentes.append(f"sessão {filme.title}")
                 continue
 

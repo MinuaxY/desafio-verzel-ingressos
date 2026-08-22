@@ -1,6 +1,7 @@
 """Configuração da aplicação, carregada do ambiente."""
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +29,22 @@ class Settings(BaseSettings):
     catalog_cache_ttl: int = 600
 
     cors_origins: str = "http://localhost:5173"
+
+    @field_validator("database_url")
+    @classmethod
+    def normaliza_driver(cls, v: str) -> str:
+        """Aceita a URL do jeito que as plataformas de hospedagem entregam.
+
+        Render, Railway, Neon e Supabase fornecem `postgresql://…` (ou o
+        `postgres://` antigo). O SQLAlchemy precisa saber qual driver usar, e
+        sem o sufixo tentaria o psycopg2, que não está instalado — o erro
+        aparece só ao subir em produção, com uma mensagem que não ajuda.
+        Converter aqui evita ter que lembrar disso ao colar a URL no painel.
+        """
+        for prefixo in ("postgresql://", "postgres://"):
+            if v.startswith(prefixo):
+                return "postgresql+psycopg://" + v[len(prefixo) :]
+        return v
 
     @property
     def cors_origin_list(self) -> list[str]:
