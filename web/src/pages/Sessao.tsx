@@ -7,6 +7,7 @@ import { dataHora, duracao, reais } from "../lib/formato";
 import type { Order, Seat, SeatMap, SectorMap, SessionDetail } from "../lib/tipos";
 import { Carregando } from "../components/Carregando";
 import { MapaDeAssentos } from "../components/MapaDeAssentos";
+import { Classificacao, SelosDaSessao } from "../components/Selos";
 import type { Escolha } from "../components/MapaDeAssentos";
 
 const MAX_POR_COMPRA = 10;
@@ -104,13 +105,17 @@ export function Sessao() {
         )}
 
         <div className="stack" style={{ gap: "var(--space-3)" }}>
-          <div className="stack" style={{ gap: "var(--space-1)" }}>
+          <div className="stack" style={{ gap: "var(--space-2)" }}>
             <h1>{sessao.movie.title}</h1>
             <p className="faint" style={{ fontSize: "var(--text-sm)" }}>
               {[sessao.movie.year, duracao(sessao.movie.runtime_minutes)]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
+            <div className="ficha">
+              <Classificacao valor={sessao.movie.age_rating} />
+              <SelosDaSessao audio={sessao.audio} formato={sessao.screen_format} />
+            </div>
           </div>
 
           <p className="sessao__quando">{dataHora(sessao.starts_at)}</p>

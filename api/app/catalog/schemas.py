@@ -19,6 +19,11 @@ class CatalogItem(BaseModel):
     runtime_minutes: int | None = None
     genres: list[str] = []
 
+    # Classificação indicativa brasileira: "L", "10", "12", "14", "16" ou "18".
+    # None quando o TMDb não tem o dado para o Brasil — acontece com filme
+    # ainda não classificado por aqui.
+    age_rating: str | None = None
+
 
 class CatalogPage(BaseModel):
     items: list[CatalogItem]

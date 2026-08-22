@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
-import { HOME_POR_PAPEL, NOME_DO_PAPEL } from "../auth/types";
+import { NOME_DO_PAPEL } from "../auth/types";
 import type { Role } from "../auth/types";
 import { Marca } from "./Marca";
 
@@ -21,14 +21,19 @@ const MENU: Record<Role, { para: string; rotulo: string }[]> = {
 
 export function Layout() {
   const { user, sair } = useAuth();
-  const itens = user ? MENU[user.role] : [{ para: "/em-cartaz", rotulo: "Em cartaz" }];
+  const itens = user
+    ? MENU[user.role]
+    : [
+        { para: "/", rotulo: "Início" },
+        { para: "/em-cartaz", rotulo: "Em cartaz" },
+      ];
 
   return (
     <div className="app">
       <header className="topo">
         <div className="topo__interno">
           <div className="topo__esquerda">
-            <Link to={user ? HOME_POR_PAPEL[user.role] : "/em-cartaz"} aria-label="Início">
+            <Link to="/" aria-label="Início">
               <Marca tamanho={24} />
             </Link>
 
@@ -38,7 +43,7 @@ export function Layout() {
                   key={i.para}
                   to={i.para}
                   className={({ isActive }) => (isActive ? "menu__item menu__item--ativo" : "menu__item")}
-                  end={i.para === "/organizador"}
+                  end={i.para === "/organizador" || i.para === "/"}
                 >
                   {i.rotulo}
                 </NavLink>

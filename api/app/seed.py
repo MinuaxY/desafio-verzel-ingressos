@@ -24,7 +24,13 @@ from app.catalog.fixture import FixtureProvider  # noqa: E402
 from app.core.security import hash_password
 from app.db import SessionLocal
 from app.models.room import Room, SeatAttribute, SeatKind, Sector
-from app.models.session import Session, SessionSectorPrice, SessionStatus
+from app.models.session import (
+    AudioType,
+    ScreenFormat,
+    Session,
+    SessionSectorPrice,
+    SessionStatus,
+)
 from app.models.user import Role, User
 
 SENHA_PADRAO = "verzel123"
@@ -83,11 +89,13 @@ PRECOS = {"Plateia": 3200, "VIP": 5400}  # em centavos
 # e é o primeiro dado que quem avalia vê.
 FUSO_LOCAL = ZoneInfo("America/Sao_Paulo")
 
+# Dia, hora, minuto, áudio e formato. Variados de propósito: quem abrir a
+# vitrine vê as quatro combinações possíveis, em vez de quatro sessões iguais.
 HORARIOS = [
-    (1, 19, 0),
-    (2, 21, 30),
-    (3, 16, 0),
-    (5, 20, 15),
+    (1, 19, 0, AudioType.DUBBED, ScreenFormat.TWO_D),
+    (2, 21, 30, AudioType.SUBTITLED, ScreenFormat.THREE_D),
+    (3, 16, 0, AudioType.DUBBED, ScreenFormat.THREE_D),
+    (5, 20, 15, AudioType.SUBTITLED, ScreenFormat.TWO_D),
 ]
 
 
@@ -158,7 +166,7 @@ def run() -> None:
         # -- sessoes -------------------------------------------------------
         filmes = FixtureProvider().items[: len(HORARIOS)]
 
-        for filme, (dias, hora, minuto) in zip(filmes, HORARIOS):
+        for filme, (dias, hora, minuto, audio, formato) in zip(filmes, HORARIOS):
             quando = _proximo(dias, hora, minuto)
 
             # A comparação é por filme, não por horário. Os horários são
@@ -188,7 +196,10 @@ def run() -> None:
                 movie_backdrop_url=filme.backdrop_url,
                 movie_runtime_minutes=filme.runtime_minutes,
                 movie_year=filme.release_year,
+                movie_age_rating=filme.age_rating,
                 starts_at=quando,
+                audio=audio,
+                screen_format=formato,
                 status=SessionStatus.PUBLISHED,
                 prices=[
                     SessionSectorPrice(sector_id=setor.id, price_cents=PRECOS[setor.name])
@@ -196,7 +207,12 @@ def run() -> None:
                 ],
             )
             db.add(sessao)
-            criados.append(f"sessão {filme.title} — {quando:%d/%m às %H:%M}")
+            rotulo = "Dublado" if audio is AudioType.DUBBED else "Legendado"
+            dimensao = "3D" if formato is ScreenFormat.THREE_D else "2D"
+            criados.append(
+                f"sessão {filme.title} — {quando:%d/%m às %H:%M} "
+                f"({rotulo} {dimensao}, {filme.age_rating or 'sem classificação'})"
+            )
         db.commit()
 
         # -- relatorio -----------------------------------------------------

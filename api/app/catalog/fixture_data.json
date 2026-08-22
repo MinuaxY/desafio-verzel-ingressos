@@ -15,7 +15,8 @@
         "Ficção científica",
         "Ação",
         "Aventura"
-      ]
+      ],
+      "age_rating": "12"
     },
     {
       "id": "1368337",
@@ -24,14 +25,15 @@
       "overview": "Acompanhe o rei grego Odisseu em sua perigosa jornada de 20 anos para voltar a Ítaca após a Guerra de Troia, enfrentando monstros e deuses enquanto sua esposa Penélope resiste em seu reino.",
       "release_year": 2026,
       "poster_url": "https://image.tmdb.org/t/p/w500/muMwJAiMtReEHLKpKMWt2rMkYF7.jpg",
-      "backdrop_url": "https://image.tmdb.org/t/p/w1280/r57L2UBLPKcHdZQYg8tagv9XqK2.jpg",
+      "backdrop_url": "https://image.tmdb.org/t/p/w1280/RMXG8myu1aGlNUsRjtxzmpdMK0.jpg",
       "rating": 8.0,
       "runtime_minutes": 172,
       "genres": [
         "Aventura",
         "Ação",
         "Fantasia"
-      ]
+      ],
+      "age_rating": "14"
     },
     {
       "id": "1084244",
@@ -48,7 +50,8 @@
         "Família",
         "Comédia",
         "Aventura"
-      ]
+      ],
+      "age_rating": "10"
     },
     {
       "id": "634649",
@@ -64,7 +67,8 @@
         "Ação",
         "Aventura",
         "Ficção científica"
-      ]
+      ],
+      "age_rating": "12"
     },
     {
       "id": "1375646",
@@ -80,7 +84,8 @@
         "Ação",
         "Terror",
         "Ficção científica"
-      ]
+      ],
+      "age_rating": null
     },
     {
       "id": "1315772",
@@ -98,7 +103,8 @@
         "Comédia",
         "Família",
         "Fantasia"
-      ]
+      ],
+      "age_rating": "10"
     },
     {
       "id": "1339713",
@@ -113,7 +119,8 @@
       "genres": [
         "Terror",
         "Thriller"
-      ]
+      ],
+      "age_rating": "18"
     },
     {
       "id": "1284041",
@@ -129,7 +136,8 @@
         "Terror",
         "Ficção científica",
         "Thriller"
-      ]
+      ],
+      "age_rating": "14"
     },
     {
       "id": "1284465",
@@ -145,7 +153,8 @@
         "Aventura",
         "Drama",
         "Ação"
-      ]
+      ],
+      "age_rating": "18"
     },
     {
       "id": "1101383",
@@ -155,13 +164,14 @@
       "release_year": 2026,
       "poster_url": "https://image.tmdb.org/t/p/w500/4uuHvSqtAqbFFl0ZgOMx3xbGw1J.jpg",
       "backdrop_url": "https://image.tmdb.org/t/p/w1280/b9q9VmbXDvJmTziRqkwdEmFdwhr.jpg",
-      "rating": 6.5,
+      "rating": 6.4,
       "runtime_minutes": 100,
       "genres": [
         "Ficção científica",
         "Mistério",
         "Thriller"
-      ]
+      ],
+      "age_rating": "14"
     },
     {
       "id": "1108427",
@@ -171,14 +181,15 @@
       "release_year": 2026,
       "poster_url": "https://image.tmdb.org/t/p/w500/eEsiTi19EYBluPQliS3CMnBgqTj.jpg",
       "backdrop_url": "https://image.tmdb.org/t/p/w1280/c6BPbkO5Npt1OdwttAxCFo06wtH.jpg",
-      "rating": 6.0,
+      "rating": 6.1,
       "runtime_minutes": 115,
       "genres": [
         "Família",
         "Fantasia",
         "Comédia",
         "Aventura"
-      ]
+      ],
+      "age_rating": "10"
     },
     {
       "id": "1275779",
@@ -193,7 +204,8 @@
       "genres": [
         "Ficção científica",
         "Thriller"
-      ]
+      ],
+      "age_rating": "12"
     },
     {
       "id": "1212763",
@@ -207,7 +219,8 @@
       "runtime_minutes": 117,
       "genres": [
         "Terror"
-      ]
+      ],
+      "age_rating": "18"
     }
   ]
 }

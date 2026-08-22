@@ -5,6 +5,7 @@ import { ApiError, request } from "../lib/api";
 import { dataHora, faixaDePreco } from "../lib/formato";
 import type { SessionDetail } from "../lib/tipos";
 import { Carregando } from "../components/Carregando";
+import { Classificacao, SelosDaSessao } from "../components/Selos";
 
 const SITUACAO = {
   DRAFT: { rotulo: "Rascunho", classe: "selo--rascunho" },
@@ -99,6 +100,10 @@ export function Organizador() {
                     {s.room_name} · {s.capacity} lugares ·{" "}
                     {faixaDePreco(s.min_price_cents, s.max_price_cents)}
                   </p>
+                  <div className="ficha">
+                    <Classificacao valor={s.movie.age_rating} tamanho="mini" />
+                    <SelosDaSessao audio={s.audio} formato={s.screen_format} />
+                  </div>
                 </div>
 
                 <div className="linha-sessao__acoes">

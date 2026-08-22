@@ -8,6 +8,7 @@ import { Layout } from "./components/Layout";
 import { Carregando } from "./components/Carregando";
 import { Entrar } from "./pages/Entrar";
 import { CriarConta } from "./pages/CriarConta";
+import { Inicio } from "./pages/Inicio";
 import { EmCartaz } from "./pages/EmCartaz";
 import { Sessao } from "./pages/Sessao";
 import { Pedido } from "./pages/Pedido";
@@ -24,13 +25,20 @@ const Portaria = lazy(() =>
   import("./pages/Portaria").then((m) => ({ default: m.Portaria })),
 );
 
-/** A raiz manda cada papel para a sua área. Visitante vai para o cartaz, e não
- *  para o login: o catálogo é público e pedir conta para olhar é atrito sem
- *  contrapartida. Ver decisão D10. */
+/** A raiz é a tela inicial, para todo mundo.
+ *
+ *  Antes ela redirecionava direto para a área de cada papel. Passou a ser uma
+ *  página de entrada com prévia do cartaz: quem chega pela primeira vez precisa
+ *  entender o que o sistema faz antes de decidir criar conta, e quem já entrou
+ *  tem o atalho para a própria área no fecho e no menu. Ver decisão D10.
+ *
+ *  A portaria é a exceção: é uma tela operacional, usada em turno, e quem entra
+ *  com esse papel quer ir direto ao trabalho. */
 function Raiz() {
   const { user, carregando } = useAuth();
   if (carregando) return <Carregando />;
-  return <Navigate to={user ? HOME_POR_PAPEL[user.role] : "/em-cartaz"} replace />;
+  if (user?.role === "GATE") return <Navigate to={HOME_POR_PAPEL.GATE} replace />;
+  return <Inicio />;
 }
 
 function NaoEncontrado() {

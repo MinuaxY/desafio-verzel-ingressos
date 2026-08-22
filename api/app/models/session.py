@@ -22,6 +22,23 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
 
 
+class AudioType(str, enum.Enum):
+    """Como o filme é apresentado nesta sessão.
+
+    Decisão do organizador, não do catálogo: o mesmo filme roda dublado às
+    16h e legendado às 21h.
+    """
+
+    DUBBED = "DUBBED"        # Dublado
+    SUBTITLED = "SUBTITLED"  # Legendado
+    NATIONAL = "NATIONAL"    # Nacional — áudio original em português
+
+
+class ScreenFormat(str, enum.Enum):
+    TWO_D = "TWO_D"
+    THREE_D = "THREE_D"
+
+
 class SessionStatus(str, enum.Enum):
     """DRAFT não aparece para o público. PUBLISHED está à venda. CANCELLED foi
     cancelada depois de publicada e não volta atrás."""
@@ -52,6 +69,23 @@ class Session(Base):
     movie_backdrop_url: Mapped[str | None] = mapped_column(String(500), default=None)
     movie_runtime_minutes: Mapped[int | None] = mapped_column(Integer, default=None)
     movie_year: Mapped[int | None] = mapped_column(Integer, default=None)
+
+    # Classificação indicativa ("L", "10", "12", "14", "16", "18"), copiada
+    # junto com o resto na criação da sessão. Fica como texto e não como enum:
+    # é dado de terceiro, e um valor inesperado deve aparecer na tela em vez de
+    # derrubar a criação da sessão. None quando o filme não tem classificação
+    # brasileira registrada.
+    movie_age_rating: Mapped[str | None] = mapped_column(String(6), default=None)
+
+    # --- Como esta sessão é exibida ---------------------------------------
+    # Diferente do bloco acima, isto não vem do catálogo: é escolha de quem
+    # publica. O mesmo filme tem sessão dublada e legendada no mesmo dia.
+    audio: Mapped[AudioType] = mapped_column(
+        SAEnum(AudioType, name="audio_type"), default=AudioType.SUBTITLED
+    )
+    screen_format: Mapped[ScreenFormat] = mapped_column(
+        SAEnum(ScreenFormat, name="screen_format"), default=ScreenFormat.TWO_D
+    )
 
     # --- Quando -----------------------------------------------------------
     # Sempre com fuso. Sessão de cinema é hora local, e gravar sem fuso obriga

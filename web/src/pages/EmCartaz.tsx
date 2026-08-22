@@ -5,6 +5,7 @@ import { request } from "../lib/api";
 import { dataHora, duracao, faixaDePreco } from "../lib/formato";
 import type { SessionPage } from "../lib/tipos";
 import { Carregando } from "../components/Carregando";
+import { Classificacao, SelosDaSessao } from "../components/Selos";
 
 /**
  * Vitrine pública. Não exige conta: quem procura sessão precisa ver o que
@@ -109,6 +110,7 @@ export function EmCartaz() {
                         🎬
                       </span>
                     )}
+                    <Classificacao valor={s.age_rating} tamanho="mini" />
                   </div>
 
                   <div className="cartaz__info">
@@ -116,6 +118,7 @@ export function EmCartaz() {
                     <p className="faint" style={{ fontSize: "var(--text-xs)" }}>
                       {[s.year, duracao(s.runtime_minutes)].filter(Boolean).join(" · ")}
                     </p>
+                    <SelosDaSessao audio={s.audio} formato={s.screen_format} />
                     <p className="cartaz__quando">{dataHora(s.starts_at)}</p>
                     <p className="muted" style={{ fontSize: "var(--text-sm)" }}>
                       {s.room_name}

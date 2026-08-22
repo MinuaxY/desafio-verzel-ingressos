@@ -7,6 +7,48 @@ export type OrderStatus = "PENDING" | "PAID" | "DECLINED" | "EXPIRED" | "CANCELL
 export type TicketStatus = "RESERVED" | "VALID" | "USED" | "CANCELLED";
 export type GateResult = "VALID" | "INVALID" | "ALREADY_USED" | "WRONG_SESSION";
 
+export type AudioType = "DUBBED" | "SUBTITLED" | "NATIONAL";
+export type ScreenFormat = "TWO_D" | "THREE_D";
+
+export const AUDIO: Record<AudioType, string> = {
+  DUBBED: "Dublado",
+  SUBTITLED: "Legendado",
+  NATIONAL: "Nacional",
+};
+
+export const FORMATO: Record<ScreenFormat, string> = {
+  TWO_D: "2D",
+  THREE_D: "3D",
+};
+
+/** Classificação indicativa brasileira.
+ *
+ *  As cores são as do sistema oficial — verde para livre, subindo até preto
+ *  para dezoito anos. O número aparece sempre escrito junto: cor sozinha
+ *  excluiria quem não distingue matiz. */
+const CLASSIFICACOES: Record<string, { rotulo: string; cor: string; texto: string; descricao: string }> = {
+  L: { rotulo: "L", cor: "#0f8a3c", texto: "#fff", descricao: "Livre para todos os públicos" },
+  "10": { rotulo: "10", cor: "#0f7fbd", texto: "#fff", descricao: "Não recomendado para menores de 10 anos" },
+  "12": { rotulo: "12", cor: "#e0a800", texto: "#1a1206", descricao: "Não recomendado para menores de 12 anos" },
+  "14": { rotulo: "14", cor: "#e07b1f", texto: "#1a1206", descricao: "Não recomendado para menores de 14 anos" },
+  "16": { rotulo: "16", cor: "#d13b30", texto: "#fff", descricao: "Não recomendado para menores de 16 anos" },
+  "18": { rotulo: "18", cor: "#1a1a1a", texto: "#fff", descricao: "Não recomendado para menores de 18 anos" },
+};
+
+const SEM_CLASSIFICACAO = {
+  rotulo: "?",
+  cor: "#3a3640",
+  texto: "#a49d95",
+  descricao: "Classificação indicativa não informada",
+};
+
+export function classificacao(valor: string | null | undefined) {
+  if (!valor) return SEM_CLASSIFICACAO;
+  // "Livre" aparece por extenso em alguns registros do catálogo.
+  const chave = valor.trim().toUpperCase() === "LIVRE" ? "L" : valor.trim().toUpperCase();
+  return CLASSIFICACOES[chave] ?? { ...SEM_CLASSIFICACAO, rotulo: valor, descricao: `Classificação ${valor}` };
+}
+
 /** Rótulo e sigla de cada natureza de poltrona.
  *
  *  A sigla existe para o mapa não depender só de cor: quem não distingue
@@ -22,6 +64,7 @@ export const ASSENTO: Record<SeatKind, { rotulo: string; sigla: string }> = {
 export interface CatalogItem {
   id: string;
   title: string;
+  age_rating?: string | null;
   overview: string | null;
   release_year: number | null;
   poster_url: string | null;
@@ -70,6 +113,7 @@ export interface Movie {
   backdrop_url: string | null;
   runtime_minutes: number | null;
   year: number | null;
+  age_rating: string | null;
 }
 
 export interface SessionDetail {
@@ -80,6 +124,8 @@ export interface SessionDetail {
   room_location: string | null;
   starts_at: string;
   status: SessionStatus;
+  audio: AudioType;
+  screen_format: ScreenFormat;
   capacity: number;
   prices: { sector: Sector; price_cents: number }[];
   min_price_cents: number | null;
@@ -92,6 +138,9 @@ export interface SessionListItem {
   poster_url: string | null;
   year: number | null;
   runtime_minutes: number | null;
+  age_rating: string | null;
+  audio: AudioType;
+  screen_format: ScreenFormat;
   starts_at: string;
   room_name: string;
   room_location: string | null;

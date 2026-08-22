@@ -108,7 +108,10 @@ class SessionService:
             movie_backdrop_url=filme.backdrop_url,
             movie_runtime_minutes=filme.runtime_minutes,
             movie_year=filme.release_year,
+            movie_age_rating=filme.age_rating,
             starts_at=dados.starts_at,
+            audio=dados.audio,
+            screen_format=dados.screen_format,
             status=SessionStatus.PUBLISHED if dados.publish else SessionStatus.DRAFT,
         )
         return self.sessions.create(sessao, precos)
@@ -124,6 +127,11 @@ class SessionService:
             if self.sessions.exists_at(sessao.room_id, dados.starts_at):
                 raise RoomBusy
             sessao.starts_at = dados.starts_at
+
+        if dados.audio is not None:
+            sessao.audio = dados.audio
+        if dados.screen_format is not None:
+            sessao.screen_format = dados.screen_format
 
         if dados.prices is not None:
             novos = self._monta_precos(

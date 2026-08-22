@@ -15,7 +15,13 @@ from app.models.room import (  # noqa: F401
     SeatKind,
     Sector,
 )
-from app.models.session import Session, SessionSectorPrice, SessionStatus  # noqa: F401
+from app.models.session import (  # noqa: F401
+    AudioType,
+    ScreenFormat,
+    Session,
+    SessionSectorPrice,
+    SessionStatus,
+)
 from app.models.user import Role, User  # noqa: F401
 
 __all__ = [
@@ -25,7 +31,9 @@ __all__ = [
     "OCUPAM_ASSENTO",
     "Order",
     "OrderStatus",
+    "AudioType",
     "Role",
+    "ScreenFormat",
     "Room",
     "SeatAttribute",
     "SeatKind",

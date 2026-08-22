@@ -1,5 +1,6 @@
 @import "./tokens.css";
 @import "./telas.css";
+@import "./inicio.css";
 
 *, *::before, *::after { box-sizing: border-box; }
 

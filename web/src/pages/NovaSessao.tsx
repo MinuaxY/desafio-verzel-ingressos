@@ -3,7 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError, request } from "../lib/api";
 import { duracao, reais } from "../lib/formato";
-import type { CatalogItem, CatalogPage, Room, SessionDetail } from "../lib/tipos";
+import type { AudioType, CatalogItem, CatalogPage, Room, ScreenFormat, SessionDetail } from "../lib/tipos";
+import { AUDIO, FORMATO } from "../lib/tipos";
+import { Classificacao } from "../components/Selos";
 import { Campo } from "../components/Campo";
 
 /** Converte "32,00" ou "32.00" em centavos, sem passar por float. */
@@ -31,6 +33,8 @@ export function NovaSessao() {
   const [salas, setSalas] = useState<Room[]>([]);
   const [salaId, setSalaId] = useState("");
   const [quando, setQuando] = useState("");
+  const [audio, setAudio] = useState<AudioType>("SUBTITLED");
+  const [formato, setFormato] = useState<ScreenFormat>("TWO_D");
   const [precos, setPrecos] = useState<Record<string, string>>({});
 
   const [erro, setErro] = useState("");
@@ -75,6 +79,8 @@ export function NovaSessao() {
           catalog_id: filme.id,
           room_id: sala.id,
           starts_at: comFuso(quando),
+          audio,
+          screen_format: formato,
           prices: sala.sectors.map((s) => ({
             sector_id: s.id,
             price_cents: paraCentavos(precos[s.id] ?? ""),
@@ -116,12 +122,18 @@ export function NovaSessao() {
         {filme ? (
           <div className="escolhido">
             {filme.poster_url && <img src={filme.poster_url} alt="" />}
-            <div className="stack" style={{ gap: "var(--space-1)", flex: 1, minWidth: 0 }}>
+            <div className="stack" style={{ gap: "var(--space-2)", flex: 1, minWidth: 0 }}>
               <strong>{filme.title}</strong>
               <span className="faint" style={{ fontSize: "var(--text-sm)" }}>
                 {[filme.release_year, duracao(filme.runtime_minutes), filme.genres.join(", ")]
                   .filter(Boolean)
                   .join(" · ")}
+              </span>
+              <span className="ficha">
+                <Classificacao valor={filme.age_rating ?? null} tamanho="mini" />
+                <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
+                  classificação do catálogo
+                </span>
               </span>
             </div>
             <button className="btn btn--ghost btn--mini" type="button" onClick={() => setFilme(null)}>
@@ -223,10 +235,50 @@ export function NovaSessao() {
       {/* 3 — horario e precos */}
       <div className="etapa">
         <h2 className="etapa__titulo">
-          <span className="etapa__numero">3</span> Horário e preços
+          <span className="etapa__numero">3</span> Exibição, horário e preços
         </h2>
 
         <div className="stack" style={{ gap: "var(--space-4)" }}>
+          {/* Áudio e formato são desta sessão, não do filme: o mesmo título
+              roda dublado às 16h e legendado às 21h. */}
+          <div className="exibicao">
+            <div className="field">
+              <label className="field__label" htmlFor="audio">
+                Áudio
+              </label>
+              <select
+                id="audio"
+                className="field__input"
+                value={audio}
+                onChange={(e) => setAudio(e.target.value as AudioType)}
+              >
+                {Object.entries(AUDIO).map(([v, rotulo]) => (
+                  <option key={v} value={v}>
+                    {rotulo}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="field">
+              <label className="field__label" htmlFor="formato">
+                Formato de tela
+              </label>
+              <select
+                id="formato"
+                className="field__input"
+                value={formato}
+                onChange={(e) => setFormato(e.target.value as ScreenFormat)}
+              >
+                {Object.entries(FORMATO).map(([v, rotulo]) => (
+                  <option key={v} value={v}>
+                    {rotulo}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <Campo
             label="Início da sessão"
             name="quando"

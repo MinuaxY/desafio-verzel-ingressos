@@ -232,6 +232,50 @@ disponibilidade, e não em tarefa agendada. O projeto não tem processo de fundo
 de um seria depender de algo que a avaliação não vai ligar. O custo é um UPDATE que quase
 sempre não encontra nada.
 
+## D21 — Classificação indicativa vem do catálogo, formato vem da sessão
+
+**Origem:** pedido do Paulo em 22/08 — "pensando como o UCI e o ingresso.com funcionam, quero
+classificação de idade e o que a sala e o filme disponibilizam".
+
+**A separação que importa:** são duas informações de naturezas diferentes, e misturá-las
+daria errado depois.
+
+- **Classificação indicativa é do filme.** Vem do TMDb e é copiada para a sessão junto com
+  título e pôster, pela mesma razão da D13: o que foi vendido não muda sozinho.
+- **Áudio e formato de tela são da sessão.** O mesmo título roda dublado às 16h e legendado
+  às 21h, em 2D numa sala e 3D noutra. Guardar isso no filme obrigaria a duplicar filme.
+
+**Detalhe do catálogo:** o TMDb devolve **várias** classificações por filme, uma por tipo de
+lançamento — Duna é 14 no cinema e 12 no digital. Para sessão de cinema vale a de exibição
+em sala, então a extração ordena por tipo e prefere as de cinema. Vem na mesma requisição do
+detalhe, via `append_to_response`, sem gastar uma segunda chamada por filme.
+
+**Guardada como texto, não como enum:** é dado de terceiro. Um valor inesperado deve aparecer
+na tela como veio, e não derrubar a criação da sessão. Filme sem classificação registrada
+publica normalmente.
+
+**Na interface:** as cores são as do sistema brasileiro — verde para livre, subindo até preto
+para dezoito anos — porque é assim que a faixa é reconhecida sem ler. Mas **o número está
+sempre escrito**: cor sozinha excluiria quem não distingue matiz, e a informação é importante
+demais para depender disso. Mesmo princípio da D16.
+
+## D22 — A raiz vira tela inicial, não redirecionamento
+
+**Antes:** `/` mandava direto para a área de cada papel.
+
+**Agora:** `/` é uma página de entrada com chamada, prévia das próximas sessões e os três
+papéis explicados em um parágrafo cada. Entrar e Criar conta ficam no canto superior direito.
+
+**Por quê:** quem chega pela primeira vez precisa entender o que o sistema faz antes de
+decidir criar conta. O redirecionamento anterior jogava a pessoa numa lista sem contexto.
+
+**A exceção:** quem entra como **portaria** continua indo direto para a tela de validação. É
+uma tela operacional, usada em turno, e quem abre o sistema com esse papel quer trabalhar,
+não ler apresentação.
+
+**A prévia usa dados reais**, não ilustração: o pôster da próxima sessão é a arte da abertura.
+Material de verdade convence mais que imagem genérica, e já estava disponível.
+
 ---
 
 ## Decisões pendentes

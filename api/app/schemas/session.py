@@ -8,7 +8,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.session import SessionStatus
+from app.models.session import AudioType, ScreenFormat, SessionStatus
 from app.schemas.room import SectorOut
 
 PRECO_MAXIMO_CENTAVOS = 100_000_00  # R$ 100.000, trava contra erro de digitação
@@ -23,6 +23,8 @@ class SessionCreate(BaseModel):
     catalog_id: str = Field(min_length=1, max_length=40, description="Id do filme no catálogo")
     room_id: uuid.UUID
     starts_at: datetime
+    audio: AudioType = AudioType.SUBTITLED
+    screen_format: ScreenFormat = ScreenFormat.TWO_D
     prices: list[SectorPriceIn] = Field(min_length=1)
     publish: bool = Field(False, description="Publica já; caso contrário nasce como rascunho")
 
@@ -47,6 +49,8 @@ class SessionCreate(BaseModel):
 class SessionUpdate(BaseModel):
     starts_at: datetime | None = None
     prices: list[SectorPriceIn] | None = None
+    audio: AudioType | None = None
+    screen_format: ScreenFormat | None = None
 
     @field_validator("starts_at")
     @classmethod
@@ -73,6 +77,7 @@ class MovieOut(BaseModel):
     backdrop_url: str | None
     runtime_minutes: int | None
     year: int | None
+    age_rating: str | None
 
 
 class SessionOut(BaseModel):
@@ -83,6 +88,8 @@ class SessionOut(BaseModel):
     room_location: str | None
     starts_at: datetime
     status: SessionStatus
+    audio: AudioType
+    screen_format: ScreenFormat
     capacity: int
     prices: list[SectorPriceOut]
     min_price_cents: int | None
@@ -97,6 +104,9 @@ class SessionListItem(BaseModel):
     poster_url: str | None
     year: int | None
     runtime_minutes: int | None
+    age_rating: str | None
+    audio: AudioType
+    screen_format: ScreenFormat
     starts_at: datetime
     room_name: str
     room_location: str | None
@@ -127,6 +137,7 @@ def to_movie_out(sessao) -> MovieOut:
         backdrop_url=sessao.movie_backdrop_url,
         runtime_minutes=sessao.movie_runtime_minutes,
         year=sessao.movie_year,
+        age_rating=sessao.movie_age_rating,
     )
 
 
@@ -140,6 +151,8 @@ def to_session_out(sessao) -> SessionOut:
         room_location=sessao.room.location,
         starts_at=sessao.starts_at,
         status=sessao.status,
+        audio=sessao.audio,
+        screen_format=sessao.screen_format,
         capacity=sessao.room.capacity,
         prices=[
             SectorPriceOut(sector=SectorOut.model_validate(p.sector), price_cents=p.price_cents)
@@ -158,6 +171,9 @@ def to_list_item(sessao) -> SessionListItem:
         poster_url=sessao.movie_poster_url,
         year=sessao.movie_year,
         runtime_minutes=sessao.movie_runtime_minutes,
+        age_rating=sessao.movie_age_rating,
+        audio=sessao.audio,
+        screen_format=sessao.screen_format,
         starts_at=sessao.starts_at,
         room_name=sessao.room.name,
         room_location=sessao.room.location,
