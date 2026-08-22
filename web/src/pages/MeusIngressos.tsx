@@ -50,7 +50,7 @@ export function MeusIngressos() {
       ) : (
         <div className="stack" style={{ gap: "var(--space-5)" }}>
           {ordenados.map((i) => (
-            <Ingresso key={i.id} ingresso={i} />
+            <Ingresso key={i.id} ingresso={i} comLinkDoPedido />
           ))}
         </div>
       )}

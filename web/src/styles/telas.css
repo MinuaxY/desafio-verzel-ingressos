@@ -562,3 +562,17 @@
   .topo__nome { display: none; }
   .topo__esquerda { gap: var(--space-3); }
 }
+
+/* Cancelamento de compra paga: separado do fluxo principal e discreto, porque
+   e acao destrutiva — deve estar disponivel, nao convidativa. */
+.cancelamento {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}

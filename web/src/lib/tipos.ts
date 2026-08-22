@@ -186,6 +186,7 @@ export interface SeatMap {
 
 export interface Ticket {
   id: string;
+  order_id: string;
   seat_code: string;
   sector_name: string;
   seat_kind: SeatKind | null;

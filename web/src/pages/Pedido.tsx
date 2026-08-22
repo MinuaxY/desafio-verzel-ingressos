@@ -26,6 +26,7 @@ export function Pedido() {
   const [pagando, setPagando] = useState(false);
   const [cartao, setCartao] = useState({ card_number: "", card_holder: "" });
   const [agora, setAgora] = useState(Date.now());
+  const [cancelando, setCancelando] = useState(false);
 
   useEffect(() => {
     request<Order>(`/orders/${id}`)
@@ -59,6 +60,24 @@ export function Pedido() {
       setErro(err instanceof ApiError ? err.message : "Não foi possível pagar.");
     } finally {
       setPagando(false);
+    }
+  }
+
+  async function cancelar() {
+    const pago = pedido?.status === "PAID";
+    const aviso = pago
+      ? "Cancelar esta compra? As poltronas voltam para o estoque e os ingressos deixam de valer."
+      : "Cancelar este pedido? As poltronas voltam para o estoque.";
+    if (!window.confirm(aviso)) return;
+
+    setErro("");
+    setCancelando(true);
+    try {
+      setPedido(await request<Order>(`/orders/${id}/cancel`, { method: "POST" }));
+    } catch (err) {
+      setErro(err instanceof ApiError ? err.message : "Não foi possível cancelar.");
+    } finally {
+      setCancelando(false);
     }
   }
 
@@ -128,7 +147,34 @@ export function Pedido() {
       )}
 
       {pedido.status === "CANCELLED" && (
-        <p className="alert alert--error">Este pedido foi cancelado.</p>
+        <div className="alert alert--error">
+          <span>
+            Este pedido foi cancelado e as poltronas voltaram para o estoque.{" "}
+            <Link to={`/sessao/${pedido.session_id}`}>Escolher de novo</Link>.
+          </span>
+        </div>
+      )}
+
+      {/* Compra paga também pode ser cancelada: é o opcional de devolução ao
+          estoque que o enunciado lista, e o back já garante que ingresso já
+          utilizado na portaria não é desfeito. */}
+      {pedido.status === "PAID" && (
+        <div className="cancelamento">
+          <div className="stack" style={{ gap: "2px" }}>
+            <strong style={{ fontSize: "var(--text-sm)" }}>Mudou de ideia?</strong>
+            <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
+              As poltronas voltam para o estoque e os ingressos deixam de valer.
+            </span>
+          </div>
+          <button
+            className="btn btn--ghost btn--perigo btn--mini"
+            type="button"
+            onClick={cancelar}
+            disabled={cancelando}
+          >
+            {cancelando ? "Cancelando…" : "Cancelar compra"}
+          </button>
+        </div>
       )}
 
       {podePagar && (
@@ -168,9 +214,19 @@ export function Pedido() {
               onChange={(e) => setCartao({ ...cartao, card_holder: e.target.value })}
             />
 
-            <button className="btn btn--primary" type="submit" disabled={pagando}>
-              {pagando ? "Processando…" : `Pagar ${reais(pedido.total_cents)}`}
-            </button>
+            <div className="rodape-acao">
+              <button
+                className="btn btn--ghost btn--perigo"
+                type="button"
+                onClick={cancelar}
+                disabled={pagando || cancelando}
+              >
+                {cancelando ? "Cancelando…" : "Cancelar pedido"}
+              </button>
+              <button className="btn btn--primary" type="submit" disabled={pagando}>
+                {pagando ? "Processando…" : `Pagar ${reais(pedido.total_cents)}`}
+              </button>
+            </div>
           </form>
 
           <div className="simulado">

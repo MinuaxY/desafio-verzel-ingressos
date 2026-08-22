@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { dataHora } from "../lib/formato";
 import { ASSENTO } from "../lib/tipos";
@@ -15,9 +16,12 @@ import { QRCode } from "./QRCode";
 export function Ingresso({
   ingresso,
   compartilhavel = true,
+  comLinkDoPedido = false,
 }: {
   ingresso: TicketDetail;
   compartilhavel?: boolean;
+  /** Mostra o caminho para o pedido, de onde dá para cancelar a compra. */
+  comLinkDoPedido?: boolean;
 }) {
   const [copiado, setCopiado] = useState<"link" | "codigo" | null>(null);
   const usado = ingresso.status === "USED";
@@ -63,6 +67,16 @@ export function Ingresso({
             <p className="ingresso__carimbo">
               Utilizado{ingresso.used_at && ` em ${dataHora(ingresso.used_at)}`}
             </p>
+          )}
+
+          {comLinkDoPedido && !usado && (
+            <Link
+              className="link-discreto"
+              to={`/pedido/${ingresso.order_id}`}
+              style={{ fontSize: "var(--text-xs)" }}
+            >
+              Ver pedido ou cancelar
+            </Link>
           )}
         </div>
       </div>

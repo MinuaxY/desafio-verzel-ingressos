@@ -82,6 +82,7 @@ class TicketOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    order_id: uuid.UUID
     seat_code: str
     sector_name: str
     seat_kind: SeatKind | None
@@ -161,6 +162,7 @@ def _tipo_do_assento(ingresso) -> SeatKind | None:
 def to_ticket_out(ingresso, *, codigo: str | None = None) -> TicketOut:
     return TicketOut(
         id=ingresso.id,
+        order_id=ingresso.order_id,
         seat_code=ingresso.seat_code,
         sector_name=ingresso.sector.name,
         seat_kind=_tipo_do_assento(ingresso),
