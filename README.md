@@ -9,10 +9,30 @@ por link. Na entrada, a portaria lê o QR pela câmera e libera, ou recusa com o
 
 **Repositório:** https://github.com/MinuaxY/desafio-verzel-ingressos
 
+## 🌐 Aplicação publicada
+
+| | |
+|---|---|
+| **Aplicação** | https://desafio-verzel-ingressos.vercel.app |
+| **API** (documentação navegável) | https://verzel-ingressos-api.onrender.com/docs |
+
+Entre pelo acesso rápido na tela de login — não é preciso digitar credencial.
+
+> **A primeira visita pode demorar até um minuto.** A API está no plano gratuito do Render,
+> que hiberna o serviço depois de alguns minutos sem tráfego. A demora é o servidor
+> acordando, não a aplicação sendo lenta: depois da primeira requisição, tudo responde
+> normalmente. Se a tela disser que não conseguiu falar com o servidor, recarregue após
+> alguns segundos.
+
+> A **câmera da portaria** funciona no ambiente publicado, porque ele é HTTPS. Em celular,
+> o navegador vai pedir permissão de câmera na primeira leitura.
+
+
 ---
 
 ## Sumário
 
+- [Aplicação publicada](#-aplicação-publicada)
 - [Stack](#stack)
 - [Como executar](#como-executar)
 - [Contas de teste](#contas-de-teste)
@@ -295,7 +315,11 @@ O que **não** está pronto, ou está pronto pela metade:
   projeto não tem processo de fundo, e depender de um seria depender de algo que a avaliação
   não vai ligar. O custo é um `UPDATE` que quase sempre não encontra nada.
 - **A câmera da portaria exige HTTPS** fora de `localhost`. É restrição do navegador, não do
-  código. A digitação manual funciona em qualquer situação e existe justamente para isso.
+  código. No ambiente publicado isso está resolvido; rodando local em rede, use a digitação
+  manual, que existe justamente para isso.
+- **O ambiente publicado usa o plano gratuito do Render**, que hiberna após alguns minutos
+  sem tráfego. A primeira requisição depois disso leva até um minuto. O banco gratuito
+  também tem prazo de validade — o link não vive para sempre.
 - **Elegibilidade para assento acessível não é validada.** O sistema não tem como conferir
   laudo, e cinemas reais checam na entrada. Marcar sem verificar é o comportamento do mundo real.
 - **Meia-entrada não foi implementada.** Abriria uma frente de regra de preço que não cabia no
