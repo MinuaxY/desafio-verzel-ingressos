@@ -153,11 +153,18 @@ def minhas(
     db: DbSession = Depends(get_db),
 ) -> list[SessionOut]:
     servico = SessionService(db)
+    sessoes = servico.listar_do_organizador(user.id)
+
+    # As contagens acompanham cada sessão: dizem o estrago antes de cancelar e
+    # se a sessão pode ser apagada. Uma consulta para a lista toda.
+    contagens = servico.contagens_de_ingressos([s.id for s in sessoes])
     return [
-        # A contagem de vendidos acompanha cada sessão: é o que permite a
-        # confirmação de cancelamento dizer o estrago antes de perguntar.
-        to_session_out(s, vendidos=servico.ingressos_vendidos(s.id))
-        for s in servico.listar_do_organizador(user.id)
+        to_session_out(
+            s,
+            vendidos=contagens.get(s.id, (0, 0))[0],
+            teve_ingressos=contagens.get(s.id, (0, 0))[1] > 0,
+        )
+        for s in sessoes
     ]
 
 

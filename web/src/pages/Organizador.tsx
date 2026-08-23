@@ -27,11 +27,8 @@ export function Organizador() {
   useEffect(carregar, []);
 
   async function excluir(s: SessionDetail) {
-    if (
-      !window.confirm(
-        `Excluir a sessão de ${s.movie.title}? Isso apaga o rascunho de vez.`,
-      )
-    )
+    const oque = s.status === "CANCELLED" ? "a sessão cancelada" : "o rascunho";
+    if (!window.confirm(`Excluir a sessão de ${s.movie.title}? Isso apaga ${oque} de vez.`))
       return;
 
     setAgindo(s.id);
@@ -207,6 +204,21 @@ Isso não pode ser desfeito.`,
                         Excluir
                       </button>
                     </>
+                  )}
+
+                  {/* A cancelada que nunca vendeu nada não é histórico de
+                      coisa alguma — pela D30 ela estava vazia quando foi
+                      cancelada. Sem isso a linha ficaria no painel para sempre,
+                      sem nenhum botão. Ver decisão D31. */}
+                  {s.status === "CANCELLED" && !s.has_tickets && (
+                    <button
+                      className="btn btn--ghost btn--mini btn--perigo"
+                      type="button"
+                      disabled={ocupado}
+                      onClick={() => excluir(s)}
+                    >
+                      Excluir
+                    </button>
                   )}
 
                   {/* Cancelar só enquanto a sessão está vazia. Com ingresso

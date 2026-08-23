@@ -104,10 +104,22 @@ class SessionRepository:
         )
 
     def exists_at(self, room_id: uuid.UUID, starts_at: datetime) -> bool:
+        """A sala está ocupada nesse horário?
+
+        Sessão cancelada **não** ocupa. A pergunta não é "existe alguma linha",
+        e sim "existe alguma sessão que vai acontecer" — e cancelada é
+        justamente o anúncio de que não vai. Contá-la deixaria o horário preso
+        para sempre, já que cancelar não tem volta.
+
+        É a mesma regra do índice parcial que impede vender a poltrona duas
+        vezes: cancelado não ocupa. Ver decisão D31.
+        """
         return (
             self.db.scalar(
                 select(Session.id).where(
-                    Session.room_id == room_id, Session.starts_at == starts_at
+                    Session.room_id == room_id,
+                    Session.starts_at == starts_at,
+                    Session.status != SessionStatus.CANCELLED,
                 )
             )
             is not None

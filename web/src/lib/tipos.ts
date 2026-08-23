@@ -133,6 +133,9 @@ export interface SessionDetail {
   max_price_cents: number | null;
   /** Ingressos que ocupam poltrona. Só vem na visão do organizador. */
   tickets_sold?: number | null;
+  /** Se a sessao ja teve pedido algum dia, mesmo cancelado depois.
+   *  Decide se ela pode ser apagada. Ver decisao D31. */
+  has_tickets?: boolean | null;
 }
 
 export interface SessionListItem {

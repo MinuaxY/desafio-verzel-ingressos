@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SAEnum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -107,8 +108,19 @@ class Session(Base):
     )
 
     __table_args__ = (
-        # A mesma sala não pode ter duas sessões no mesmo instante.
-        UniqueConstraint("room_id", "starts_at", name="uq_sessao_sala_horario"),
+        # A mesma sala não pode ter duas sessões no mesmo instante — mas
+        # cancelada não conta, porque ela não vai acontecer. Índice parcial e
+        # não constraint, pela mesma razão do índice de poltrona: só o banco
+        # decide o empate entre duas criações simultâneas, e uma constraint
+        # cega deixaria o horário da cancelada preso para sempre.
+        # Ver decisões D6 e D31.
+        Index(
+            "uq_sessao_sala_horario",
+            "room_id",
+            "starts_at",
+            unique=True,
+            postgresql_where=(status != SessionStatus.CANCELLED),
+        ),
     )
 
     @property

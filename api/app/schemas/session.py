@@ -127,9 +127,12 @@ class SessionOut(BaseModel):
     prices: list[SectorPriceOut]
     min_price_cents: int | None
     max_price_cents: int | None
-    # Quantos ingressos desta sessão ainda valem. Só é preenchido na visão do
-    # organizador, que é quem precisa saber o estrago antes de cancelar.
+    # Quantos ingressos desta sessão ocupam poltrona. Só é preenchido na visão
+    # do organizador, que é quem precisa saber o estrago antes de cancelar.
     tickets_sold: int | None = None
+    # Se a sessão já teve pedido algum dia, mesmo cancelado depois. É o que
+    # decide se ela pode ser apagada de vez. Ver decisão D31.
+    has_tickets: bool | None = None
 
 
 class SessionListItem(BaseModel):
@@ -198,7 +201,9 @@ def to_movie_out(sessao) -> MovieOut:
     )
 
 
-def to_session_out(sessao, *, vendidos: int | None = None) -> SessionOut:
+def to_session_out(
+    sessao, *, vendidos: int | None = None, teve_ingressos: bool | None = None
+) -> SessionOut:
     faixa = sessao.price_range_cents
     return SessionOut(
         id=sessao.id,
@@ -218,6 +223,7 @@ def to_session_out(sessao, *, vendidos: int | None = None) -> SessionOut:
         min_price_cents=faixa[0] if faixa else None,
         max_price_cents=faixa[1] if faixa else None,
         tickets_sold=vendidos,
+        has_tickets=teve_ingressos,
     )
 
 

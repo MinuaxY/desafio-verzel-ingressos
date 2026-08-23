@@ -353,7 +353,7 @@ cd api
 python -m pytest -v
 ```
 
-**227 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
+**235 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
 cada execução — o container precisa estar de pé. Usar o mesmo SGBD da aplicação evita que um
 teste passe em SQLite e quebre em produção por causa de enum nativo ou índice parcial.
 

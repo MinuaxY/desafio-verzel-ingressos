@@ -498,6 +498,40 @@ lógica da D6: duas verificações independentes valem mais que uma bem feita.
 
 ---
 
+## D31 — Sessão cancelada não ocupa a sala
+
+**Impasse encontrado testando:** cancelei uma sessão e tentei recriá-la igual. "Já existe uma
+sessão nessa sala nesse horário". Como cancelar não tem volta (D30), aquele horário daquela
+sala ficava preso **para sempre** — e a linha cancelada seguia no painel sem nenhum botão.
+
+**O erro não era a falta de um "descancelar".** Era uma pergunta respondida errado: a checagem
+perguntava "existe alguma linha nessa sala nesse horário?", quando a pergunta é "existe alguma
+sessão que **vai acontecer**". Cancelada é justamente o anúncio de que não vai.
+
+**Escolhido:** cancelada deixa de ocupar a sala, na aplicação e no banco. A `UniqueConstraint`
+de `(room_id, starts_at)` virou **índice parcial** com `WHERE status <> 'CANCELLED'` — a mesma
+forma do índice que impede vender a poltrona duas vezes. O projeto já tinha a regra "cancelado
+não ocupa" para assentos; ela só não tinha sido aplicada a horários.
+
+**Descartado: um botão de "descancelar".** Ele desfaz a distinção que a D30 construiu.
+Despublicar é reversível *porque* a sessão vai acontecer; cancelar é irreversível *porque* é o
+anúncio de que não vai. Se dá para voltar atrás, as duas viram a mesma coisa com nomes
+diferentes — que era exatamente o defeito original. Recriar a sessão também é mais honesto: é
+uma sessão nova, com histórico próprio, em vez do anúncio anterior sendo apagado.
+
+**Efeito colateral que o mesmo defeito causava:** a criação em lote usa a mesma checagem e
+*pulava* o dia bloqueado por uma cancelada, informando "já havia sessão nessa sala nesse
+horário" — um motivo falso.
+
+**A cancelada que nunca vendeu nada pode ser apagada.** Ela não é registro de coisa alguma:
+pela D30, estava vazia quando foi cancelada. Se chegou a ter pedido — cancelado depois ou não
+—, fica, porque alguém pode precisar rastrear o que aconteceu com aquela compra. É a diferença
+entre os dois campos que o painel recebe: `tickets_sold` conta quem ocupa poltrona hoje e
+decide se dá para cancelar; `has_tickets` conta se algum dia houve pedido e decide se dá para
+apagar.
+
+---
+
 ## Decisões pendentes
 
 - [ ] Plataforma de deploy — FastAPI não roda confortavelmente na Vercel; avaliar Render ou Railway para a API, com o front na Vercel

@@ -290,6 +290,34 @@ class SessionService:
             or 0
         )
 
+    def contagens_de_ingressos(
+        self, session_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, tuple[int, int]]:
+        """Por sessão: (quantos ocupam poltrona, quantos existem ao todo).
+
+        As duas contagens respondem perguntas diferentes do painel. A primeira
+        diz se a sessão pode ser cancelada — cancelado não ocupa. A segunda diz
+        se ela pode ser **apagada**: uma sessão que um dia teve pedido não some,
+        mesmo que todos tenham sido cancelados depois, porque alguém pode
+        precisar rastrear o que aconteceu com aquela compra.
+
+        Uma consulta só para a lista inteira: uma por sessão transformaria o
+        painel em N+1 conforme a programação cresce.
+        """
+        if not session_ids:
+            return {}
+
+        linhas = self.db.execute(
+            select(
+                Ticket.session_id,
+                func.count().filter(Ticket.status.in_(OCUPAM_ASSENTO)),
+                func.count(),
+            )
+            .where(Ticket.session_id.in_(session_ids))
+            .group_by(Ticket.session_id)
+        ).all()
+        return {sid: (ocupam, total) for sid, ocupam, total in linhas}
+
     def cancelar(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
         """Cancela a sessão — só enquanto ela estiver vazia.
 

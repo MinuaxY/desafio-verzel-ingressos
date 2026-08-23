@@ -786,3 +786,118 @@ class TestCancelamentoEmMassaDePedidos:
             f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=auth(client, CLIENTE)
         )
         assert r.status_code == 403
+
+
+class TestSessaoCanceladaLiberaOHorario:
+    def test_da_para_recriar_a_sessao_cancelada(self, client):
+        """O impasse: cancelar nao tem volta, e a cancelada segurava o horario
+        para sempre. Sessao cancelada nao vai acontecer, entao a sala esta
+        livre. Ver decisao D31."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+
+        r = cria_sessao(client, headers, sala, publicar=True)
+        assert r.status_code == 201
+        assert r.json()["id"] != sessao["id"]
+
+    def test_duas_sessoes_vivas_continuam_brigando_pela_sala(self, client):
+        """A trava original nao foi afrouxada: so parou de contar a cancelada."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala, publicar=True)
+
+        assert cria_sessao(client, headers, sala, publicar=True).status_code == 409
+
+    def test_rascunho_tambem_continua_ocupando(self, client):
+        """Rascunho vai acontecer assim que for publicado."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cria_sessao(client, headers, sala, publicar=False)
+
+        assert cria_sessao(client, headers, sala, publicar=True).status_code == 409
+
+    def test_o_lote_nao_pula_mais_o_dia_da_cancelada(self, client):
+        """O lote usava a mesma checagem e pulava o dia com um motivo falso."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, dias=3, hora=20, publicar=True).json()
+        client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+
+        r = client.post(
+            "/organizer/sessions/batch",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "dates": dias_a_frente(3, 4),
+                "time_of_day": "20:00",
+                "prices": [
+                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                ],
+                "publish": True,
+            },
+            headers=headers,
+        ).json()
+        assert len(r["created"]) == 2
+        assert r["skipped"] == []
+
+    def test_mover_uma_sessao_para_o_horario_da_cancelada(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        cancelada = cria_sessao(client, headers, sala, dias=3, hora=20).json()
+        client.post(f"/organizer/sessions/{cancelada['id']}/cancel", headers=headers)
+
+        outra = cria_sessao(client, headers, sala, dias=5, hora=22).json()
+        quando = (datetime.now(timezone.utc) + timedelta(days=3)).replace(
+            hour=20, minute=0, second=0, microsecond=0
+        )
+        r = client.patch(
+            f"/organizer/sessions/{outra['id']}",
+            json={"starts_at": quando.isoformat()},
+            headers=headers,
+        )
+        assert r.status_code == 200
+
+
+class TestExclusaoDeSessaoCancelada:
+    def test_cancelada_que_nunca_vendeu_pode_ser_apagada(self, client):
+        """Ela não é histórico de coisa nenhuma: estava vazia quando foi
+        cancelada, senão o cancelamento teria sido recusado."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+
+        assert client.delete(
+            f"/organizer/sessions/{sessao['id']}", headers=headers
+        ).status_code == 204
+        assert client.get("/organizer/sessions", headers=headers).json() == []
+
+    def test_cancelada_que_teve_pedido_fica_como_registro(self, client):
+        """Alguém pode precisar rastrear o que aconteceu com aquela compra."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        compra_paga(client, sessao, sala)
+        client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
+        client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+
+        assert client.delete(
+            f"/organizer/sessions/{sessao['id']}", headers=headers
+        ).status_code == 409
+
+    def test_o_painel_diz_qual_das_duas_e(self, client):
+        """É o campo que decide se o botão de excluir aparece."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        limpa = cria_sessao(client, headers, sala, dias=2, publicar=True).json()
+        suja = cria_sessao(client, headers, sala, dias=4, publicar=True).json()
+        compra_paga(client, suja, sala)
+        client.post(f"/organizer/sessions/{suja['id']}/cancel-orders", headers=headers)
+
+        painel = {s["id"]: s for s in client.get("/organizer/sessions", headers=headers).json()}
+        assert painel[limpa["id"]]["has_tickets"] is False
+        assert painel[suja["id"]]["has_tickets"] is True
+        # os pedidos foram cancelados, entao nenhuma das duas ocupa poltrona
+        assert painel[suja["id"]]["tickets_sold"] == 0
