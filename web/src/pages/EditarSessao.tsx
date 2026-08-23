@@ -149,6 +149,14 @@ export function EditarSessao() {
 
   return (
     <section className="stack" style={{ gap: "var(--space-6)", maxWidth: "44rem" }}>
+      {/* Fica no topo porque o "Cancelar" do formulário ficou no meio da
+          página depois do bloco de repetir, e sair da tela não deveria exigir
+          rolar até achá-lo. Link e não navigate(-1): a edição só se alcança
+          pela lista, e o histórico do navegador pode vir de fora do app. */}
+      <Link className="voltar" to="/organizador">
+        ← Minhas sessões
+      </Link>
+
       <header className="stack" style={{ gap: "var(--space-2)" }}>
         <h1>Editar sessão</h1>
         <p className="muted">

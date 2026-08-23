@@ -724,3 +724,18 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
+
+/* Volta para a tela de origem. Discreto de propósito: é caminho de saída, não
+   uma ação da página — competir com o botão principal atrapalharia. */
+.voltar {
+  align-self: flex-start;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  margin-bottom: calc(var(--space-2) * -1);
+}
+
+.voltar:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
