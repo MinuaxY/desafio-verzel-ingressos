@@ -20,7 +20,7 @@ propunha, eu decidia, ela implementava, e eu verificava no navegador.
 
 **A maior parte do código.** Modelos, migrations, endpoints, serviços, testes, componentes
 React e CSS foram escritos pela ferramenta. Não faz sentido fingir o contrário: são cerca de
-8.800 linhas em cinco dias de calendário e três de trabalho efetivo.
+**10.400 linhas de código e 4.900 de teste**, em três dias de trabalho efetivo.
 
 Também fez o trabalho de apoio que consome tempo e não aparece: gerar migrations, rodar a
 suíte de testes, subir e derrubar servidores, diagnosticar processos travados, e verificar o
@@ -85,8 +85,25 @@ processo que mais economizou tempo, porque o dia seguinte foi só consumir uma A
 
 ### Testei e achei defeitos
 
-O texto dos botões-link sumia no hover, e eu reportei. Era um conflito de especificidade no
-CSS que afetava todos os links estilizados como botão, não só o que eu tinha visto.
+Fui usando o sistema como usuário a cada etapa, e a maior parte do que apareceu veio daí.
+
+O texto dos botões-link sumia no hover: era um conflito de especificidade no CSS que afetava
+todos os links estilizados como botão, não só o que eu tinha visto.
+
+O mapa de assentos não correspondia a uma sala de verdade — os setores vinham empilhados, cada
+um recomeçando na fileira A, o que dava duas fileiras "A" na mesma sala. Também não estava
+centralizado, com a tela no meio e as poltronas à esquerda. E a poltrona ocupada precisou de
+quatro tentativas até parar de ser abstração e virar a silhueta de alguém sentado — mandei
+refazer três vezes, e trouxe uma referência do UCI para a quarta.
+
+**A pergunta que rendeu mais foi a que não parecia um bug.** Olhando o painel do organizador,
+não consegui distinguir "cancelar" de "despublicar" e perguntei qual era a diferença. Não havia
+— e foi assim que apareceu o defeito descrito abaixo, com a funcionalidade inteira já
+construída, testada e documentada.
+
+Depois disso, tentei recriar uma sessão idêntica a uma que eu tinha cancelado, e o sistema
+disse que a sala estava ocupada — por uma sessão que não ia acontecer, e que não tinha como ser
+descancelada. Também esse veio de usar, não de ler código.
 
 ---
 
@@ -117,6 +134,33 @@ que não existia.
 **Errou o próprio CSS na primeira tentativa de corrigir.** A correção do hover funcionou para a
 cor do texto, mas anulou o clareamento do fundo. Precisou de uma segunda passada.
 
+**Construiu uma funcionalidade inteira que não fazia nada.** Este é o maior. O cancelamento de
+sessão tinha botão, endpoint, teste e uma decisão documentada — e só mudava um campo `status`.
+Os ingressos continuavam válidos e a portaria nunca consultava a sessão, então o QR de uma
+sessão cancelada **passava na portaria**. Todos os testes passavam, porque cada um verificava a
+parte que a ferramenta tinha pensado em verificar; nenhum perguntava "e daí?".
+
+Descobri pedindo a diferença entre "cancelar" e "despublicar", que eu não estava conseguindo
+enxergar na tela. A resposta honesta era que não havia diferença nenhuma além de cancelar não
+ter volta. Se eu tivesse aceitado a primeira explicação em vez de perguntar, isso teria ido
+para a entrega.
+
+**E errou de novo na primeira correção.** A proposta foi cancelar invalidando os ingressos em
+massa, com uma confirmação avisando quantas pessoas seriam atingidas. Mandei desfazer: o
+sistema não manda e-mail nem estorna, então esse botão daria ao organizador a sensação de ter
+resolvido algo que ele só apagou da própria tela. Cancelar passou a exigir sessão vazia.
+
+**Deixou a API discordar da própria interface.** A tela de criação exigia preço maior que zero;
+a API aceitava zero. Como o pagamento simulado recusa valor zero — corretamente —, dava para
+reservar uma poltrona e nunca conseguir pagar. Ninguém tinha reparado porque o caminho normal
+passa pela tela; o defeito só ficou alcançável quando um botão novo chegou à API por outro
+caminho.
+
+**Escreveu documentação que deixou de ser verdade.** Na conferência final, o README afirmava
+que os artefatos de processo estavam versionados em `docs/` quando só as decisões estavam, e as
+tabelas de teste somavam 196 de 242 casos reais. Nada disso quebrava o sistema — eram
+afirmações do projeto sobre si mesmo que envelheceram sem ninguém perceber.
+
 ---
 
 ## O que eu faria diferente
@@ -130,11 +174,16 @@ menciona — provavelmente teria encontrado outras.
 
 ## Artefatos de processo
 
-Versionados neste repositório, como o enunciado pede:
+Versionados neste repositório, como o enunciado pede. Eles nasceram num vault do Obsidian que
+usei durante o projeto, e estão espelhados em `docs/` — por isso o tom de anotação de trabalho,
+e não de documento escrito depois para parecer organizado.
 
-- [`decisoes.md`](decisoes.md) — 20 decisões técnicas, cada uma com a alternativa descartada e
+- [`decisoes.md`](decisoes.md) — 33 decisões técnicas, cada uma com a alternativa descartada e
   o motivo. É o documento que melhor mostra como o projeto foi conduzido.
-
-Fora do repositório, num vault Obsidian pessoal, ficaram o Product Backlog, o Diário das
-Sprints — que registra o que deu errado a cada dia — e o quadro Kanban. O conteúdo relevante
-deles está refletido aqui e no README.
+- [`diario.md`](diario.md) — o que aconteceu em ordem, incluindo o dia que passou em branco e
+  os defeitos que apareceram no caminho.
+- [`backlog.md`](backlog.md) — requisitos, o que foi entregue, e o que ficou fora de propósito.
+- [`quadro.md`](quadro.md) — o kanban ao fim do projeto, com uma coluna para o que foi avaliado
+  e descartado.
+- [`aprendizados.md`](aprendizados.md) — as 15 lições que ficaram, cada uma amarrada ao
+  episódio que a originou.

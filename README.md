@@ -39,10 +39,13 @@ Entre pelo acesso rápido na tela de login — não é preciso digitar credencia
 - [Cartões de teste](#cartões-de-teste)
 - [Percorrendo o sistema em 5 minutos](#percorrendo-o-sistema-em-5-minutos)
 - [Decisões que valem explicação](#decisões-que-valem-explicação)
+- [Gestão da programação](#gestão-da-programação)
+- [Segurança e dados pessoais](#segurança-e-dados-pessoais)
 - [Testes](#testes)
 - [Estrutura](#estrutura)
 - [Limitações conhecidas](#limitações-conhecidas)
 - [Uso de IA](#uso-de-ia)
+- [Artefatos de processo](#artefatos-de-processo)
 
 ---
 
@@ -189,7 +192,8 @@ própria tela de pagamento**, para não precisar consultar este arquivo durante 
 ## Percorrendo o sistema em 5 minutos
 
 1. Abra **http://localhost:5173**. A vitrine é pública — não é preciso ter conta para ver o
-   que está em cartaz nem para abrir o mapa de assentos.
+   que está em cartaz nem para abrir o mapa de assentos. Use a **barra de datas** no topo para
+   filtrar por dia: o seed publica cerca de 90 sessões em dez dias, então há o que filtrar.
 2. Clique numa sessão. Veja o mapa da sala: poltronas acessíveis aparecem com sigla e borda
    tracejada, não apenas com cor.
 3. Escolha dois lugares e clique em **Entrar e continuar**. Na tela de entrada, use o acesso
@@ -203,6 +207,20 @@ própria tela de pagamento**, para não precisar consultar este arquivo durante 
    Invente um código qualquer: **✕ Não vale**.
 8. Para ver a criação de sessão, entre como **Organizador** → Nova sessão. A busca consulta o
    catálogo de filmes.
+
+### Se sobrar tempo — a gestão da programação
+
+Estes três levam mais dois minutos e mostram a parte do sistema que mais tem regra por trás:
+
+- **Repetir em vários dias.** Em Nova sessão, escolha filme, sala e horário, e abra *Repetir em
+   outros dias*. Marque uma semana inteira e crie. Os dias em que a sala já está ocupada voltam
+   numa lista, com o motivo, em vez de derrubar o lote.
+- **Cancelar uma sessão que vendeu.** Compre um ingresso para uma sessão, volte ao painel do
+   organizador e tente cancelá-la: o botão está desabilitado, dizendo quantos ingressos há. Ao
+   lado dele existe **"cancelar os N pedidos vendidos"**, que é o passo explícito — depois dele,
+   cancelar funciona. Abra o pedido como cliente: ele diz que **o cinema** cancelou.
+- **Excluir e editar.** Rascunho pode ser apagado, publicada não; sala com sessão futura não é
+   removida. Cada recusa vem com o motivo na tela.
 
 ---
 
@@ -260,14 +278,39 @@ está incompleto como produto.
 
 Além de criar sessão a sessão, o organizador tem:
 
-**Repetir em vários dias.** No formulário de criação, os dias são marcados num calendário de
-quatro semanas, com atalhos para "toda sexta" e "sextas, sábados e domingos". Dia em que a
-sala já está ocupada é pulado, e a lista do que ficou de fora volta com o motivo — um
-conflito não descarta o resto da seleção.
+**Repetir em vários dias.** Os dias são marcados num calendário de quatro semanas, com atalhos
+para "toda sexta" e "sextas, sábados e domingos". Dia em que a sala já está ocupada é pulado, e
+a lista do que ficou de fora volta com o motivo — um conflito não descarta o resto da seleção.
+Está tanto na criação quanto na edição: na tela de editar, ele cria cópias da sessão em outros
+dias, usando o que estiver no formulário.
 
-**Editar e remover.** Sessão em rascunho pode ser apagada; publicada sai do cartaz com
-despublicar; e sessão que já vendeu ingresso não some — para essa, o caminho é cancelar, e
-quem comprou continua enxergando o que aconteceu.
+**Despublicar e cancelar são coisas diferentes, e o sistema trata assim.**
+
+| | Despublicar | Cancelar |
+|---|---|---|
+| A sessão vai acontecer? | Sim | Não |
+| Para de vender? | Sim | Sim |
+| Quem já comprou entra? | Sim | Não existe esse caso |
+| Reversível? | Sim, republicando | Não |
+
+Cancelar só é aceito com a sessão **vazia**. Com ingresso vendido, a API responde 409 dizendo
+quantos são e o painel mostra o botão desabilitado com o motivo — porque o sistema não manda
+e-mail nem estorna, e um cancelamento que só apaga a sessão da tela do organizador deixaria a
+pessoa descobrindo na porta do cinema. Para esse caso existe um passo à parte, **"cancelar os
+N pedidos vendidos"**, que desfaz as compras de propósito e explicitamente. O pedido guarda
+**quem** cancelou, para o cliente ler "o cinema cancelou" em vez de achar que a desistência foi
+dele.
+
+Isso nasceu de um defeito real: cancelar mexia só no estado da sessão, e o QR de uma sessão
+cancelada passava na portaria. Ver [D30](docs/decisoes.md).
+
+**Editar e remover.** Rascunho pode ser apagado; publicada sai do cartaz com despublicar;
+cancelada que nunca vendeu nada também pode ser apagada, mas a que teve pedido fica, para dar
+como rastrear aquela compra.
+
+**Sessão cancelada não ocupa a sala.** Como cancelar não tem volta, contá-la prenderia aquele
+horário para sempre. É a mesma regra do índice que impede vender a poltrona duas vezes:
+cancelado não ocupa. Ver [D31](docs/decisoes.md).
 
 Sala segue a mesma lógica: **sala nunca usada é apagada de verdade; sala com histórico é
 desativada**, porque sessão passada aponta para ela. **Sala com sessão futura não é
@@ -371,17 +414,21 @@ teste passe em SQLite e quebre em produção por causa de enum nativo ou índice
 
 | Arquivo | Testes | Cobre |
 |---|---|---|
+| `test_melhorias.py` | 63 | Gestão da programação, cancelamento, e os defeitos da revisão |
+| `test_rooms.py` | 31 | Salas, setores, isolamento entre organizadores, edição e remoção |
 | `test_portaria.py` | 29 | Quatro vereditos, código forjado, tolerância na digitação, link compartilhado |
 | `test_compra.py` | 27 | Reserva, pagamento aprovado e recusado, devolução de assento, expiração |
 | `test_sessions.py` | 21 | Criação, ciclo de vida, vitrine pública |
-| `test_rooms.py` | 17 | Salas, setores, isolamento entre organizadores |
+| `test_exibicao.py` | 16 | Classificação indicativa, áudio e formato da sessão |
+| `test_seguranca.py` | 14 | Limite de tentativas, cabeçalhos, erro sem estrutura interna |
 | `test_auth.py` | 13 | Cadastro, login, autorização por papel |
 | `test_catalog.py` | 13 | Provedor trocável, cache, tradução de erro |
 | `test_acessibilidade.py` | 12 | Marcação de poltronas, validação de geometria |
-| `test_exibicao.py` | 16 | Classificação indicativa, áudio e formato da sessão |
-| `test_melhorias.py` | 31 | Edição de sala, exclusão de sessão, criação em lote, filtro por dia |
-| `test_seguranca.py` | 14 | Limite de tentativas, cabeçalhos, erro sem estrutura interna |
 | `test_concorrencia.py` | 3 | Oito threads disputando a mesma poltrona |
+
+O `test_melhorias.py` cresceu por acúmulo: começou nas melhorias de gestão (D26–D29) e recebeu
+o cancelamento (D30–D31) e os defeitos da revisão (D33). Num projeto que continuasse, seria
+dividido por assunto — está aqui como está porque é o que foi feito, não o que ficaria bonito.
 
 ### Front-end
 
@@ -396,11 +443,11 @@ npm test
 | Arquivo | Testes | Cobre |
 |---|---|---|
 | `MapaDeAssentos.test.tsx` | 22 | Orientação da sala, corredores, estados da poltrona, limite de seleção |
-| `api.test.ts` | 12 | Tradução de erro do FastAPI, token, falha de rede |
-| `formato.test.ts` | 15 | Moeda em centavos, faixa de preço, duração, prazo da reserva |
+| `api.test.ts` | 11 | Tradução de erro do FastAPI, token, falha de rede |
+| `formato.test.ts` | 16 | Moeda em centavos, faixa de preço, duração, prazo da reserva |
 | `tipos.test.ts` | 12 | Classificação indicativa, rótulos, naturezas de poltrona |
-| `EmCartaz.test.tsx` | 11 | Vitrine pública, busca, estado vazio, servidor fora do ar |
-| `Ingresso.test.tsx` | 9 | QR, código, compartilhamento, ingresso não pago |
+| `EmCartaz.test.tsx` | 13 | Vitrine pública, busca, estado vazio, servidor fora do ar |
+| `Ingresso.test.tsx` | 12 | QR, código, compartilhamento, ingresso não pago |
 | `ProtectedRoute.test.tsx` | 7 | Acesso por papel, token inválido, espera pela sessão |
 | `EscolhaDeDias.test.tsx` | 15 | Repetição em vários dias, atalhos, dia principal travado, contagem na edição |
 | `BarraDeDias.test.tsx` | 10 | Filtro por dia, dia sem sessão, data sem escorregar para UTC |
@@ -414,10 +461,14 @@ npm test
 desafio-verzel-ingressos/
 ├── docker-compose.yml
 ├── docs/
-│   ├── decisoes.md          decisões técnicas e o que foi descartado
+│   ├── decisoes.md          as 33 decisões técnicas, e o que foi descartado em cada uma
+│   ├── backlog.md           requisitos, o que foi entregue e o que ficou fora do escopo
+│   ├── diario.md            o que aconteceu em ordem, incluindo o que deu errado
+│   ├── quadro.md            o kanban ao fim do projeto
+│   ├── aprendizados.md      as lições transferíveis, cada uma com o episódio que a originou
 │   └── ia.md                como a IA foi usada, e o que foi feito sem
 ├── api/
-│   ├── alembic/versions/    4 migrations
+│   ├── alembic/versions/    8 migrations
 │   ├── app/
 │   │   ├── catalog/         provedor de catálogo (TMDb ou local)
 │   │   ├── core/            segurança, dependências, código do ingresso
@@ -480,5 +531,19 @@ O que **não** está pronto, ou está pronto pela metade:
 Este projeto foi construído com IA, e o relato está em [`docs/ia.md`](docs/ia.md): quais
 ferramentas, em que partes, **o que foi feito sem IA**, e como as decisões foram conduzidas.
 
-Os artefatos de processo — backlog, diário das sprints e o registro de decisões — estão
-versionados junto do código, em `docs/`.
+## Artefatos de processo
+
+Estão versionados junto do código, em `docs/`, e não num anexo à parte. São o registro de como
+o projeto foi conduzido — que é o que este desafio diz avaliar.
+
+| | |
+|---|---|
+| [`decisoes.md`](docs/decisoes.md) | As **33 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
+| [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
+| [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
+| [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |
+| [`aprendizados.md`](docs/aprendizados.md) | As **15 lições** que ficaram, cada uma amarrada ao episódio concreto que a originou |
+| [`ia.md`](docs/ia.md) | Onde a IA entrou, onde não entrou, e onde ela errou |
+
+Os quatro primeiros são espelhos de um vault do Obsidian usado durante o projeto — por isso o
+tom de anotação de trabalho, e não de documento escrito depois para parecer organizado.

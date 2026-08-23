@@ -1,3 +1,6 @@
+<!-- Espelho de "Decisões técnicas", do vault de anotações do projeto (Obsidian).
+     Versionado aqui porque o desafio pede os artefatos de processo junto do código. -->
+
 # Decisões Técnicas
 
 Registro das escolhas e do que foi descartado. Vai versionado no repositório em `docs/decisoes.md` — o desafio pede explicitamente para ver como o projeto foi conduzido.
@@ -612,7 +615,23 @@ que o mesmo filme roda em vários dias. Passou a usar `(sala, horário)` — a m
 
 ---
 
-## Decisões pendentes
+## Decisões que estavam pendentes
 
-- [ ] Plataforma de deploy — FastAPI não roda confortavelmente na Vercel; avaliar Render ou Railway para a API, com o front na Vercel
-- [ ] Biblioteca de leitura de QR pela câmera
+Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma
+lista de pendências que some não conta que foi resolvida — parece que foi esquecida.
+
+- [x] **Plataforma de deploy.** FastAPI não roda confortavelmente na Vercel. Resolvido em
+  20/08: front na **Vercel**, API e banco no **Render**, plano gratuito. O Render hiberna após
+  alguns minutos sem tráfego, o que custa até um minuto na primeira visita — aceitável para
+  uma avaliação, e está avisado no README.
+- [x] **Biblioteca de leitura de QR pela câmera.** Resolvido com **html5-qrcode**, que resolve
+  permissão de câmera e escolha de lente sozinha. A digitação manual continua ao lado, porque
+  a câmera exige HTTPS fora de `localhost` e nem todo avaliador vai abrir pelo celular.
+
+---
+
+## Nenhuma decisão em aberto
+
+O projeto foi entregue em 22/08 e revisado até 23/08. O que foi conscientemente deixado de
+fora está em **Limitações conhecidas**, no README, e no quadro, na coluna "Avaliado e
+descartado" — que é lugar de escolha registrada, não de pendência.
