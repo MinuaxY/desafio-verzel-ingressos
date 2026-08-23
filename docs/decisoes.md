@@ -219,6 +219,10 @@ genérica em vez do veredito.
 legitimamente numa sala e apareceu na porta errada precisa ouvir "sessão errada", e não
 "já utilizado".
 
+**Correção posterior:** o texto original desta decisão dizia que a portaria confere
+"assinatura e banco", como se isso cobrisse tudo. Cobria o estado do *ingresso*, e não o da
+*sessão* — um ingresso de sessão cancelada passava. Ver D30.
+
 ## D20 — Reserva expira e devolve o assento
 
 **Problema:** um pedido que ninguém paga prenderia a poltrona para sempre.
@@ -434,6 +438,46 @@ emitido guarda o valor que foi pago.
 
 **Consequência na interface:** o formulário de edição de sala mostra só nome e endereço, e
 explica por que o layout não está ali. Esconder sem explicar pareceria falta.
+
+---
+
+## D30 — Cancelar sessão exige sessão vazia
+
+**Problema encontrado testando:** publiquei uma sessão, comprei um ingresso, cancelei a
+sessão e levei o QR na portaria. Resultado: `VALID — Entrada liberada, Plateia, poltrona
+C6`. O cancelamento mexia só no campo `status` da sessão; os ingressos continuavam válidos
+e a portaria nunca olhava a sessão. Na prática, a única diferença entre cancelar e
+despublicar era que cancelar não podia ser desfeito — irreversível e sem efeito.
+
+**As duas operações existem porque respondem a perguntas diferentes:**
+
+| | Despublicar | Cancelar |
+|---|---|---|
+| A sessão vai acontecer? | Sim | Não |
+| Para de vender? | Sim | Sim |
+| Quem já comprou entra? | Sim | Não existe esse caso |
+| Reversível? | Sim, republicando | Não |
+
+**Descartado:** cancelar invalidando em massa os ingressos vendidos, com uma confirmação
+avisando quantos seriam atingidos. Chegou a ser implementado, e foi desfeito: o sistema não
+manda e-mail nem estorna. A pessoa descobriria na porta do cinema, e o botão daria ao
+organizador a sensação de ter resolvido algo que ele só apagou da própria tela.
+
+**Escolhido:** cancelar só é aceito enquanto a sessão está **vazia**. Com ingresso vendido a
+API responde 409 dizendo quantos são, e o painel já mostra o botão desabilitado com o
+motivo. Para tirar do cartaz uma sessão que vai acontecer, o caminho é despublicar. Se ela
+realmente não vai acontecer, o organizador cancela os pedidos primeiro — e aí lida com cada
+cliente sabendo que está lidando.
+
+**"Vazia" é medido pelo mesmo critério do índice que impede vender duas vezes:** ingresso
+cancelado pelo cliente não conta, porque a poltrona voltou ao estoque. Uma sessão em que
+todo mundo desistiu está vazia de novo e volta a poder ser cancelada.
+
+**A portaria passou a conferir o estado da sessão de qualquer jeito.** No fluxo atual essa
+checagem é redundante — não há como existir ingresso válido em sessão cancelada. Ela fica
+porque a consequência de falhar é alguém entrar numa sala que não vai exibir nada, e porque
+a regra do que pode ser cancelado é do organizador, enquanto a porta é a última linha. Mesma
+lógica da D6: duas verificações independentes valem mais que uma bem feita.
 
 ---
 

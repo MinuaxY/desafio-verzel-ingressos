@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.core import ticket_code
 from app.models.order import Ticket, TicketStatus
+from app.models.session import SessionStatus
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,21 @@ class GateService:
         ingresso = self.db.get(Ticket, ticket_id)
         if ingresso is None:
             return Resultado(INVALID, "Ingresso não encontrado")
+
+        # A sessão é conferida antes do ingresso, e de propósito.
+        #
+        # Cancelar a sessão já invalida os ingressos dela, então esta checagem
+        # é redundante no caminho normal. Ela existe porque a consequência de
+        # falhar é grave: alguém entrando numa sala que não vai exibir nada.
+        # Se um ingresso escapar da invalidação — por um estado que ainda não
+        # previmos, ou por dado antigo —, a porta continua fechada. Mesmo
+        # princípio da D6: duas verificações independentes. Ver decisão D30.
+        if ingresso.session.status is SessionStatus.CANCELLED:
+            return Resultado(
+                INVALID,
+                f"A sessão de {ingresso.session.movie_title} foi cancelada",
+                ingresso,
+            )
 
         if ingresso.status is TicketStatus.CANCELLED:
             return Resultado(INVALID, "Ingresso cancelado", ingresso)

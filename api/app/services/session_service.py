@@ -3,11 +3,11 @@ import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.catalog.factory import get_catalog_provider
-from app.models.order import Ticket
+from app.models.order import OCUPAM_ASSENTO, Ticket
 from app.models.session import Session, SessionSectorPrice, SessionStatus
 from app.repositories.room_repository import RoomRepository
 from app.repositories.session_repository import SessionRepository
@@ -52,6 +52,14 @@ class SessionAlreadyCancelled(Exception):
 class SessionHasTickets(Exception):
     """A sessão já vendeu ingresso: não pode ser apagada nem ter o horário
     mudado por baixo de quem comprou."""
+
+
+class SessionSold(Exception):
+    """A sessão já vendeu: cancelar exige resolver com quem comprou antes."""
+
+    def __init__(self, vendidos: int) -> None:
+        self.vendidos = vendidos
+        super().__init__(f"{vendidos} ingresso(s) vendido(s)")
 
 
 class SessionIsPublished(Exception):
@@ -262,9 +270,46 @@ class SessionService:
         sessao.status = SessionStatus.DRAFT
         return self.sessions.save(sessao)
 
+    def ingressos_vendidos(self, session_id: uuid.UUID) -> int:
+        """Quantos ingressos desta sessão ocupam poltrona.
+
+        Ingresso cancelado pelo próprio cliente não conta: a poltrona voltou
+        para o estoque, e uma sessão em que todo mundo desistiu está vazia de
+        novo. Mesmo critério do índice que impede vender duas vezes.
+        """
+        return (
+            self.db.scalar(
+                select(func.count())
+                .select_from(Ticket)
+                .where(
+                    Ticket.session_id == session_id,
+                    Ticket.status.in_(OCUPAM_ASSENTO),
+                )
+            )
+            or 0
+        )
+
     def cancelar(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
+        """Cancela a sessão — só enquanto ela estiver vazia.
+
+        Cancelar diz que a sessão **não vai acontecer**. Se alguém já comprou,
+        esse anúncio sozinho não resolve nada: a pessoa continuaria com um QR
+        na mão, e o sistema não tem como avisá-la nem como devolver o dinheiro.
+        Então a operação é recusada, e o organizador tem que lidar com quem
+        comprou antes — cancelando os pedidos — para só depois cancelar a
+        sessão.
+
+        Para tirar do cartaz uma sessão que **vai acontecer**, o caminho é
+        despublicar: para de vender e quem já tem ingresso entra normalmente.
+        Ver decisão D30.
+        """
         sessao = self.obter_do_organizador(session_id, organizer_id)
         self._exige_nao_cancelada(sessao)
+
+        vendidos = self.ingressos_vendidos(session_id)
+        if vendidos:
+            raise SessionSold(vendidos)
+
         sessao.status = SessionStatus.CANCELLED
         return self.sessions.save(sessao)
 

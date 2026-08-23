@@ -1,4 +1,5 @@
 """Edição de sala, exclusão de sessão, criação em lote e filtro por dia."""
+import uuid
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -13,6 +14,8 @@ ORGANIZADOR = {
 OUTRO = {
     "name": "Org2", "email": "org2@melh.dev", "password": "senhaforte123", "role": "ORGANIZER",
 }
+CARTAO_OK = {"card_number": "4111111111111111", "card_holder": "PAULO V"}
+
 CLIENTE = {
     "name": "Cli", "email": "cli@melh.dev", "password": "senhaforte123", "role": "CUSTOMER",
 }
@@ -472,3 +475,157 @@ class TestDiasEmCartaz:
         r = client.get("/sessions/days")
         assert r.status_code == 200
         assert isinstance(r.json(), list)
+
+
+# ==========================================================================
+# Cancelamento de sessao (D30)
+# ==========================================================================
+
+
+def compra_paga(client, sessao, sala, cliente=CLIENTE, assento="A1"):
+    """Compra uma poltrona e paga, devolvendo o pedido já com o ingresso."""
+    h = auth(client, cliente)
+    pedido = client.post(
+        "/orders",
+        json={
+            "session_id": sessao["id"],
+            "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": assento}],
+        },
+        headers=h,
+    ).json()
+    pago = client.post(f"/orders/{pedido['id']}/pay", json=CARTAO_OK, headers=h).json()
+    return pago, h
+
+
+class TestCancelamentoDeSessao:
+    def test_sessao_vazia_cancela(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        assert r.status_code == 200
+        assert r.json()["status"] == "CANCELLED"
+
+    def test_com_ingresso_vendido_recusa(self, client):
+        """O ponto da D30: cancelar não avisa nem reembolsa ninguém, então
+        cancelar por cima de quem comprou seria só esconder o problema."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        compra_paga(client, sessao, sala)
+
+        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        assert r.status_code == 409
+        assert "1 ingresso" in r.json()["detail"]
+
+        # e a sessao continua de pe
+        atual = client.get(f"/organizer/sessions/{sessao['id']}", headers=headers).json()
+        assert atual["status"] == "PUBLISHED"
+
+    def test_reserva_nao_paga_tambem_segura(self, client):
+        """A poltrona está fora do estoque desde a reserva; para o mapa de
+        assentos ela é tão ocupada quanto uma paga."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        client.post(
+            "/orders",
+            json={
+                "session_id": sessao["id"],
+                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A1"}],
+            },
+            headers=auth(client, CLIENTE),
+        )
+
+        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        assert r.status_code == 409
+
+    def test_desistencia_do_cliente_libera_o_cancelamento(self, client):
+        """Se todo mundo desistiu, a sessão está vazia de novo e volta a poder
+        ser cancelada."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        pedido, h_cliente = compra_paga(client, sessao, sala)
+
+        assert client.post(
+            f"/organizer/sessions/{sessao['id']}/cancel", headers=headers
+        ).status_code == 409
+
+        client.post(f"/orders/{pedido['id']}/cancel", headers=h_cliente)
+
+        assert client.post(
+            f"/organizer/sessions/{sessao['id']}/cancel", headers=headers
+        ).status_code == 200
+
+    def test_despublicar_continua_livre_com_ingresso(self, client):
+        """Despublicar é o caminho para tirar do cartaz sem quebrar promessa:
+        para de vender e quem já comprou continua com o ingresso de pé."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        pedido, _ = compra_paga(client, sessao, sala)
+
+        r = client.post(f"/organizer/sessions/{sessao['id']}/unpublish", headers=headers)
+        assert r.status_code == 200
+        assert r.json()["status"] == "DRAFT"
+
+        # o ingresso nao foi tocado
+        porteiro = auth(client, {
+            "name": "Porteiro", "email": "p@melh.dev", "password": "senhaforte123", "role": "GATE",
+        })
+        codigo = pedido["tickets"][0]["code"]
+        assert client.post(
+            "/gate/validate", json={"code": codigo}, headers=porteiro
+        ).json()["result"] == "VALID"
+
+    def test_o_painel_informa_quantos_foram_vendidos(self, client):
+        """É o número que desabilita o botão de cancelar na interface."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        lista = client.get("/organizer/sessions", headers=headers).json()
+        assert lista[0]["tickets_sold"] == 0
+
+        compra_paga(client, sessao, sala)
+        lista = client.get("/organizer/sessions", headers=headers).json()
+        assert lista[0]["tickets_sold"] == 1
+
+
+class TestPortariaEsessaoCancelada:
+    def test_ingresso_de_sessao_cancelada_nao_entra(self, client):
+        """Segunda verificação, independente do estado do ingresso.
+
+        Hoje o caminho normal não chega aqui, porque cancelar exige sessão
+        vazia. A checagem existe para o caso de um ingresso escapar: a
+        consequência de errar é alguém entrar numa sala que não vai exibir
+        nada. Mesmo princípio da D6.
+        """
+        from app.models.session import Session, SessionStatus
+
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        pedido, _ = compra_paga(client, sessao, sala)
+
+        # Cancelamento forcado no banco: a API recusaria, e o que se testa aqui
+        # e justamente a rede de seguranca embaixo dela.
+        from tests.conftest import TestSession
+
+        db = TestSession()
+        s = db.get(Session, uuid.UUID(sessao["id"]))
+        s.status = SessionStatus.CANCELLED
+        db.commit()
+        db.close()
+
+        porteiro = auth(client, {
+            "name": "Porteiro Dois", "email": "p2@melh.dev", "password": "senhaforte123", "role": "GATE",
+        })
+        r = client.post(
+            "/gate/validate", json={"code": pedido["tickets"][0]["code"]}, headers=porteiro
+        ).json()
+        assert r["result"] == "INVALID"
+        assert "cancelada" in r["message"].lower()

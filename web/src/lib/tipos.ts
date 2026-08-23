@@ -131,6 +131,8 @@ export interface SessionDetail {
   prices: { sector: Sector; price_cents: number }[];
   min_price_cents: number | null;
   max_price_cents: number | null;
+  /** Ingressos que ocupam poltrona. Só vem na visão do organizador. */
+  tickets_sold?: number | null;
 }
 
 export interface SessionListItem {

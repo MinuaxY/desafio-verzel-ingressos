@@ -38,6 +38,7 @@ from app.services.session_service import (
     SessionIsPublished,
     SessionNotFound,
     SessionService,
+    SessionSold,
 )
 
 # --------------------------------------------------------------------------
@@ -124,6 +125,13 @@ def _traduz(erro: Exception) -> HTTPException:
             "Esta sessão já vendeu ingressos. Para tirá-la do cartaz, cancele — "
             "assim quem comprou continua vendo o que aconteceu.",
         )
+    if isinstance(erro, SessionSold):
+        return HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Esta sessão já vendeu {erro.vendidos} ingresso(s) e não pode ser cancelada. "
+            "Para tirá-la do cartaz sem prejudicar quem comprou, despublique. "
+            "Se ela realmente não vai acontecer, cancele antes os pedidos.",
+        )
     if isinstance(erro, SessionIsPublished):
         return HTTPException(
             status.HTTP_409_CONFLICT,
@@ -143,7 +151,13 @@ def minhas(
     user: User = Depends(require_role(Role.ORGANIZER)),
     db: DbSession = Depends(get_db),
 ) -> list[SessionOut]:
-    return [to_session_out(s) for s in SessionService(db).listar_do_organizador(user.id)]
+    servico = SessionService(db)
+    return [
+        # A contagem de vendidos acompanha cada sessão: é o que permite a
+        # confirmação de cancelamento dizer o estrago antes de perguntar.
+        to_session_out(s, vendidos=servico.ingressos_vendidos(s.id))
+        for s in servico.listar_do_organizador(user.id)
+    ]
 
 
 @gestao.post("", response_model=SessionOut, status_code=status.HTTP_201_CREATED)

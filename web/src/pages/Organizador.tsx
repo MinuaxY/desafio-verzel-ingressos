@@ -103,6 +103,7 @@ export function Organizador() {
           {sessoes?.map((s) => {
             const situacao = SITUACAO[s.status];
             const ocupado = agindo === s.id;
+            const vendidos = s.tickets_sold ?? 0;
 
             return (
               <li key={s.id} className="linha-sessao">
@@ -176,11 +177,21 @@ export function Organizador() {
                     </>
                   )}
 
+                  {/* Cancelar só enquanto a sessão está vazia. Com ingresso
+                      vendido o botão fica desabilitado e diz por quê, em vez
+                      de deixar clicar para receber a recusa da API: o erro que
+                      já dá para prever vale mais como aviso. Ver decisão D30. */}
                   {s.status !== "CANCELLED" && (
                     <button
                       className="btn btn--ghost btn--mini btn--perigo"
                       type="button"
-                      disabled={ocupado}
+                      disabled={ocupado || vendidos > 0}
+                      title={
+                        vendidos > 0
+                          ? `${vendidos} ingresso(s) vendido(s). Despublique para tirar do ` +
+                            `cartaz sem prejudicar quem comprou.`
+                          : undefined
+                      }
                       onClick={() =>
                         acao(
                           s.id,
@@ -191,6 +202,11 @@ export function Organizador() {
                     >
                       Cancelar
                     </button>
+                  )}
+                  {s.status !== "CANCELLED" && vendidos > 0 && (
+                    <span className="muted nota-acao">
+                      {vendidos} vendido(s): não dá para cancelar
+                    </span>
                   )}
                 </div>
               </li>
