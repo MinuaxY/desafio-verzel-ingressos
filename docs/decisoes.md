@@ -473,6 +473,23 @@ cliente sabendo que está lidando.
 cancelado pelo cliente não conta, porque a poltrona voltou ao estoque. Uma sessão em que
 todo mundo desistiu está vazia de novo e volta a poder ser cancelada.
 
+**O passo que faltava:** recusar o cancelamento resolve o dano, mas deixa o organizador sem
+saída para a sessão que realmente não vai acontecer. Existe então um **"cancelar os N pedidos
+vendidos"**, separado, no painel — ao lado do botão travado, dizendo o que fazer e não só o
+que não dá. Ele despublica a sessão antes de esvaziá-la: não dá para drenar uma sessão que
+continua vendendo.
+
+São duas decisões diferentes de propósito, e não um botão só. Desfazer a compra de pessoas
+reais é a que pesa; embutir isso num botão chamado "cancelar sessão" faria o organizador
+tomá-la sem perceber que tomou.
+
+**O pedido registra quem cancelou** (`cancelled_by_organizer`). Sem isso, o cliente abriria a
+compra, leria "pedido cancelado" e concluiria que a desistência foi dele — o sistema
+esconderia justamente o que precisa aparecer. A tela dele passa a dizer que o cinema cancelou
+e que a devolução é com o organizador, em vez de oferecer "escolher de novo" numa sessão que
+não existe mais. É o mais honesto que dá para ser sem apparato de e-mail e estorno, e a
+falta desses dois está registrada como limitação conhecida.
+
 **A portaria passou a conferir o estado da sessão de qualquer jeito.** No fluxo atual essa
 checagem é redundante — não há como existir ingresso válido em sessão cancelada. Ela fica
 porque a consequência de falhar é alguém entrar numa sala que não vai exibir nada, e porque

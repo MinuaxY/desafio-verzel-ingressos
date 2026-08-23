@@ -164,6 +164,13 @@ class BatchResult(BaseModel):
     skipped: list[SkippedDate]
 
 
+class OrdersCancelled(BaseModel):
+    """Resultado do cancelamento em massa dos pedidos de uma sessão."""
+
+    cancelled: int
+    session: SessionOut
+
+
 class DayInCartaz(BaseModel):
     """Um dia da barra de datas, com quantas sessões tem."""
 

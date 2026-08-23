@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Enum as SAEnum,
@@ -75,6 +76,11 @@ class Order(Base):
 
     # Motivo da recusa, para a tela conseguir explicar o que aconteceu.
     decline_reason: Mapped[str | None] = mapped_column(String(120), default=None)
+
+    # Quem cancelou. Sem isso, o cliente que teve a sessão cancelada leria
+    # apenas "pedido cancelado" e concluiria que a desistência foi dele — e o
+    # sistema esconderia justamente o que precisa aparecer. Ver decisão D30.
+    cancelled_by_organizer: Mapped[bool] = mapped_column(Boolean, default=False)
 
     session: Mapped["Session"] = relationship(lazy="selectin")  # noqa: F821
     tickets: Mapped[list["Ticket"]] = relationship(

@@ -353,7 +353,7 @@ cd api
 python -m pytest -v
 ```
 
-**217 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
+**227 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
 cada execução — o container precisa estar de pé. Usar o mesmo SGBD da aplicação evita que um
 teste passe em SQLite e quebre em produção por causa de enum nativo ou índice parcial.
 
@@ -378,7 +378,7 @@ cd web
 npm test
 ```
 
-**114 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
+**118 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
 `lib` em 95%, `components` em 83%, `auth` em 77%.
 
 | Arquivo | Testes | Cobre |
@@ -392,6 +392,7 @@ npm test
 | `ProtectedRoute.test.tsx` | 7 | Acesso por papel, token inválido, espera pela sessão |
 | `EscolhaDeDias.test.tsx` | 12 | Repetição em vários dias, atalhos, dia principal travado |
 | `BarraDeDias.test.tsx` | 10 | Filtro por dia, dia sem sessão, data sem escorregar para UTC |
+| `Pedido.test.tsx` | 4 | Quem cancelou o pedido: a desistência do cliente e o cancelamento pelo cinema |
 
 ---
 
@@ -434,9 +435,14 @@ conhece HTTP.
 O que **não** está pronto, ou está pronto pela metade:
 
 - **Os testes de front-end cobrem lógica e componentes, não as páginas inteiras.** O mapa de
-  assentos, o ingresso, a rota protegida e a vitrine têm teste; o checkout, a portaria e o
-  painel do organizador foram verificados manualmente no navegador, de ponta a ponta. Com mais
-  tempo, o próximo alvo seria o fluxo de pagamento.
+  assentos, o ingresso, a rota protegida, a vitrine e os avisos de pedido cancelado têm teste;
+  o checkout, a portaria e o painel do organizador foram verificados manualmente no navegador,
+  de ponta a ponta. Com mais tempo, o próximo alvo seria o fluxo de pagamento.
+- **Cancelar a sessão não avisa nem estorna ninguém.** Quando o organizador desfaz os pedidos
+  de uma sessão, o cliente descobre ao abrir a compra — que passa a dizer que o cinema
+  cancelou e que a devolução é com o organizador. Falta o e-mail e falta o estorno, e é por
+  isso que a operação é um passo separado e explícito em vez de um efeito colateral de
+  cancelar a sessão. Ver decisão D30.
 - **O cache do catálogo é em memória**, então vale por instância. Com mais de um processo,
   cada um teria o próprio. Trocar por Redis seria o passo seguinte.
 - **A limpeza de reservas vencidas roda no caminho de quem usa**, não em tarefa agendada. O

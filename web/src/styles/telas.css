@@ -724,10 +724,3 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
-
-/* Explica um botão desabilitado ao lado dele: o title só aparece no hover, e
-   quem navega por teclado ou toque nunca veria o motivo. */
-.nota-acao {
-  align-self: center;
-  font-size: 0.78rem;
-}

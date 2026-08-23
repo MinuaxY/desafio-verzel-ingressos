@@ -146,7 +146,20 @@ export function Pedido() {
         </div>
       )}
 
-      {pedido.status === "CANCELLED" && (
+      {/* Quem cancelou muda tudo para quem lê. "Pedido cancelado" sozinho
+          faria o cliente concluir que a desistência foi dele, e não achar o
+          que fazer a respeito. Ver decisão D30. */}
+      {pedido.status === "CANCELLED" && pedido.cancelled_by_organizer && (
+        <div className="alert alert--error" role="alert">
+          <span>
+            <strong>A sessão foi cancelada pelo cinema</strong> e este pedido foi desfeito.
+            Procure o organizador sobre a devolução — a compra não é estornada por aqui.{" "}
+            <Link to="/em-cartaz">Ver outras sessões</Link>.
+          </span>
+        </div>
+      )}
+
+      {pedido.status === "CANCELLED" && !pedido.cancelled_by_organizer && (
         <div className="alert alert--error">
           <span>
             Este pedido foi cancelado e as poltronas voltaram para o estoque.{" "}

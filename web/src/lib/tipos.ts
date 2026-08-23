@@ -231,6 +231,9 @@ export interface Order {
   expires_at: string | null;
   paid_at: string | null;
   decline_reason: string | null;
+  /** Distingue a desistencia do cliente do cancelamento pelo cinema.
+   *  Ver decisao D30. */
+  cancelled_by_organizer: boolean;
   tickets: Ticket[];
 }
 

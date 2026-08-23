@@ -117,6 +117,9 @@ class OrderOut(BaseModel):
     expires_at: datetime | None
     paid_at: datetime | None
     decline_reason: str | None
+    # Distingue "eu desisti" de "o cinema cancelou". A tela precisa disso para
+    # não deixar o cliente achar que a desistência foi dele. Ver decisão D30.
+    cancelled_by_organizer: bool
     tickets: list[TicketOut]
 
 
@@ -201,6 +204,7 @@ def to_order_out(pedido, *, codigo_de=None) -> OrderOut:
         expires_at=pedido.expires_at if pedido.status == OrderStatus.PENDING else None,
         paid_at=pedido.paid_at,
         decline_reason=pedido.decline_reason,
+        cancelled_by_organizer=pedido.cancelled_by_organizer,
         tickets=[
             to_ticket_out(t, codigo=codigo_de(t) if codigo_de else None)
             for t in sorted(pedido.tickets, key=lambda t: (t.sector.display_order, t.seat_code))

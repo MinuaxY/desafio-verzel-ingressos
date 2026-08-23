@@ -46,6 +46,38 @@ export function Organizador() {
     }
   }
 
+  /** Desfaz as compras da sessão. Passo à parte do cancelamento dela: é este
+   *  que mexe na vida de gente que comprou, e precisa ser pedido de propósito.
+   *  Ver decisão D30. */
+  async function cancelarPedidos(s: SessionDetail, vendidos: number) {
+    if (
+      !window.confirm(
+        `Cancelar ${vendidos} ingresso(s) já vendido(s) da sessão de ${s.movie.title}?
+
+` +
+          `A sessão sai do cartaz e essas pessoas perdem o ingresso. O sistema não avisa ` +
+          `ninguém nem devolve o dinheiro — isso fica com você.
+
+Isso não pode ser desfeito.`,
+      )
+    )
+      return;
+
+    setAgindo(s.id);
+    setErro("");
+    try {
+      const r = await request<{ cancelled: number; session: SessionDetail }>(
+        `/organizer/sessions/${s.id}/cancel-orders`,
+        { method: "POST" },
+      );
+      setSessoes((atual) => atual?.map((x) => (x.id === s.id ? r.session : x)) ?? null);
+    } catch (e) {
+      setErro(e instanceof ApiError ? e.message : "Não foi possível cancelar os pedidos.");
+    } finally {
+      setAgindo("");
+    }
+  }
+
   async function acao(id: string, caminho: string, confirmacao?: string) {
     if (confirmacao && !window.confirm(confirmacao)) return;
 
@@ -189,7 +221,7 @@ export function Organizador() {
                       title={
                         vendidos > 0
                           ? `${vendidos} ingresso(s) vendido(s). Despublique para tirar do ` +
-                            `cartaz sem prejudicar quem comprou.`
+                            `cartaz sem prejudicar quem comprou, ou cancele os pedidos antes.`
                           : undefined
                       }
                       onClick={() =>
@@ -203,10 +235,18 @@ export function Organizador() {
                       Cancelar
                     </button>
                   )}
+                  {/* Com ingresso vendido, o caminho para cancelar a sessão
+                      passa por aqui primeiro. Fica ao lado do botão travado
+                      para dizer o que fazer, e não só o que não dá. */}
                   {s.status !== "CANCELLED" && vendidos > 0 && (
-                    <span className="muted nota-acao">
-                      {vendidos} vendido(s): não dá para cancelar
-                    </span>
+                    <button
+                      className="btn btn--ghost btn--mini btn--perigo"
+                      type="button"
+                      disabled={ocupado}
+                      onClick={() => cancelarPedidos(s, vendidos)}
+                    >
+                      Cancelar {vendidos} pedido(s) vendido(s)
+                    </button>
                   )}
                 </div>
               </li>

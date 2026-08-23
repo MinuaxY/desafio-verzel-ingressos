@@ -18,6 +18,7 @@ from app.models.user import Role, User
 from app.schemas.session import (
     BatchResult,
     DayInCartaz,
+    OrdersCancelled,
     SessionCreate,
     SessionOut,
     SessionPage,
@@ -268,3 +269,27 @@ def cancelar(
         return to_session_out(SessionService(db).cancelar(session_id, user.id))
     except Exception as e:
         raise _traduz(e)
+
+
+@gestao.post("/{session_id}/cancel-orders", response_model=OrdersCancelled)
+def cancelar_pedidos(
+    session_id: uuid.UUID,
+    user: User = Depends(require_role(Role.ORGANIZER)),
+    db: DbSession = Depends(get_db),
+) -> OrdersCancelled:
+    """Cancela todos os pedidos da sessão, despublicando-a antes.
+
+    Passo separado do cancelamento da sessão: é ele que desfaz compras de
+    pessoas reais, e precisa ser pedido explicitamente. Ver decisão D30.
+    """
+    servico = SessionService(db)
+    try:
+        quantos = servico.cancelar_pedidos(session_id, user.id)
+    except Exception as e:
+        raise _traduz(e)
+
+    sessao = servico.obter_do_organizador(session_id, user.id)
+    return OrdersCancelled(
+        cancelled=quantos,
+        session=to_session_out(sessao, vendidos=servico.ingressos_vendidos(session_id)),
+    )

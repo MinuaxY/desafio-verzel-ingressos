@@ -12,6 +12,7 @@ from app.models.session import Session, SessionSectorPrice, SessionStatus
 from app.repositories.room_repository import RoomRepository
 from app.repositories.session_repository import SessionRepository
 from app.schemas.session import SessionCreate, SessionRepeat, SessionUpdate
+from app.services.order_service import OrderService
 from app.services.room_service import RoomNotFound, RoomService
 
 # Fuso em que as datas escolhidas pelo organizador são interpretadas. "Dia 24
@@ -312,6 +313,31 @@ class SessionService:
 
         sessao.status = SessionStatus.CANCELLED
         return self.sessions.save(sessao)
+
+    def cancelar_pedidos(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> int:
+        """Cancela de uma vez todos os pedidos da sessão. Devolve quantos.
+
+        É o passo que falta para conseguir cancelar uma sessão que já vendeu.
+        Fica separado do cancelamento da sessão de propósito: são duas
+        decisões diferentes — desfazer as compras de pessoas reais é a que
+        pesa, e embutir isso num botão chamado "cancelar sessão" faria o
+        organizador tomá-la sem perceber.
+
+        **Despublica antes**, e só então cancela. Não dá para esvaziar uma
+        sessão que continua vendendo: alguém compraria no meio da operação e o
+        organizador voltaria à mesma tela com um pedido novo. O despublicar é
+        commitado primeiro, o que fecha a porta de entrada — resta a janela de
+        um pedido que já estava em voo, e para esse a contagem devolvida
+        denuncia a diferença.
+        """
+        sessao = self.obter_do_organizador(session_id, organizer_id)
+        self._exige_nao_cancelada(sessao)
+
+        if sessao.status is SessionStatus.PUBLISHED:
+            sessao.status = SessionStatus.DRAFT
+            self.sessions.save(sessao)
+
+        return OrderService(self.db).cancelar_da_sessao(session_id)
 
     # -- apoio -------------------------------------------------------------
 

@@ -195,14 +195,49 @@ class OrderService:
         if pedido.status not in (OrderStatus.PENDING, OrderStatus.PAID):
             raise OrderNotPayable(pedido.status)
 
-        pedido.status = OrderStatus.CANCELLED
-        for ingresso in pedido.tickets:
-            if ingresso.status is not TicketStatus.USED:
-                ingresso.status = TicketStatus.CANCELLED
-
+        self._marca_cancelado(pedido)
         self.db.commit()
         self.db.refresh(pedido)
         return pedido
+
+    def cancelar_da_sessao(self, session_id: uuid.UUID) -> int:
+        """Cancela todos os pedidos vivos de uma sessão. Devolve quantos.
+
+        Quem chama é o organizador, pela sessão — o cliente não está por perto
+        para consentir. Por isso cada pedido fica marcado como cancelado pelo
+        organizador: é o que permite a tela do cliente dizer "o cinema
+        cancelou" em vez de deixá-lo achar que a desistência foi dele.
+
+        Ingresso já utilizado não é tocado, como no cancelamento comum: ele é
+        registro de quem entrou. Ver decisão D30.
+        """
+        pedidos = list(
+            self.db.scalars(
+                select(Order).where(
+                    Order.session_id == session_id,
+                    Order.status.in_((OrderStatus.PENDING, OrderStatus.PAID)),
+                )
+            )
+        )
+        for pedido in pedidos:
+            self._marca_cancelado(pedido, pelo_organizador=True)
+
+        self.db.commit()
+        return len(pedidos)
+
+    @staticmethod
+    def _marca_cancelado(pedido: Order, *, pelo_organizador: bool = False) -> None:
+        """A regra de o que acontece com o pedido e os ingressos ao cancelar.
+
+        Fica num lugar só porque os dois caminhos — o cliente desistindo e o
+        organizador cancelando a sessão — precisam concordar sobre o que
+        sobrevive. Não commita: quem chama decide o escopo da transação.
+        """
+        pedido.status = OrderStatus.CANCELLED
+        pedido.cancelled_by_organizer = pelo_organizador
+        for ingresso in pedido.tickets:
+            if ingresso.status is not TicketStatus.USED:
+                ingresso.status = TicketStatus.CANCELLED
 
     # -- leitura -----------------------------------------------------------
 
