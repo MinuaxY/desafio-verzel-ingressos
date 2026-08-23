@@ -127,7 +127,10 @@ def meus_pedidos(
     db: DbSession = Depends(get_db),
 ) -> list[OrderOut]:
     servico = OrderService(db)
-    return [to_order_out(p, codigo_de=servico.codigo_do) for p in servico.listar_do_cliente(user.id)]
+    return [
+        to_order_out(p, codigo_de=servico.codigo_do)
+        for p in servico.listar_do_cliente(user.id)
+    ]
 
 
 @compra.get("/{order_id}", response_model=OrderOut)

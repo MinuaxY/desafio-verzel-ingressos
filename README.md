@@ -150,10 +150,22 @@ Criadas pelo `python -m app.seed`. **Senha de todas: `verzel123`**
 A tela de entrada tem **botões de acesso rápido** para os três papéis — não é preciso digitar
 credencial para percorrer o sistema.
 
-Rodar o seed de novo não duplica nada: a checagem é por filme e sala, não por horário.
+Rodar o seed de novo no mesmo dia não duplica nada: a chave é `(sala, horário)`, a mesma que o
+banco usa para impedir duas sessões na mesma sala ao mesmo tempo.
 
-O seed também cria uma sala de **88 lugares** (Plateia 6×12 e VIP 2×8), com **10 poltronas
-acessíveis** marcadas, e **4 sessões publicadas** em horários futuros.
+O seed também cria **três salas** e uma programação de **dez dias** com os treze filmes do
+catálogo local — cerca de **90 sessões publicadas**, o suficiente para a vitrine exercitar
+paginação, filtro por dia e busca de verdade:
+
+| Sala | Lugares | Desenho | Preços |
+|---|---|---|---|
+| Sala 1 — Cine Verzel | 88 | Plateia 6×12 (dois corredores) + VIP 2×8 | R$ 32 / R$ 54 |
+| Sala 2 — Cine Verzel | 32 | Plateia 4×8, setor único, corredor central | R$ 26 |
+| Sala 3 — Cine Verzel (IMAX) | 132 | Plateia 8×14 (três corredores) + VIP 2×10 | R$ 38 / R$ 62 |
+
+As geometrias são diferentes de propósito: a Sala 2 mostra que o mapa fica bom sem VIP nenhum,
+e a Sala 3 leva o desenho ao limite do que a tela acomoda. Ao todo são **23 poltronas
+acessíveis** marcadas, das quatro naturezas.
 
 ---
 
@@ -353,7 +365,7 @@ cd api
 python -m pytest -v
 ```
 
-**235 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
+**242 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
 cada execução — o container precisa estar de pé. Usar o mesmo SGBD da aplicação evita que um
 teste passe em SQLite e quebre em produção por causa de enum nativo ou índice parcial.
 

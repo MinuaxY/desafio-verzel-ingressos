@@ -9,7 +9,6 @@ Threads de verdade, conexões de verdade, commits concorrentes. Um teste
 sequencial não provaria nada aqui.
 """
 import threading
-import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest

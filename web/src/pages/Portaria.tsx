@@ -3,7 +3,7 @@ import { Html5Qrcode } from "html5-qrcode";
 
 import { ApiError, request } from "../lib/api";
 import { dataHora } from "../lib/formato";
-import type { GateCheck, GateResult, SessionPage } from "../lib/tipos";
+import type { GateCheck, GateResult, SessionListItem } from "../lib/tipos";
 
 const LEITOR_ID = "leitor-qr";
 
@@ -20,7 +20,7 @@ const VEREDITO: Record<GateResult, { rotulo: string; simbolo: string; classe: st
 };
 
 export function Portaria() {
-  const [sessoes, setSessoes] = useState<SessionPage | null>(null);
+  const [sessoes, setSessoes] = useState<SessionListItem[] | null>(null);
   const [sessaoId, setSessaoId] = useState("");
   const [codigo, setCodigo] = useState("");
   const [resultado, setResultado] = useState<GateCheck | null>(null);
@@ -32,8 +32,12 @@ export function Portaria() {
   const leitor = useRef<Html5Qrcode | null>(null);
   const ultimoLido = useRef<{ codigo: string; quando: number } | null>(null);
 
+  // Endpoint próprio da portaria, e não a vitrine: a vitrine esconde o que já
+  // começou, e a sessão sumia da lista bem no meio da entrada — perdendo a
+  // checagem de "ingresso de outra sessão" na hora em que ela mais serve.
+  // Ver decisão D33.
   useEffect(() => {
-    request<SessionPage>("/sessions?por_pagina=48", { auth: false })
+    request<SessionListItem[]>("/gate/sessions")
       .then(setSessoes)
       .catch(() => {});
   }, []);
@@ -134,7 +138,7 @@ export function Portaria() {
           onChange={(e) => setSessaoId(e.target.value)}
         >
           <option value="">Qualquer sessão</option>
-          {sessoes?.items.map((s) => (
+          {sessoes?.map((s) => (
             <option key={s.id} value={s.id}>
               {s.title} — {dataHora(s.starts_at)}
             </option>

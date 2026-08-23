@@ -13,10 +13,16 @@ from app.schemas.room import SectorOut
 
 PRECO_MAXIMO_CENTAVOS = 100_000_00  # R$ 100.000, trava contra erro de digitação
 
+# O mínimo é um centavo, e não zero. Sessão de graça parecia inofensiva, mas o
+# pagamento simulado recusa valor zero — o cliente reservava a poltrona e não
+# conseguia pagar nunca, ficando com um pedido morto. A tela de criação já
+# exigia preço maior que zero; a API é que discordava dela. Ver decisão D33.
+PRECO_MINIMO_CENTAVOS = 1
+
 
 class SectorPriceIn(BaseModel):
     sector_id: uuid.UUID
-    price_cents: int = Field(ge=0, le=PRECO_MAXIMO_CENTAVOS)
+    price_cents: int = Field(ge=PRECO_MINIMO_CENTAVOS, le=PRECO_MAXIMO_CENTAVOS)
 
 
 class SessionCreate(BaseModel):

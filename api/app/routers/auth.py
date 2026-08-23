@@ -2,10 +2,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user, require_role
+from app.core.deps import get_current_user
 from app.core.throttle import tentativas_de_login
 from app.db import get_db
-from app.models.user import Role, User
+from app.models.user import User
 from app.schemas.user import TokenOut, UserLogin, UserOut, UserRegister
 from app.services.auth_service import AuthService, EmailAlreadyUsed, InvalidCredentials
 
@@ -50,9 +50,3 @@ def login(data: UserLogin, request: Request, db: Session = Depends(get_db)) -> T
 def me(user: User = Depends(get_current_user)) -> User:
     return user
 
-
-@router.get("/organizer-only", include_in_schema=False)
-def organizer_only(user: User = Depends(require_role(Role.ORGANIZER))) -> dict[str, str]:
-    """Rota de verificação da autorização por papel (T6). Removida na Sprint 2,
-    quando os endpoints reais de organizador passarem a exercer a mesma trava."""
-    return {"ok": user.email}

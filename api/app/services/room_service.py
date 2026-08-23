@@ -130,7 +130,9 @@ class RoomService:
     def sessoes_da_sala(self, room_id: uuid.UUID) -> tuple[int, int]:
         """Quantas sessões a sala tem no total, e quantas ainda vão acontecer."""
         total = (
-            self.db.scalar(select(func.count()).select_from(Session).where(Session.room_id == room_id))
+            self.db.scalar(
+                select(func.count()).select_from(Session).where(Session.room_id == room_id)
+            )
             or 0
         )
         futuras = (

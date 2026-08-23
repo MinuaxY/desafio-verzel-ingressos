@@ -94,12 +94,15 @@ class TestAutorizacao:
         assert r.json()["email"] == CLIENTE["email"]
 
     def test_organizador_acessa_rota_de_organizador(self, client):
+        # Exercido num endpoint real do organizador. Existia aqui uma rota
+        # criada só para este teste; ela prometia sair quando os endpoints de
+        # verdade passassem a valer, e tinha ficado para trás. Ver decisão D33.
         token = token_de(client, ORGANIZADOR)
-        r = client.get("/auth/organizer-only", headers={"Authorization": f"Bearer {token}"})
+        r = client.get("/organizer/sessions", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 200
 
     def test_cliente_recebe_403_em_rota_de_organizador(self, client):
         """Autenticado, porém sem permissão: 403, não 401."""
         token = token_de(client, CLIENTE)
-        r = client.get("/auth/organizer-only", headers={"Authorization": f"Bearer {token}"})
+        r = client.get("/organizer/sessions", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 403

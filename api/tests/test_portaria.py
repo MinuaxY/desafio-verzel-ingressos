@@ -255,7 +255,7 @@ class TestLinkCompartilhado:
         token = ingresso_pago["ticket"]["share_token"]
         assert client.get(f"/shared/{token}").json()["code"] == ingresso_pago["codigo"]
 
-    def test_token_inexistente_responde_404(self, client, ingresso_pago):
+    def test_token_inexistente_responde_404(self, client):
         assert client.get(f"/shared/{uuid.uuid4()}").status_code == 404
 
 

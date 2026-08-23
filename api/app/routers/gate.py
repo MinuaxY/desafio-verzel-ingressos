@@ -13,14 +13,28 @@ from app.schemas.order import (
     TicketDetailOut,
     to_ticket_detail,
 )
+from app.schemas.session import SessionListItem, to_list_item
 from app.services.gate_service import GateService
 from app.services.order_service import OrderService
+from app.services.session_service import SessionService
 
 portaria = APIRouter(
     prefix="/gate",
     tags=["Portaria"],
     dependencies=[Depends(require_role(Role.GATE))],
 )
+
+
+@portaria.get("/sessions", response_model=list[SessionListItem])
+def sessoes_da_portaria(db: DbSession = Depends(get_db)) -> list[SessionListItem]:
+    """Sessões que a portaria pode estar conferindo agora.
+
+    Endpoint próprio, e não a vitrine: a vitrine esconde o que já começou,
+    porque quem compra não tem mais o que fazer ali. Na porta é o contrário —
+    a sessão em andamento é justamente a que está recebendo gente.
+    Ver decisão D33.
+    """
+    return [to_list_item(s) for s in SessionService(db).listar_para_portaria()]
 
 
 @portaria.post("/validate", response_model=GateResultOut)
@@ -42,7 +56,9 @@ def validar(
 
     ingresso = None
     if resultado.ticket is not None:
-        ingresso = to_ticket_detail(resultado.ticket, codigo=OrderService.codigo_do(resultado.ticket))
+        ingresso = to_ticket_detail(
+            resultado.ticket, codigo=OrderService.codigo_do(resultado.ticket)
+        )
 
     return GateResultOut(
         result=resultado.result,

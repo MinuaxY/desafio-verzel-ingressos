@@ -19,6 +19,11 @@ from app.services.room_service import RoomNotFound, RoomService
 # às 19h" é hora local de quem vai ao cinema. Ver decisão D27.
 FUSO_LOCAL = ZoneInfo("America/Sao_Paulo")
 
+# Quanto tempo uma sessão continua aparecendo para a portaria depois de
+# começar. Uma sessão de duas horas com público chegando atrasado ainda está
+# recebendo gente; sumir da lista nesse momento é o pior instante possível.
+HORAS_DE_TOLERANCIA_NA_PORTARIA = timedelta(hours=6)
+
 # Teto para a criação em lote. Uma programação de cinema não passa de algumas
 # semanas, e sem limite um engano criaria centenas de sessões.
 MAX_DATAS_POR_LOTE = 60
@@ -105,6 +110,27 @@ class SessionService:
             tzinfo=FUSO_LOCAL,
         )
         return self.sessions.dias_com_sessao(a_partir_de=agora, ate=fim, busca=busca)
+
+    def listar_para_portaria(self) -> list[Session]:
+        """Sessões que a portaria pode estar conferindo agora.
+
+        A vitrine só mostra o que ainda vai começar, e faz sentido para quem
+        compra. Para quem está na porta, não: a sessão sumia da lista no
+        instante em que começava — bem no meio da entrada, com gente chegando
+        atrasada. Sem conseguir escolher a sessão, o operador perdia justamente
+        a checagem de "este ingresso é de outra sessão".
+
+        A janela vai de algumas horas atrás até o fim do dia seguinte: cobre a
+        sessão em andamento e as próximas do turno, sem despejar a programação
+        do mês num seletor. Ver decisão D33.
+        """
+        agora = datetime.now(timezone.utc)
+        itens, _ = self.sessions.list_published(
+            a_partir_de=agora - HORAS_DE_TOLERANCIA_NA_PORTARIA,
+            page=1,
+            por_pagina=100,
+        )
+        return [s for s in itens if s.starts_at <= agora + timedelta(days=2)]
 
     def obter_publica(self, session_id: uuid.UUID) -> Session:
         sessao = self.sessions.get(session_id)

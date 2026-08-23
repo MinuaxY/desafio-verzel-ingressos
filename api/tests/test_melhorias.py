@@ -144,7 +144,9 @@ class TestEdicaoDeSala:
         sala = cria_sala(client, headers)
         cria_sessao(client, headers, sala)
 
-        r = client.patch(f"/rooms/{sala['id']}", json={"name": "Sala 1 (reformada)"}, headers=headers)
+        r = client.patch(
+            f"/rooms/{sala['id']}", json={"name": "Sala 1 (reformada)"}, headers=headers
+        )
         assert r.status_code == 200
 
     def test_geometria_invalida_e_recusada(self, client):
@@ -184,8 +186,11 @@ class TestExclusaoDeSessao:
         sala = cria_sala(client, headers)
         sessao = cria_sessao(client, headers, sala).json()
 
-        assert client.delete(f"/organizer/sessions/{sessao['id']}", headers=headers).status_code == 204
-        assert client.get(f"/organizer/sessions/{sessao['id']}", headers=headers).status_code == 404
+        apagar = client.delete(f"/organizer/sessions/{sessao['id']}", headers=headers)
+        assert apagar.status_code == 204
+        assert client.get(
+            f"/organizer/sessions/{sessao['id']}", headers=headers
+        ).status_code == 404
 
     def test_sessao_publicada_nao_e_apagada(self, client):
         """Sai do cartaz com despublicar, não com exclusão."""
@@ -440,7 +445,8 @@ class TestFiltroPorDia:
         alvo = client.get("/sessions").json()["items"][0]
         dia = alvo["starts_at"][:10]
 
-        assert client.get("/sessions", params={"dia": dia, "busca": alvo["title"][:5]}).json()["total"] == 1
+        achou = client.get("/sessions", params={"dia": dia, "busca": alvo["title"][:5]})
+        assert achou.json()["total"] == 1
         assert client.get("/sessions", params={"dia": dia, "busca": "zzzz"}).json()["total"] == 0
 
     def test_dia_invalido_e_recusado(self, client):
@@ -622,7 +628,8 @@ class TestPortariaEsessaoCancelada:
         db.close()
 
         porteiro = auth(client, {
-            "name": "Porteiro Dois", "email": "p2@melh.dev", "password": "senhaforte123", "role": "GATE",
+            "name": "Porteiro Dois", "email": "p2@melh.dev",
+            "password": "senhaforte123", "role": "GATE",
         })
         r = client.post(
             "/gate/validate", json={"code": pedido["tickets"][0]["code"]}, headers=porteiro
@@ -901,3 +908,125 @@ class TestExclusaoDeSessaoCancelada:
         assert painel[suja["id"]]["has_tickets"] is True
         # os pedidos foram cancelados, entao nenhuma das duas ocupa poltrona
         assert painel[suja["id"]]["tickets_sold"] == 0
+
+
+class TestDefeitosDaRevisao:
+    """Três defeitos encontrados na revisão de 22/08. Ver decisão D33."""
+
+    def test_sessao_de_graca_e_recusada(self, client):
+        """Preço zero deixava o cliente com um pedido que nunca podia ser pago:
+        o pagamento simulado recusa valor zero, e a poltrona ficava presa até
+        a reserva expirar. A tela de criação já exigia preço; a API é que
+        discordava dela."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
+            hour=20, minute=0, second=0, microsecond=0
+        )
+        r = client.post(
+            "/organizer/sessions",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "starts_at": quando.isoformat(),
+                "prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 0}],
+            },
+            headers=headers,
+        )
+        assert r.status_code == 422
+
+    def test_um_centavo_continua_valendo(self, client):
+        """A trava é contra o zero, não contra preço baixo."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
+            hour=20, minute=0, second=0, microsecond=0
+        )
+        r = client.post(
+            "/organizer/sessions",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "starts_at": quando.isoformat(),
+                "prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 1}],
+            },
+            headers=headers,
+        )
+        assert r.status_code == 201
+
+    def test_edicao_tambem_nao_zera_o_preco(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala).json()
+
+        r = client.patch(
+            f"/organizer/sessions/{sessao['id']}",
+            json={"prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 0}]},
+            headers=headers,
+        )
+        assert r.status_code == 422
+
+    def test_a_rota_andaime_nao_existe_mais(self, client):
+        """Ela prometia sair quando os endpoints reais valessem, e ficou."""
+        headers = auth(client, ORGANIZADOR)
+        assert client.get("/auth/organizer-only", headers=headers).status_code == 404
+
+    def test_a_portaria_ve_a_sessao_que_ja_comecou(self, client):
+        """O defeito: a sessão sumia da lista no instante em que começava, com
+        o público ainda entrando, e o operador perdia a checagem de sessão
+        errada bem na hora em que ela serve."""
+        import uuid as U
+
+        from app.models.session import Session
+
+        from tests.conftest import TestSession
+
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        db = TestSession()
+        obj = db.get(Session, U.UUID(sessao["id"]))
+        obj.starts_at = datetime.now(timezone.utc) - timedelta(minutes=20)
+        db.commit()
+        db.close()
+
+        porteiro = auth(client, {
+            "name": "Porteiro Cinco", "email": "p5@melh.dev",
+            "password": "senhaforte123", "role": "GATE",
+        })
+        # a vitrine, corretamente, ja nao mostra
+        assert client.get("/sessions").json()["total"] == 0
+        # a portaria, sim
+        lista = client.get("/gate/sessions", headers=porteiro).json()
+        assert [s["id"] for s in lista] == [sessao["id"]]
+
+    def test_a_portaria_nao_ve_a_sessao_de_ontem(self, client):
+        """A janela é do turno, não do histórico."""
+        import uuid as U
+
+        from app.models.session import Session
+
+        from tests.conftest import TestSession
+
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+
+        db = TestSession()
+        obj = db.get(Session, U.UUID(sessao["id"]))
+        obj.starts_at = datetime.now(timezone.utc) - timedelta(days=1)
+        db.commit()
+        db.close()
+
+        porteiro = auth(client, {
+            "name": "Porteiro Seis", "email": "p6@melh.dev",
+            "password": "senhaforte123", "role": "GATE",
+        })
+        assert client.get("/gate/sessions", headers=porteiro).json() == []
+
+    def test_so_a_portaria_ve_essa_lista(self, client):
+        headers = auth(client, ORGANIZADOR)
+        assert client.get("/gate/sessions", headers=headers).status_code == 403
+        assert client.get("/gate/sessions", headers=auth(client, CLIENTE)).status_code == 403
+        assert client.get("/gate/sessions").status_code == 401

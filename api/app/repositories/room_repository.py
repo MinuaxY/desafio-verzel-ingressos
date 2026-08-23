@@ -11,7 +11,9 @@ class RoomRepository:
     def __init__(self, db: DbSession) -> None:
         self.db = db
 
-    def list_by_organizer(self, organizer_id: uuid.UUID, *, apenas_ativas: bool = True) -> list[Room]:
+    def list_by_organizer(
+        self, organizer_id: uuid.UUID, *, apenas_ativas: bool = True
+    ) -> list[Room]:
         consulta = select(Room).where(Room.organizer_id == organizer_id)
         if apenas_ativas:
             consulta = consulta.where(Room.active.is_(True))

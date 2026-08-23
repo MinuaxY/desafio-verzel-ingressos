@@ -358,6 +358,7 @@ class TestExpiracao:
 
         db = TestSession()
         try:
-            assert db.get(Order, __import__("uuid").UUID(pedido["id"])).status is OrderStatus.EXPIRED
+            gravado = db.get(Order, __import__("uuid").UUID(pedido["id"]))
+            assert gravado.status is OrderStatus.EXPIRED
         finally:
             db.close()

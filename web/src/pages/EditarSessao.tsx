@@ -68,6 +68,14 @@ export function EditarSessao() {
     e.preventDefault();
     if (!sessao) return;
 
+    const semPreco = sessao.prices
+      .filter((p) => paraCentavos(precos[p.sector.id] ?? "") <= 0)
+      .map((p) => p.sector.name);
+    if (semPreco.length > 0) {
+      setErro(`Defina um preço maior que zero para: ${semPreco.join(", ")}.`);
+      return;
+    }
+
     setErro("");
     setSalvo(false);
     setSalvando(true);
@@ -101,6 +109,18 @@ export function EditarSessao() {
    *  cópias saiam com o preço ajustado. Ver decisão D32. */
   async function repetir() {
     if (!sessao || diasExtras.length === 0) return;
+
+    // Sem esta conferência, um campo de preço apagado criaria as cópias todas
+    // a R$ 0,00 — e a API agora recusa isso com um erro de validação cru.
+    // Ver decisão D33.
+    const semPreco = sessao.prices
+      .filter((p) => paraCentavos(precos[p.sector.id] ?? "") <= 0)
+      .map((p) => p.sector.name);
+    if (semPreco.length > 0) {
+      setLote(null);
+      setErroLote(`Defina um preço maior que zero para: ${semPreco.join(", ")}.`);
+      return;
+    }
 
     setErroLote("");
     setLote(null);

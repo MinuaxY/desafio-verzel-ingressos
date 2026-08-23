@@ -566,6 +566,52 @@ irritante.
 
 ---
 
+## D33 — Revisão de código: três defeitos e o volume da vitrine
+
+Revisão feita em 22/08, depois da entrega. Rodei os linters, li o código e sondei caminhos de
+borda contra a API em vez de só ler. O que os testes já cobriam passou; o que não estava
+coberto rendeu três defeitos.
+
+**1. Sessão de graça travava o cliente.** A API aceitava preço zero (`ge=0`). O cliente
+reservava a poltrona, e o pagamento simulado — que recusa valor zero, corretamente — nunca
+aprovava. O pedido morria e a poltrona ficava presa até a reserva expirar. A tela de criação
+já exigia preço maior que zero; **a API é que discordava da sua própria interface**. O mínimo
+passou a ser um centavo, o que faz as duas concordarem e recusa o caso na porta em vez de no
+meio do caminho. Sessão gratuita de verdade exigiria pular o gateway, e não é o que o
+enunciado pede.
+
+**2. Uma rota que prometia a própria remoção.** `GET /auth/organizer-only` existia só para o
+teste de autorização por papel da Sprint 1, e o docstring dizia que sairia "quando os
+endpoints reais de organizador passarem a exercer a mesma trava". Eles passaram, e ela ficou.
+Não vazava nada — exigia o papel e devolvia o e-mail de quem chamou —, mas era andaime
+contradizendo o próprio comentário. Removida, e os dois testes passaram a exercer a trava em
+`/organizer/sessions`, que é onde ela vale.
+
+**3. A portaria perdia a sessão no instante em que ela começava.** A tela lia `/sessions`, a
+vitrine, que só mostra o que ainda vai começar — o que está certo para quem compra e errado
+para quem está na porta. Às 20:01, com o público ainda entrando, a sessão sumia do seletor e
+o operador perdia a checagem de "este ingresso é de outra sessão", justamente no momento em
+que ela serve. A portaria ganhou `GET /gate/sessions`, com uma janela do turno: até seis
+horas atrás e até dois dias à frente.
+
+**Higiene, na mesma passada:** um import e um argumento de teste sem uso, nove linhas acima
+das 100 colunas que o resto do projeto respeita, e um `Date.now()` reavaliado a cada render
+por falta de inicializador preguiçoso. Os 80 avisos de `Depends()` em argumento padrão são
+falso positivo — é o idioma do FastAPI.
+
+**O volume da vitrine.** O seed criava quatro sessões numa sala. Quatro sessões não exercitam
+paginação, filtro por dia nem busca — as três coisas que precisam ser vistas funcionando.
+Agora são **três salas de geometrias diferentes** e uma programação de dez dias com os treze
+filmes do catálogo: cerca de 90 sessões, nove páginas, todos os dias da barra preenchidos.
+As salas variam de propósito — a Sala 2 tem setor único, para provar que o mapa fica bom sem
+VIP; a Sala 3 tem quatro blocos e 132 lugares, o mapa no limite do que a tela acomoda.
+
+A idempotência mudou de chave: antes comparava `(sala, filme, futuro)`, o que quebraria agora
+que o mesmo filme roda em vários dias. Passou a usar `(sala, horário)` — a mesma chave do
+índice do banco —, então rodar duas vezes no mesmo dia não duplica nada.
+
+---
+
 ## Decisões pendentes
 
 - [ ] Plataforma de deploy — FastAPI não roda confortavelmente na Vercel; avaliar Render ou Railway para a API, com o front na Vercel

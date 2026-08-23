@@ -25,7 +25,9 @@ export function Pedido() {
   const [erro, setErro] = useState("");
   const [pagando, setPagando] = useState(false);
   const [cartao, setCartao] = useState({ card_number: "", card_holder: "" });
-  const [agora, setAgora] = useState(Date.now());
+  // Inicializador preguiçoso: sem a função, Date.now() roda a cada render
+  // e o valor é descartado em todos menos o primeiro.
+  const [agora, setAgora] = useState(() => Date.now());
   const [cancelando, setCancelando] = useState(false);
 
   useEffect(() => {
