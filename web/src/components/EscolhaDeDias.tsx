@@ -28,12 +28,17 @@ export function EscolhaDeDias({
   hora,
   selecionados,
   onMudar,
+  baseJaExiste = false,
 }: {
   /** O dia do horário principal, que já está marcado e não sai da lista. */
   baseISO: string;
   hora: string;
   selecionados: string[];
   onMudar: (dias: string[]) => void;
+  /** Na edição o dia base é uma sessão que já existe, e não uma que será
+   *  criada junto. Muda a contagem e o rótulo — dizer "serão criadas 3"
+   *  quando só 2 nascem seria mentira pequena e irritante. */
+  baseJaExiste?: boolean;
 }) {
   const base = paraData(baseISO);
   if (Number.isNaN(base.getTime())) return null;
@@ -81,6 +86,7 @@ export function EscolhaDeDias({
       <p className="faint" style={{ fontSize: "var(--text-xs)", margin: "var(--space-3) 0" }}>
         A mesma sessão, no mesmo horário{hora && ` (${hora})`}, nos dias marcados. Dia em que a
         sala já estiver ocupada é pulado, e você recebe a lista do que ficou de fora.
+        {baseJaExiste && " O dia em destaque é o desta sessão, que já existe."}
       </p>
 
       <div className="repetir__atalhos">
@@ -120,7 +126,7 @@ export function EscolhaDeDias({
               aria-pressed={marcado}
               aria-label={
                 `${d.getDate()} de ${d.toLocaleDateString("pt-BR", { month: "long" })}` +
-                (ehBase ? ", horário principal" : "")
+                (ehBase ? (baseJaExiste ? ", esta sessão" : ", horário principal") : "")
               }
               onClick={() => alternar(iso)}
             >
@@ -133,8 +139,20 @@ export function EscolhaDeDias({
 
       {selecionados.length > 0 && (
         <p className="repetir__resumo">
-          Serão criadas <strong>{selecionados.length + 1} sessões</strong>, contando o horário
-          principal.
+          {baseJaExiste ? (
+            <>
+              Serão criadas{" "}
+              <strong>
+                {selecionados.length} {selecionados.length === 1 ? "sessão" : "sessões"}
+              </strong>
+              , além desta.
+            </>
+          ) : (
+            <>
+              Serão criadas <strong>{selecionados.length + 1} sessões</strong>, contando o
+              horário principal.
+            </>
+          )}
         </p>
       )}
     </details>

@@ -378,7 +378,7 @@ cd web
 npm test
 ```
 
-**118 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
+**122 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
 `lib` em 95%, `components` em 83%, `auth` em 77%.
 
 | Arquivo | Testes | Cobre |
@@ -390,7 +390,7 @@ npm test
 | `EmCartaz.test.tsx` | 11 | Vitrine pública, busca, estado vazio, servidor fora do ar |
 | `Ingresso.test.tsx` | 9 | QR, código, compartilhamento, ingresso não pago |
 | `ProtectedRoute.test.tsx` | 7 | Acesso por papel, token inválido, espera pela sessão |
-| `EscolhaDeDias.test.tsx` | 12 | Repetição em vários dias, atalhos, dia principal travado |
+| `EscolhaDeDias.test.tsx` | 15 | Repetição em vários dias, atalhos, dia principal travado, contagem na edição |
 | `BarraDeDias.test.tsx` | 10 | Filtro por dia, dia sem sessão, data sem escorregar para UTC |
 | `Pedido.test.tsx` | 4 | Quem cancelou o pedido: a desistência do cliente e o cancelamento pelo cinema |
 

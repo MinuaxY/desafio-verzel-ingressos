@@ -532,6 +532,40 @@ apagar.
 
 ---
 
+## D32 — Repetir na edição cria cópias, não uma série
+
+**Faltava:** a repetição em outros dias só existia na criação. Quem já tinha a sessão no ar e
+quisesse colocá-la em mais dias tinha que refazer tudo do zero.
+
+**Duas leituras de "repetir" na tela de edição, e elas são bem diferentes:**
+
+1. *"Esta sessão se repete — aplique minhas edições às irmãs."* Exige um conceito de **série**
+   que o projeto não tem: as sessões criadas em lote são linhas independentes, sem vínculo.
+   Criá-lo significaria decidir o que se propaga (preço? horário?), o que acontece quando uma
+   irmã vendeu e a outra não, e o que fazer quando uma é cancelada.
+2. *"Crie cópias desta sessão em outros dias."*
+
+**Escolhido: a segunda.** É o que a mesma tela de criação já faz, e o endpoint `/batch` já
+recebe exatamente o que a sessão editada tem — filme, sala, áudio, formato, preços. Nenhuma
+mudança no back-end: só a interface faltava. A primeira leitura fica registrada como ideia
+descartada, não esquecida.
+
+**O bloco fica fora do formulário de edição.** Repetir não altera esta sessão, cria outras.
+Se estivesse dentro, "Salvar alterações" produziria sessões novas sem que ninguém tivesse
+pedido.
+
+**As cópias usam o que está no formulário, e não o que está salvo.** Quem ajusta o preço e
+manda repetir espera que as cópias saiam com o preço ajustado — e o bloco diz isso em voz
+alta, inclusive que vale para alterações ainda não salvas. Elas também nascem no mesmo estado
+da original: repetir uma sessão que está no cartaz e receber rascunhos seria surpresa.
+
+**O componente de escolha de dias precisou saber em qual dos dois contextos está.** Na criação
+o dia base é uma sessão que vai nascer junto e a contagem diz "3 sessões, contando o horário
+principal"; na edição ele já existe, e prometer 3 para entregar 2 seria uma mentira pequena e
+irritante.
+
+---
+
 ## Decisões pendentes
 
 - [ ] Plataforma de deploy — FastAPI não roda confortavelmente na Vercel; avaliar Render ou Railway para a API, com o front na Vercel

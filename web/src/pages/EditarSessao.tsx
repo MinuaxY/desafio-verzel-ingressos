@@ -4,9 +4,10 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError, request } from "../lib/api";
 import { dataHora, duracao, reais } from "../lib/formato";
 import { AUDIO, FORMATO } from "../lib/tipos";
-import type { AudioType, ScreenFormat, SessionDetail } from "../lib/tipos";
+import type { AudioType, BatchResult, ScreenFormat, SessionDetail } from "../lib/tipos";
 import { Campo } from "../components/Campo";
 import { Carregando } from "../components/Carregando";
+import { EscolhaDeDias } from "../components/EscolhaDeDias";
 import { Classificacao } from "../components/Selos";
 
 /** Converte "32,00" em centavos, sem passar por float. Ver decisão D14. */
@@ -42,6 +43,11 @@ export function EditarSessao() {
   const [audio, setAudio] = useState<AudioType>("SUBTITLED");
   const [formato, setFormato] = useState<ScreenFormat>("TWO_D");
   const [precos, setPrecos] = useState<Record<string, string>>({});
+
+  const [diasExtras, setDiasExtras] = useState<string[]>([]);
+  const [repetindo, setRepetindo] = useState(false);
+  const [lote, setLote] = useState<BatchResult | null>(null);
+  const [erroLote, setErroLote] = useState("");
 
   useEffect(() => {
     request<SessionDetail>(`/organizer/sessions/${id}`)
@@ -84,6 +90,46 @@ export function EditarSessao() {
       setErro(err instanceof ApiError ? err.message : "Não foi possível salvar.");
     } finally {
       setSalvando(false);
+    }
+  }
+
+  /** Cria cópias desta sessão em outros dias.
+   *
+   *  Ação à parte do "salvar": ela não altera esta sessão, cria outras. Usa o
+   *  que está no formulário — horário, áudio, formato e preços —, e não o que
+   *  está salvo, porque quem ajusta o preço e manda repetir espera que as
+   *  cópias saiam com o preço ajustado. Ver decisão D32. */
+  async function repetir() {
+    if (!sessao || diasExtras.length === 0) return;
+
+    setErroLote("");
+    setLote(null);
+    setRepetindo(true);
+    try {
+      const resultado = await request<BatchResult>("/organizer/sessions/batch", {
+        method: "POST",
+        body: {
+          catalog_id: sessao.movie.catalog_id,
+          room_id: sessao.room_id,
+          dates: diasExtras,
+          time_of_day: `${quando.split("T")[1] ?? ""}:00`.slice(0, 8),
+          audio,
+          screen_format: formato,
+          prices: sessao.prices.map((p) => ({
+            sector_id: p.sector.id,
+            price_cents: paraCentavos(precos[p.sector.id] ?? ""),
+          })),
+          // As cópias nascem no mesmo estado desta: repetir uma sessão que
+          // está no cartaz e receber rascunhos seria surpresa.
+          publish: sessao.status === "PUBLISHED",
+        },
+      });
+      setLote(resultado);
+      setDiasExtras([]);
+    } catch (err) {
+      setErroLote(err instanceof ApiError ? err.message : "Não foi possível repetir a sessão.");
+    } finally {
+      setRepetindo(false);
     }
   }
 
@@ -234,6 +280,84 @@ export function EditarSessao() {
           </button>
         </div>
       </form>
+
+      {/* Repetir fica fora do formulário de propósito: não altera esta sessão,
+          cria outras. Misturar as duas coisas num botão só faria "salvar"
+          produzir sessões sem que ninguém tivesse pedido. Ver decisão D32. */}
+      <div className="etapa stack" style={{ gap: "var(--space-4)" }}>
+        <div className="stack" style={{ gap: "var(--space-2)" }}>
+          <h2 style={{ fontSize: "var(--text-lg)" }}>Repetir esta sessão</h2>
+          <p className="faint" style={{ fontSize: "var(--text-sm)" }}>
+            Cria cópias em outros dias, com o mesmo filme e a mesma sala. Elas usam o horário,
+            o áudio, o formato e os preços que estão no formulário acima — inclusive
+            alterações que você ainda não salvou.
+          </p>
+        </div>
+
+        {quando && (
+          <EscolhaDeDias
+            baseISO={quando.split("T")[0]}
+            hora={quando.split("T")[1] ?? ""}
+            selecionados={diasExtras}
+            onMudar={setDiasExtras}
+            baseJaExiste
+          />
+        )}
+
+        {erroLote && (
+          <p className="alert alert--error" role="alert">
+            {erroLote}
+          </p>
+        )}
+
+        {lote && (
+          <div
+            className={`alert ${lote.created.length > 0 ? "alert--success" : "alert--error"}`}
+            role="status"
+          >
+            <div className="stack" style={{ gap: "var(--space-2)" }}>
+              <strong>
+                {lote.created.length === 0
+                  ? "Nenhuma sessão foi criada"
+                  : `${lote.created.length} ${
+                      lote.created.length === 1 ? "sessão criada" : "sessões criadas"
+                    }`}
+              </strong>
+              {/* O que ficou de fora vem com o motivo: o lote pula o dia
+                  ocupado em vez de abortar tudo. Ver decisão D27. */}
+              {lote.skipped.length > 0 && (
+                <ul style={{ paddingLeft: "var(--space-5)", fontSize: "var(--text-sm)" }}>
+                  {lote.skipped.map((p) => (
+                    <li key={p.date}>
+                      {p.date.split("-").reverse().join("/")} — {p.reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {lote.created.length > 0 && (
+                <Link to="/organizador">Ver na lista de sessões</Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="rodape-acao">
+          <button
+            className="btn btn--primary"
+            type="button"
+            disabled={repetindo || diasExtras.length === 0}
+            onClick={repetir}
+          >
+            {repetindo
+              ? "Criando…"
+              : diasExtras.length === 0
+                ? "Escolha os dias acima"
+                : `Criar ${diasExtras.length} ${
+                    diasExtras.length === 1 ? "sessão" : "sessões"
+                  }`}
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

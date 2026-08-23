@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { EscolhaDeDias } from "./EscolhaDeDias";
 
-function monta(over: { base?: string; selecionados?: string[] } = {}) {
+function monta(
+  over: { base?: string; selecionados?: string[]; baseJaExiste?: boolean } = {},
+) {
   const onMudar = vi.fn();
   render(
     <EscolhaDeDias
@@ -12,6 +14,7 @@ function monta(over: { base?: string; selecionados?: string[] } = {}) {
       hora="19:00"
       selecionados={over.selecionados ?? []}
       onMudar={onMudar}
+      baseJaExiste={over.baseJaExiste}
     />,
   );
   return { onMudar };
@@ -95,6 +98,34 @@ describe("escolha de dias para repetir", () => {
   it("avisa que dia ocupado é pulado, não perdido", () => {
     monta();
     expect(screen.getByText(/é pulado/i)).toBeInTheDocument();
+  });
+
+  it("na edição a contagem não soma o dia base, que já existe", () => {
+    // A tela de edição repete a partir de uma sessão que já está criada.
+    // Prometer "3 sessões" e entregar 2 seria mentira pequena e irritante.
+    monta({ selecionados: ["2026-08-29", "2026-08-30"], baseJaExiste: true });
+
+    expect(screen.getByText(/2 sessões/)).toBeInTheDocument();
+    expect(screen.queryByText(/3 sessões/)).not.toBeInTheDocument();
+  });
+
+  it("na edição, uma sessão só é dita no singular", () => {
+    monta({ selecionados: ["2026-08-29"], baseJaExiste: true });
+    expect(screen.getByText(/1 sessão/)).toBeInTheDocument();
+  });
+
+  it("na edição o dia base é apresentado como esta sessão", () => {
+    monta({ base: "2026-08-28", baseJaExiste: true });
+
+    expect(screen.getByLabelText(/28 de agosto, esta sessão/i)).toBeDisabled();
+    expect(screen.getByText(/o dia em destaque é o desta sessão/i)).toBeInTheDocument();
+  });
+
+  it("na criação o dia base continua sendo o horário principal", () => {
+    monta({ base: "2026-08-28" });
+
+    expect(screen.getByLabelText(/28 de agosto, horário principal/i)).toBeInTheDocument();
+    expect(screen.queryByText(/o dia em destaque/i)).not.toBeInTheDocument();
   });
 
   it("data inválida não quebra a tela", () => {
