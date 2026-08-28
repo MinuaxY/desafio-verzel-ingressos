@@ -4,7 +4,7 @@ import pytest
 from app.core.throttle import MAX_TENTATIVAS, Throttle, tentativas_de_login
 
 CLIENTE = {
-    "name": "Cli", "email": "cli@seg.dev", "password": "senhaforte123", "role": "CUSTOMER",
+    "name": "Cli", "email": "cli@seg.dev", "password": "senhaforte123",
 }
 
 

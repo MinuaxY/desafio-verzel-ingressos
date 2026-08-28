@@ -153,6 +153,19 @@ Criadas pelo `python -m app.seed`. **Senha de todas: `verzel123`**
 A tela de entrada tem **botões de acesso rápido** para os três papéis — não é preciso digitar
 credencial para percorrer o sistema.
 
+O **cadastro público cria sempre cliente**. Organizador e portaria são contas concedidas, não
+escolhidas, e vêm de um fluxo administrativo fora da API:
+
+```bash
+python -m app.admin criar-organizador "Cine Verzel" contato@cine.dev
+python -m app.admin criar-portaria "Portaria Sala 1" portaria@cine.dev
+python -m app.admin promover contato@cine.dev ORGANIZER
+python -m app.admin listar
+```
+
+A senha é pedida no terminal, sem eco — passá-la como argumento a deixaria no histórico do
+shell. O porquê disso não ser um endpoint está na decisão D34.
+
 Rodar o seed de novo no mesmo dia não duplica nada: a chave é `(sala, horário)`, a mesma que o
 banco usa para impedir duas sessões na mesma sala ao mesmo tempo.
 
@@ -337,6 +350,7 @@ Uma revisão dedicada foi feita no fim do projeto. O que segue é o resultado, i
 |---|---|
 | **Senhas** | bcrypt, nunca em texto. Hash calculado no servidor |
 | **Autorização** | Verificada por papel em cada rota, com 403 distinto de 401, e coberta por testes |
+| **Concessão de papel** | O cadastro público cria **sempre** cliente. Organizador e portaria vêm de `python -m app.admin`, fora da API |
 | **Enumeração de contas** | Senha errada e e-mail inexistente devolvem exatamente a mesma resposta |
 | **Recursos de terceiros** | Sala de outro organizador responde 404, não 403: confirmar a existência já entregaria informação |
 | **Ingresso** | QR assinado com HMAC-SHA256 e segredo próprio, comparado em tempo constante |
@@ -370,7 +384,12 @@ passo seguinte.
 
 **As contas de demonstração têm senha pública neste README.** É proposital, para a avaliação
 ser possível sem cadastro — mas significa que, no ambiente publicado, qualquer pessoa pode
-entrar como organizador e criar ou cancelar sessões.
+entrar como organizador e criar ou cancelar sessões. Isso é diferente de *se cadastrar* como
+organizador, que a API recusa desde a decisão D34.
+
+**A portaria valida ingresso de qualquer organizador.** Um usuário de portaria não pertence a
+um cinema: o papel dá acesso à validação em geral, não à validação daquele local. Amarrar
+funcionário ao organizador é modelagem que ainda não existe, e está na fila.
 
 **A documentação da API está aberta em produção** (`/docs`). Desejável aqui, para a avaliação;
 em sistema real, ficaria atrás de autenticação.
@@ -408,7 +427,7 @@ cd api
 python -m pytest -v
 ```
 
-**242 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
+**249 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
 cada execução — o container precisa estar de pé. Usar o mesmo SGBD da aplicação evita que um
 teste passe em SQLite e quebre em produção por causa de enum nativo ou índice parcial.
 
@@ -421,7 +440,7 @@ teste passe em SQLite e quebre em produção por causa de enum nativo ou índice
 | `test_sessions.py` | 21 | Criação, ciclo de vida, vitrine pública |
 | `test_exibicao.py` | 16 | Classificação indicativa, áudio e formato da sessão |
 | `test_seguranca.py` | 14 | Limite de tentativas, cabeçalhos, erro sem estrutura interna |
-| `test_auth.py` | 13 | Cadastro, login, autorização por papel |
+| `test_auth.py` | 20 | Cadastro, login, autorização por papel, fronteira de confiança |
 | `test_catalog.py` | 13 | Provedor trocável, cache, tradução de erro |
 | `test_acessibilidade.py` | 12 | Marcação de poltronas, validação de geometria |
 | `test_concorrencia.py` | 3 | Oito threads disputando a mesma poltrona |
@@ -461,7 +480,7 @@ npm test
 desafio-verzel-ingressos/
 ├── docker-compose.yml
 ├── docs/
-│   ├── decisoes.md          as 33 decisões técnicas, e o que foi descartado em cada uma
+│   ├── decisoes.md          as 34 decisões técnicas, e o que foi descartado em cada uma
 │   ├── backlog.md           requisitos, o que foi entregue e o que ficou fora do escopo
 │   ├── diario.md            o que aconteceu em ordem, incluindo o que deu errado
 │   ├── quadro.md            o kanban ao fim do projeto
@@ -538,7 +557,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 
 | | |
 |---|---|
-| [`decisoes.md`](docs/decisoes.md) | As **33 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
+| [`decisoes.md`](docs/decisoes.md) | As **34 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |

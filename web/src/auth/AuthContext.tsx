@@ -2,18 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 
 import { ApiError, request, tokenStorage } from "../lib/api";
-import type { Role, TokenResponse, User } from "./types";
+import type { TokenResponse, User } from "./types";
 
 interface AuthContextValue {
   user: User | null;
   carregando: boolean;
   login: (email: string, password: string) => Promise<User>;
-  registrar: (dados: {
-    name: string;
-    email: string;
-    password: string;
-    role: Role;
-  }) => Promise<User>;
+  /** Cadastro público. Cria sempre cliente — o papel não é parâmetro, e o
+   *  servidor recusa o campo se ele vier. Ver decisão D34. */
+  registrar: (dados: { name: string; email: string; password: string }) => Promise<User>;
   sair: () => void;
 }
 

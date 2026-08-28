@@ -615,6 +615,51 @@ que o mesmo filme roda em vários dias. Passou a usar `(sala, horário)` — a m
 
 ---
 
+## D34 — O cadastro público não concede papel
+
+**Defeito, apontado na devolutiva da Verzel:** `UserRegister` aceitava `role` do cliente e
+`AuthService.register()` gravava esse valor como veio. Bastava mandar `"role": "ORGANIZER"` no
+corpo do cadastro público para receber o painel do organizador — e `"GATE"` para validar
+ingressos na portaria, papel que a própria tela de cadastro nem oferecia.
+
+```
+cadastro pedindo ORGANIZER -> 201, papel concedido: ORGANIZER
+   painel do organizador: 200
+   cria sala: 201
+cadastro pedindo GATE -> 201
+   acessa a portaria: 200
+```
+
+**Não foi descuido de implementação: foi a premissa.** A tela perguntava "Como você vai usar"
+e oferecia Cliente ou Organizador, como se o papel fosse preferência de quem se cadastra. Num
+sistema de bilheteria não é: cliente é autoatendimento, organizador é o cinema que contratou a
+plataforma, e portaria é funcionário desse cinema. Os dois últimos são concedidos, não
+escolhidos.
+
+**Escolhido:** o cadastro público cria **sempre** cliente, e `role` deixou de ser campo de
+entrada. Organizador e portaria vêm de `python -m app.admin`, que grava direto no banco.
+
+**Descartado: ignorar o campo em silêncio.** Seria o comportamento REST usual para campo
+desconhecido, e aqui está errado — quem mandasse `role: ORGANIZER` receberia 201 e uma conta de
+cliente, saindo convencido de ter recebido o que pediu. O schema usa `extra="forbid"`, então a
+resposta é 422 dizendo qual campo sobrou. Campo de segurança que a API descarta caladamente
+ensina o cliente a acreditar em algo que nunca aconteceu.
+
+**Descartado: um endpoint administrativo protegido.** Exigiria um papel de administrador que o
+modelo não tem, e criar um só para hospedar essa operação traz mais superfície do que resolve.
+Quem tem acesso ao servidor já pode tudo; a linha de comando não amplia nada.
+
+**O que isso custou nos testes:** todos registravam com papel explícito, então a suíte inteira
+dependia do defeito. Passaram a usar um helper único no `conftest`: cliente sai do cadastro
+público, papel privilegiado é gravado direto no banco — e nos dois casos o token vem do login
+normal, então o teste continua entrando pela mesma porta do usuário real.
+
+**Fica em aberto, e é maior:** a portaria valida ingresso de **qualquer** organizador. Um
+usuário GATE não pertence a um cinema. Amarrar funcionário ao organizador é modelagem nova, e
+está anotada como próximo passo, não como parte desta correção.
+
+---
+
 ## Decisões que estavam pendentes
 
 Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma

@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models.user import User
+from app.models.user import Role, User
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import TokenOut, UserLogin, UserOut, UserRegister
 
@@ -26,7 +26,9 @@ class AuthService:
             name=data.name,
             email=data.email,
             password_hash=hash_password(data.password),
-            role=data.role,
+            # Fixo, e não vindo do pedido: era daqui que saía a escalada de
+            # privilégio. Ver decisão D34.
+            role=Role.CUSTOMER,
         )
         return self._token_for(user)
 

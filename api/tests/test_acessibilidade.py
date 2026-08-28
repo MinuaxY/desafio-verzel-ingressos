@@ -7,6 +7,8 @@ precisa dele. Ver decisão D16.
 """
 import pytest
 
+from tests.conftest import cria_conta
+
 ORGANIZADOR = {
     "name": "Org", "email": "org@acess.dev", "password": "senhaforte123", "role": "ORGANIZER",
 }
@@ -32,8 +34,8 @@ SALA_ACESSIVEL = {
 
 
 def auth(client, dados):
-    token = client.post("/auth/register", json=dados).json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    """Papel privilegiado não sai do cadastro público. Ver conftest."""
+    return cria_conta(client, dados)
 
 
 def cria(client, headers, sala=None):

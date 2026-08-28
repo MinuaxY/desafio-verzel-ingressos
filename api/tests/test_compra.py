@@ -6,6 +6,7 @@ import pytest
 from app.catalog.factory import get_catalog_provider
 from app.catalog.fixture import FixtureProvider
 from app.config import get_settings
+from tests.conftest import cria_conta
 
 ORGANIZADOR = {
     "name": "Org", "email": "org@compra.dev", "password": "senhaforte123", "role": "ORGANIZER",
@@ -55,8 +56,8 @@ def usa_fixture_provider(monkeypatch):
 
 
 def auth(client, dados):
-    token = client.post("/auth/register", json=dados).json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    """Papel privilegiado não sai do cadastro público. Ver conftest."""
+    return cria_conta(client, dados)
 
 
 @pytest.fixture

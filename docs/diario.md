@@ -232,3 +232,33 @@ tomadas há dias.
 Nada disso quebrava o sistema. Todas eram afirmações do projeto sobre si mesmo que tinham
 deixado de ser verdade — que é o tipo de erro que só aparece quando alguém confere documento
 contra código, um por um.
+
+---
+
+## Pós-devolutiva — 1.1, a fronteira de confiança do cadastro
+
+A Verzel não aprovou o projeto e mandou uma devolutiva detalhada. O ponto mais grave: o
+cadastro público aceitava `role` e o gravava como veio — dava para pedir ORGANIZER e receber o
+painel, ou GATE e receber a portaria.
+
+Fui verificar antes de corrigir, como no cancelamento:
+
+```
+cadastro pedindo ORGANIZER -> 201, papel concedido: ORGANIZER
+   painel do organizador: 200 · cria sala: 201
+cadastro pedindo GATE -> 201 · acessa a portaria: 200
+```
+
+O que mais me chamou atenção: **não era descuido, era a premissa**. A tela perguntava "Como
+você vai usar" e oferecia Cliente ou Organizador, como se papel fosse preferência. Num sistema
+de bilheteria não é — cliente é autoatendimento, os outros dois são concedidos.
+
+A suíte inteira dependia do defeito: todo teste registrava com papel explícito. Virou um helper
+único no conftest, e o token continua vindo do login normal.
+
+Também apareceu um problema que a devolutiva não citou e a correção deixou à vista: a portaria
+valida ingresso de qualquer organizador, porque um usuário GATE não pertence a cinema nenhum.
+Ficou anotado, fora do escopo desta etapa.
+
+### Decisão tomada
+D34.

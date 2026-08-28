@@ -36,7 +36,20 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] Revisao de codigo: tres defeitos corrigidos (D33)
 - [x] Volume na vitrine: tres salas, dez dias, ~90 sessoes
 - [x] Artefatos de processo versionados no repositorio
-- [x] 364 testes (242 back, 122 front)
+- [x] 364 testes (242 back, 122 front)  → agora 371 (249 back, 122 front)
+
+
+## Ciclo pos-devolutiva
+
+- [x] 1.1 Escalada de privilegio no cadastro fechada (D34)
+- [ ] 1.2 Preco de setor com garantia relacional no banco
+- [ ] 1.3 Conflito de agenda por intervalo, nao por igualdade
+- [ ] 1.4 CheckConstraint do preco alinhado com o minimo da API
+- [ ] 2.1 Padronizar o idioma dos identificadores
+- [ ] 2.2 Enxugar comentario que repete a documentacao
+- [ ] 3.1 Rodada de produto no front-end
+- [ ] 3.2 Testes E2E de checkout, portaria e gestao
+- [ ] Portaria pertencer a um organizador (surgiu da D34)
 
 
 ## Falta o Paulo fazer

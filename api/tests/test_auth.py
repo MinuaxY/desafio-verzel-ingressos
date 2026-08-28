@@ -1,11 +1,12 @@
 """Cadastro, login e autorização por papel."""
 import pytest
 
+from tests.conftest import cria_conta
+
 CLIENTE = {
     "name": "Cliente Teste",
     "email": "cliente@teste.dev",
     "password": "senhaforte123",
-    "role": "CUSTOMER",
 }
 ORGANIZADOR = {
     "name": "Organizador Teste",
@@ -16,11 +17,13 @@ ORGANIZADOR = {
 
 
 def registra(client, dados):
+    """Cadastro público, cru — é o que estes testes exercitam."""
     return client.post("/auth/register", json=dados)
 
 
 def token_de(client, dados):
-    return registra(client, dados).json()["access_token"]
+    """Token de qualquer papel. Privilegiado não sai do cadastro público."""
+    return cria_conta(client, dados)["Authorization"].removeprefix("Bearer ")
 
 
 class TestCadastro:
@@ -106,3 +109,63 @@ class TestAutorizacao:
         token = token_de(client, CLIENTE)
         r = client.get("/organizer/sessions", headers={"Authorization": f"Bearer {token}"})
         assert r.status_code == 403
+
+
+class TestFronteiraDeConfianca:
+    """O cadastro público não concede papel. Ver decisão D34.
+
+    Antes desta correção, `role` era campo de entrada e era persistido como
+    veio: bastava mandar "ORGANIZER" no corpo para receber o painel do
+    organizador, e "GATE" para validar ingressos na portaria — papel que a
+    própria tela de cadastro nem oferecia.
+    """
+
+    def test_pedir_papel_de_organizador_e_recusado(self, client):
+        r = registra(client, {**CLIENTE, "role": "ORGANIZER"})
+        assert r.status_code == 422
+
+    def test_pedir_papel_de_portaria_e_recusado(self, client):
+        r = registra(client, {**CLIENTE, "role": "GATE"})
+        assert r.status_code == 422
+
+    def test_a_recusa_e_explicita_e_nao_silenciosa(self, client):
+        """422 em vez de criar um cliente calado.
+
+        Ignorar o campo em silêncio devolveria 201 e uma conta de cliente, e
+        quem pediu sairia acreditando ter recebido o que pediu.
+        """
+        r = registra(client, {**CLIENTE, "role": "ORGANIZER"})
+        assert r.status_code == 422
+        assert "role" in str(r.json()["detail"]).lower()
+
+    def test_cadastro_limpo_cria_cliente(self, client):
+        r = registra(client, CLIENTE)
+        assert r.status_code == 201
+        assert r.json()["user"]["role"] == "CUSTOMER"
+
+    def test_cliente_cadastrado_nao_alcanca_o_painel(self, client):
+        token = registra(client, CLIENTE).json()["access_token"]
+        h = {"Authorization": f"Bearer {token}"}
+        assert client.get("/organizer/sessions", headers=h).status_code == 403
+        assert client.post("/rooms", json={"name": "X", "sectors": []}, headers=h).status_code == 403
+
+    def test_cliente_cadastrado_nao_alcanca_a_portaria(self, client):
+        token = registra(client, CLIENTE).json()["access_token"]
+        h = {"Authorization": f"Bearer {token}"}
+        r = client.post("/gate/validate", json={"code": "AAAABBBBCCCC.DDDDEEEEFFFF"}, headers=h)
+        assert r.status_code == 403
+
+    def test_o_fluxo_administrativo_continua_criando_papel_privilegiado(self, client):
+        """A porta legítima: `python -m app.admin`, que grava direto no banco."""
+        from app.admin import criar
+        from app.models.user import Role
+
+        criar("Organizadora Real", "real@admin.dev", Role.ORGANIZER, senha="senhaforte123")
+        entrou = client.post(
+            "/auth/login", json={"email": "real@admin.dev", "password": "senhaforte123"}
+        )
+        assert entrou.status_code == 200
+        assert entrou.json()["user"]["role"] == "ORGANIZER"
+
+        h = {"Authorization": f"Bearer {entrou.json()['access_token']}"}
+        assert client.get("/organizer/sessions", headers=h).status_code == 200

@@ -7,10 +7,21 @@ from app.models.user import Role
 
 
 class UserRegister(BaseModel):
+    """Cadastro público. Cria sempre um cliente.
+
+    O papel **não** é campo de entrada. Enviá-lo devolve 422 em vez de ser
+    ignorado em silêncio: um campo de segurança que a API descarta sem avisar
+    ensina o cliente a acreditar que pediu algo que nunca foi concedido.
+
+    Organizador e portaria vêm do fluxo administrativo (`python -m app.admin`),
+    não daqui. Ver decisão D34.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr
     password: str = Field(min_length=8, max_length=72)  # 72 é o limite do bcrypt
-    role: Role = Role.CUSTOMER
 
 
 class UserLogin(BaseModel):

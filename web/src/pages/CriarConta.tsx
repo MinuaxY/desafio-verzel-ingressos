@@ -3,33 +3,21 @@ import type { FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
-import { HOME_POR_PAPEL, NOME_DO_PAPEL } from "../auth/types";
-import type { Role } from "../auth/types";
+import { HOME_POR_PAPEL } from "../auth/types";
 import { ApiError } from "../lib/api";
 import { Campo } from "../components/Campo";
 import { Marca } from "../components/Marca";
 
 const SENHA_MINIMA = 8;
 
-/** Portaria fica de fora: e conta operacional, criada por quem administra o
- *  cinema, nao por autocadastro. */
-const PAPEIS_PUBLICOS: Role[] = ["CUSTOMER", "ORGANIZER"];
-
-const DESCRICAO: Record<string, string> = {
-  CUSTOMER: "Quero comprar ingressos",
-  ORGANIZER: "Quero publicar sessões",
-};
-
 export function CriarConta() {
   const { user, registrar } = useAuth();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "CUSTOMER" as Role,
-  });
+  // Sem escolha de papel. O cadastro público cria cliente, e o servidor não
+  // aceita mais o campo — organizador e portaria vêm do fluxo administrativo.
+  // Ver decisão D34.
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
@@ -109,28 +97,10 @@ export function CriarConta() {
             erro={senhaCurta ? "A senha precisa de ao menos " + SENHA_MINIMA + " caracteres." : undefined}
           />
 
-          <fieldset className="papeis">
-            <legend className="field__label">Como você vai usar</legend>
-            {PAPEIS_PUBLICOS.map((papel) => (
-              <label
-                key={papel}
-                className={form.role === papel ? "papeis__opcao papeis__opcao--ativa" : "papeis__opcao"}
-              >
-                <input
-                  type="radio"
-                  name="role"
-                  value={papel}
-                  className="sr-only"
-                  checked={form.role === papel}
-                  onChange={() => setForm({ ...form, role: papel })}
-                />
-                <span style={{ fontWeight: 600 }}>{NOME_DO_PAPEL[papel]}</span>
-                <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
-                  {DESCRICAO[papel]}
-                </span>
-              </label>
-            ))}
-          </fieldset>
+          <p className="faint" style={{ fontSize: "var(--text-xs)" }}>
+            A conta é de cliente, para comprar ingressos. Contas de organizador e de portaria
+            são criadas por quem administra a plataforma.
+          </p>
 
           <button className="btn btn--primary btn--block" type="submit" disabled={enviando}>
             {enviando ? "Criando…" : "Criar conta"}
