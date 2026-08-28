@@ -290,3 +290,28 @@ o código novo já nasce assim.
 
 ### Decisões tomadas
 D35 e D36.
+
+---
+
+## Onde paramos — 27/08, fim do dia
+
+Bloco 1 do ciclo pós-devolutiva **quase fechado**: 1.1, 1.2 e 1.4 entregues. Falta a 1.3.
+
+**A próxima etapa é a 1.3 — conflito de agenda por intervalo.** Hoje `exists_at` compara
+`starts_at ==`, então duas sessões de duas horas na mesma sala, às 20:00 e às 20:01, não
+colidem. O caminho já levantado:
+
+- Usar `movie_runtime_minutes`, que já existe no model, mais uma folga de limpeza da sala
+- `EXCLUDE USING gist (room_id WITH =, tstzrange(...) WITH &&)`, que exige a extensão `btree_gist`
+- Cuidado com a D31: sessão cancelada não pode entrar na exclusão, então a constraint precisa
+  do mesmo `WHERE status <> 'CANCELLED'` do índice de horário
+- `movie_runtime_minutes` é anulável — decidir a duração presumida quando o catálogo não informa
+- Diferente da 1.2, **esta vai quebrar testes**: há vários criando sessões em horários próximos
+  na mesma sala
+
+Depois dela vem o bloco 2, que é a varredura de idioma (2.1, inglês, decidido na D36) mais o
+enxugamento de comentário (2.2). Combinamos fazer os dois juntos, porque tocam nos mesmos
+arquivos e separá-los dobraria o trabalho.
+
+**Também na fila, fora do backlog original:** a portaria valida ingresso de qualquer
+organizador, porque um usuário GATE não pertence a cinema nenhum. Apareceu durante a D34.

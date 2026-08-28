@@ -43,7 +43,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 
 - [x] 1.1 Escalada de privilegio no cadastro fechada (D34)
 - [x] 1.2 Preco de setor com garantia relacional no banco (D35)
-- [ ] 1.3 Conflito de agenda por intervalo, nao por igualdade
+- [ ] 1.3 Conflito de agenda por intervalo, nao por igualdade  ← PROXIMA
 - [x] 1.4 CheckConstraint do preco alinhado com o minimo da API (veio junto da D35)
 - [ ] 2.1 Padronizar o idioma dos identificadores — ingles, decidido na D36
 - [ ] 2.2 Enxugar comentario que repete a documentacao
