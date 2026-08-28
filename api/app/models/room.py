@@ -114,6 +114,9 @@ class Sector(Base):
 
     __table_args__ = (
         UniqueConstraint("room_id", "name", name="uq_setor_sala_nome"),
+        # Alvo da chave composta de session_sector_prices, que usa (id, room_id)
+        # para provar que o setor é da sala da sessão. Ver decisão D35.
+        UniqueConstraint("id", "room_id", name="uq_sector_id_room"),
         CheckConstraint(f"rows > 0 AND rows <= {MAX_FILEIRAS}", name="ck_setor_fileiras"),
         CheckConstraint(
             f"seats_per_row > 0 AND seats_per_row <= {MAX_POLTRONAS_POR_FILEIRA}",

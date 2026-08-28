@@ -376,6 +376,7 @@ def run() -> None:
                     prices=[
                         SessionSectorPrice(
                             sector_id=setor.id,
+                            room_id=sala.id,
                             price_cents=SALAS[indice_sala]["precos"][setor.name],
                         )
                         for setor in sala.sectors

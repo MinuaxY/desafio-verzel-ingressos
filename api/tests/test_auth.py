@@ -147,7 +147,8 @@ class TestFronteiraDeConfianca:
         token = registra(client, CLIENTE).json()["access_token"]
         h = {"Authorization": f"Bearer {token}"}
         assert client.get("/organizer/sessions", headers=h).status_code == 403
-        assert client.post("/rooms", json={"name": "X", "sectors": []}, headers=h).status_code == 403
+        criar_sala = client.post("/rooms", json={"name": "X", "sectors": []}, headers=h)
+        assert criar_sala.status_code == 403
 
     def test_cliente_cadastrado_nao_alcanca_a_portaria(self, client):
         token = registra(client, CLIENTE).json()["access_token"]

@@ -262,3 +262,31 @@ Ficou anotado, fora do escopo desta etapa.
 
 ### Decisão tomada
 D34.
+
+---
+
+## Pós-devolutiva — 1.2, a invariante que morava só no serviço
+
+`SessionSectorPrice` apontava para `sessions.id` e `sectors.id` de forma independente. Nada no
+banco impedia gravar o preço de um setor de outra sala — só o serviço conferia.
+
+A solução foi a clássica de modelagem relacional, e é bonita de ver funcionando: **duas chaves
+estrangeiras compostas que compartilham a coluna `room_id`**. Uma exige que a sessão esteja
+naquela sala, a outra exige o mesmo do setor; sendo a mesma coluna, as duas falam da mesma
+sala. A regra sai do Python e vira um estado que o banco não consegue representar.
+
+O preço foi uma coluna derivável a mais na tabela. É a troca que a técnica pede: é justamente o
+compartilhamento dela que prova a regra.
+
+**Nenhum teste existente precisou mudar** — que era o resultado esperado, porque a regra já
+valia, só não estava garantida. Os cinco novos escrevem direto no banco, por baixo do serviço,
+já que é esse o caminho que a checagem em Python nunca cobriu.
+
+Puxei o item 1.4 para esta migration: o `CHECK` do preço subiu de `>= 0` para `>= 1`. Mesma
+tabela, mesma linha — separar seria uma segunda migration para mudar a mesma coisa.
+
+Também ficou decidido o idioma dos identificadores: **inglês**. A varredura é a próxima etapa;
+o código novo já nasce assim.
+
+### Decisões tomadas
+D35 e D36.

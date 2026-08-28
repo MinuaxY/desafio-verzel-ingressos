@@ -360,6 +360,7 @@ Uma revisão dedicada foi feita no fim do projeto. O que segue é o resultado, i
 | **Mensagens de erro** | Validação devolve só local e motivo, sem o parser por dentro nem o valor enviado |
 | **CORS** | Restrito às origens declaradas; verificado contra produção |
 | **Injeção de SQL** | Consultas via SQLAlchemy, sem concatenação |
+| **Invariantes no banco** | Índice único parcial contra venda dupla, e chaves compostas garantindo que o preço aponte para um setor da sala daquela sessão |
 | **Contêiner** | A API roda com usuário sem privilégio |
 
 **Dado de pagamento não é retido.** O número do cartão chega, decide o desfecho e é
@@ -427,13 +428,13 @@ cd api
 python -m pytest -v
 ```
 
-**249 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
+**254 testes**, rodando contra um banco Postgres separado (`verzel_test`), criado e destruído a
 cada execução — o container precisa estar de pé. Usar o mesmo SGBD da aplicação evita que um
 teste passe em SQLite e quebre em produção por causa de enum nativo ou índice parcial.
 
 | Arquivo | Testes | Cobre |
 |---|---|---|
-| `test_melhorias.py` | 63 | Gestão da programação, cancelamento, e os defeitos da revisão |
+| `test_melhorias.py` | 68 | Gestão da programação, cancelamento, e os defeitos da revisão |
 | `test_rooms.py` | 31 | Salas, setores, isolamento entre organizadores, edição e remoção |
 | `test_portaria.py` | 29 | Quatro vereditos, código forjado, tolerância na digitação, link compartilhado |
 | `test_compra.py` | 27 | Reserva, pagamento aprovado e recusado, devolução de assento, expiração |
@@ -480,14 +481,14 @@ npm test
 desafio-verzel-ingressos/
 ├── docker-compose.yml
 ├── docs/
-│   ├── decisoes.md          as 34 decisões técnicas, e o que foi descartado em cada uma
+│   ├── decisoes.md          as 36 decisões técnicas, e o que foi descartado em cada uma
 │   ├── backlog.md           requisitos, o que foi entregue e o que ficou fora do escopo
 │   ├── diario.md            o que aconteceu em ordem, incluindo o que deu errado
 │   ├── quadro.md            o kanban ao fim do projeto
 │   ├── aprendizados.md      as lições transferíveis, cada uma com o episódio que a originou
 │   └── ia.md                como a IA foi usada, e o que foi feito sem
 ├── api/
-│   ├── alembic/versions/    8 migrations
+│   ├── alembic/versions/    9 migrations
 │   ├── app/
 │   │   ├── catalog/         provedor de catálogo (TMDb ou local)
 │   │   ├── core/            segurança, dependências, código do ingresso
@@ -557,7 +558,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 
 | | |
 |---|---|
-| [`decisoes.md`](docs/decisoes.md) | As **34 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
+| [`decisoes.md`](docs/decisoes.md) | As **36 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |

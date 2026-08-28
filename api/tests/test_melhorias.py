@@ -1031,3 +1031,142 @@ class TestDefeitosDaRevisao:
         assert client.get("/gate/sessions", headers=headers).status_code == 403
         assert client.get("/gate/sessions", headers=auth(client, CLIENTE)).status_code == 403
         assert client.get("/gate/sessions").status_code == 401
+
+
+class TestPrecoPertenceASalaDaSessao:
+    """A invariante mora no banco, não só no serviço. Ver decisão D35.
+
+    Antes, `session_id` e `sector_id` referenciavam suas tabelas de forma
+    independente: nada impedia gravar o preço de um setor de outra sala. O
+    serviço conferia, e invariante que vive apenas no serviço é invariante que
+    a próxima rota esquece.
+    """
+
+    def test_o_banco_recusa_setor_de_outra_sala(self, client):
+        """Escrito direto no banco, por baixo do serviço — que é justamente o
+        caminho que a checagem em Python não cobre."""
+        import uuid as U
+
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.session import SessionSectorPrice
+
+        from tests.conftest import TestSession
+
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers, nome="Sala A")
+        outra = cria_sala(client, headers, nome="Sala B")
+        sessao = cria_sessao(client, headers, sala).json()
+
+        db = TestSession()
+        try:
+            db.add(
+                SessionSectorPrice(
+                    session_id=U.UUID(sessao["id"]),
+                    sector_id=U.UUID(outra["sectors"][0]["id"]),
+                    room_id=U.UUID(sala["id"]),
+                    price_cents=3000,
+                )
+            )
+            with pytest.raises(IntegrityError):
+                db.commit()
+        finally:
+            db.rollback()
+            db.close()
+
+        # a sessão continua com os preços que tinha
+        atual = client.get(f"/organizer/sessions/{sessao['id']}", headers=headers).json()
+        assert len(atual["prices"]) == len(sala["sectors"])
+
+    def test_o_banco_recusa_sala_que_nao_e_a_da_sessao(self, client):
+        """A outra metade da prova: o setor até é da sala informada, mas a
+        sessão não é."""
+        import uuid as U
+
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.session import SessionSectorPrice
+
+        from tests.conftest import TestSession
+
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers, nome="Sala C")
+        outra = cria_sala(client, headers, nome="Sala D")
+        sessao = cria_sessao(client, headers, sala).json()
+
+        db = TestSession()
+        try:
+            db.add(
+                SessionSectorPrice(
+                    session_id=U.UUID(sessao["id"]),
+                    sector_id=U.UUID(outra["sectors"][0]["id"]),
+                    room_id=U.UUID(outra["id"]),
+                    price_cents=3000,
+                )
+            )
+            with pytest.raises(IntegrityError):
+                db.commit()
+        finally:
+            db.rollback()
+            db.close()
+
+    def test_o_banco_recusa_preco_zerado(self, client):
+        """O `CheckConstraint` acompanha o mínimo da API. Ver decisão D33."""
+        import uuid as U
+
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.session import SessionSectorPrice
+
+        from tests.conftest import TestSession
+
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers, nome="Sala E")
+        sessao = cria_sessao(client, headers, sala).json()
+
+        db = TestSession()
+        try:
+            db.add(
+                SessionSectorPrice(
+                    session_id=U.UUID(sessao["id"]),
+                    sector_id=U.UUID(sala["sectors"][0]["id"]),
+                    room_id=U.UUID(sala["id"]),
+                    price_cents=0,
+                )
+            )
+            with pytest.raises(IntegrityError):
+                db.commit()
+        finally:
+            db.rollback()
+            db.close()
+
+    def test_a_api_continua_recusando_com_mensagem_legivel(self, client):
+        """A trava do banco é rede de segurança, não substituta: quem passa
+        pela API precisa de erro explicado, não de violação de constraint."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers, nome="Sala F")
+        outra = cria_sala(client, headers, nome="Sala G")
+        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
+            hour=20, minute=0, second=0, microsecond=0
+        )
+
+        r = client.post(
+            "/organizer/sessions",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "starts_at": quando.isoformat(),
+                "prices": [{"sector_id": outra["sectors"][0]["id"], "price_cents": 3000}],
+            },
+            headers=headers,
+        )
+        assert r.status_code == 422
+        assert "preço" in r.json()["detail"].lower()
+
+    def test_apagar_a_sala_leva_os_precos_junto(self, client):
+        """A chave composta manteve o CASCADE que as chaves simples tinham."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers, nome="Sala H")
+        cria_sessao(client, headers, sala)
+
+        assert client.delete(f"/rooms/{sala['id']}", headers=headers).status_code == 409

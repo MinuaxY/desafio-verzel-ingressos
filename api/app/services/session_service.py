@@ -419,7 +419,9 @@ class SessionService:
 
         validos = {s.id for s in sala.sectors}
         return [
-            SessionSectorPrice(sector_id=sid, price_cents=valor)
+            # `room_id` explícito: é ele que a chave composta usa para provar
+            # que o setor é desta sala. Ver decisão D35.
+            SessionSectorPrice(sector_id=sid, room_id=sala.id, price_cents=valor)
             for sid, valor in por_setor.items()
             if sid in validos
         ]

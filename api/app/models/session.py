@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SAEnum,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -114,6 +115,10 @@ class Session(Base):
         # decide o empate entre duas criações simultâneas, e uma constraint
         # cega deixaria o horário da cancelada preso para sempre.
         # Ver decisões D6 e D31.
+        # Alvo da chave composta de session_sector_prices. Redundante com a
+        # chave primária, e exigida pelo Postgres: uma chave estrangeira só
+        # aponta para colunas com unicidade declarada. Ver decisão D35.
+        UniqueConstraint("id", "room_id", name="uq_session_id_room"),
         Index(
             "uq_sessao_sala_horario",
             "room_id",
@@ -149,16 +154,57 @@ class SessionSectorPrice(Base):
     __tablename__ = "session_sector_prices"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    session_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("sessions.id", ondelete="CASCADE"), index=True
-    )
-    sector_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sectors.id", ondelete="CASCADE"))
+    session_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    sector_id: Mapped[uuid.UUID] = mapped_column()
+
+    # Derivável da sessão, e guardada mesmo assim: é a coluna que as duas
+    # chaves compostas abaixo compartilham, e é o compartilhamento que prova a
+    # regra. Ver decisão D35.
+    room_id: Mapped[uuid.UUID] = mapped_column()
+
     price_cents: Mapped[int] = mapped_column(Integer)
 
-    session: Mapped["Session"] = relationship(back_populates="prices")
-    sector: Mapped["Sector"] = relationship(lazy="selectin")  # noqa: F821
+    # As duas chaves são compostas e dividem `room_id`, então a sessão e o
+    # setor precisam ser da mesma sala para a linha existir. Sem `primaryjoin`
+    # explícito o SQLAlchemy não saberia qual das duas usar em cada lado.
+    session: Mapped["Session"] = relationship(
+        back_populates="prices",
+        primaryjoin="SessionSectorPrice.session_id == Session.id",
+        foreign_keys="SessionSectorPrice.session_id",
+    )
+    sector: Mapped["Sector"] = relationship(  # noqa: F821
+        lazy="selectin",
+        primaryjoin="SessionSectorPrice.sector_id == Sector.id",
+        foreign_keys="SessionSectorPrice.sector_id",
+    )
 
     __table_args__ = (
-        UniqueConstraint("session_id", "sector_id", name="uq_preco_sessao_setor"),
-        CheckConstraint("price_cents >= 0", name="ck_preco_nao_negativo"),
+        # O preço aponta para um setor **da sala daquela sessão**, e quem
+        # garante isso é o banco.
+        #
+        # Antes, `session_id` e `sector_id` referenciavam suas tabelas de forma
+        # independente: nada impedia gravar o preço de um setor de outra sala.
+        # Só o serviço conferia, e invariante que vive apenas no serviço é
+        # invariante que a próxima rota esquece.
+        #
+        # A prova está no `room_id` compartilhado: a primeira chave exige que a
+        # sessão esteja nessa sala, a segunda exige o mesmo do setor. Sendo a
+        # mesma coluna, as duas falam da mesma sala. Ver decisão D35.
+        ForeignKeyConstraint(
+            ["session_id", "room_id"],
+            ["sessions.id", "sessions.room_id"],
+            name="fk_session_price_session_room",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["sector_id", "room_id"],
+            ["sectors.id", "sectors.room_id"],
+            name="fk_session_price_sector_room",
+            ondelete="CASCADE",
+        ),
+        UniqueConstraint("session_id", "sector_id", name="uq_session_price_sector"),
+        # Mínimo de um centavo, alinhado com o contrato da API. O banco aceitava
+        # zero enquanto a aplicação já recusava — e sessão de graça deixa o
+        # cliente com um pedido que nunca pode ser pago. Ver decisões D33 e D35.
+        CheckConstraint("price_cents >= 1", name="ck_session_price_positive"),
     )

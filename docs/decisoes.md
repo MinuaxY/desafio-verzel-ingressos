@@ -660,6 +660,74 @@ está anotada como próximo passo, não como parte desta correção.
 
 ---
 
+## D35 — O preço aponta para um setor da sala daquela sessão, e quem garante é o banco
+
+**Apontado na devolutiva:** `SessionSectorPrice` tinha `session_id` e `sector_id` referenciando
+suas tabelas de forma **independente**. Nada no banco impedia gravar o preço de um setor de
+outra sala. Só o serviço conferia — e invariante que vive apenas no serviço é invariante que a
+próxima rota esquece.
+
+**Escolhido: duas chaves estrangeiras compostas que compartilham `room_id`.**
+
+```
+FOREIGN KEY (session_id, room_id) REFERENCES sessions(id, room_id)
+FOREIGN KEY (sector_id,  room_id) REFERENCES sectors (id, room_id)
+```
+
+A primeira exige que a sessão esteja naquela sala; a segunda exige o mesmo do setor. Sendo a
+**mesma coluna** nas duas, elas falam necessariamente da mesma sala. A regra deixa de ser uma
+conferência em Python e passa a ser um estado que o banco não consegue representar.
+
+**O custo é uma coluna derivável.** `room_id` sai da sessão, então guardá-la é redundância. É a
+troca que a técnica exige: é justamente o compartilhamento dessa coluna que prova a regra. Sem
+ela, só sobrariam trigger ou checagem na aplicação — e a aplicação já era o problema.
+
+**Descartado: trigger.** Faria a mesma coisa, em código imperativo, invisível no schema e
+difícil de testar. Chave composta é declarativa: quem lê a tabela vê a regra.
+
+**Descartado: `CHECK` com subconsulta.** O Postgres não permite — `CHECK` não enxerga outras
+tabelas, exatamente para não depender de linhas que podem mudar depois.
+
+**As chaves simples deram lugar às compostas**, com `ON DELETE CASCADE` preservado. Para o
+Postgres aceitar as compostas foi preciso declarar `UNIQUE (id, room_id)` em `sessions` e em
+`sectors`: trivialmente único por causa da chave primária, mas uma chave estrangeira só aponta
+para colunas com unicidade declarada.
+
+**Junto veio o item 1.4:** o `CHECK` do preço subiu de `>= 0` para `>= 1`. O banco aceitava zero
+enquanto a API já recusava desde a D33, e sessão de graça deixa o cliente com um pedido que
+nunca pode ser pago. Estava na mesma tabela e na mesma migration — separar seria uma segunda
+migration para mudar a mesma linha.
+
+**Nenhum teste existente precisou mudar**, o que era o resultado esperado: a regra já valia, só
+não estava garantida. Os cinco novos escrevem **direto no banco**, por baixo do serviço, porque
+é exatamente o caminho que a checagem em Python não cobre.
+
+---
+
+## D36 — Identificadores em inglês
+
+**Apontado na devolutiva:** convivem `OrderService`, `SessionNotAvailable`, `customer_id` e
+`price_cents` com `pedido`, `sessao`, `pagar`, `processar` e `resultado.aprovado`. O problema
+não é a escolha do idioma: é alternar os dois dentro da mesma unidade de código.
+
+Medido antes de decidir: **42 funções com nome em português contra 154 em inglês**, com classes
+em inglês e métodos em português no mesmo arquivo.
+
+**Escolhido: inglês nos identificadores** — nomes de função, variável, exceção, constraint e
+contrato. Português continua onde é conteúdo, não código: mensagens ao usuário, docstrings,
+comentários e documentação.
+
+**Por quê:** é a menor migração (154 já estão assim contra 42), é o idioma dos frameworks que o
+código chama o tempo todo, e é o que um revisor espera encontrar. Português nos identificadores
+seria igualmente defensável como convenção — só custaria quase quatro vezes mais para chegar no
+mesmo lugar.
+
+**A varredura é a etapa 2.1.** O código escrito daqui em diante já nasce em inglês: as
+constraints e a coluna da D35 são o primeiro exemplo. O `app/admin.py` da D34 ficou em
+português por ter sido escrito antes desta decisão, e entra na varredura como o resto.
+
+---
+
 ## Decisões que estavam pendentes
 
 Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma
