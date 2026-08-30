@@ -38,11 +38,11 @@ def login(data: UserLogin, request: Request, db: Session = Depends(get_db)) -> T
     try:
         resposta = AuthService(db).login(data)
     except InvalidCredentials:
-        login_attempts.registrar(key)
+        login_attempts.record(key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "E-mail ou senha inválidos")
 
     # Quem acertou não carrega o histórico de erros para a próxima vez.
-    login_attempts.liberar(key)
+    login_attempts.clear(key)
     return resposta
 
 

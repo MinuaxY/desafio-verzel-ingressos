@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.core.seguranca_http import install as instalar_seguranca
+from app.core.http_security import install as install_security_headers
 from app.routers import auth, catalog, gate, orders, rooms, sessions
 
 settings = get_settings()
@@ -14,7 +14,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-instalar_seguranca(app)
+install_security_headers(app)
 
 app.add_middleware(
     CORSMiddleware,

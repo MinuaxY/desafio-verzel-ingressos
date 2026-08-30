@@ -27,13 +27,8 @@ gate = APIRouter(
 
 @gate.get("/sessions", response_model=list[SessionListItem])
 def gate_sessions(db: DbSession = Depends(get_db)) -> list[SessionListItem]:
-    """Sessões que a portaria pode estar conferindo agora.
-
-    Endpoint próprio, e não a vitrine: a vitrine esconde o que já começou,
-    porque quem compra não tem mais o que fazer ali. Na porta é o contrário —
-    a sessão em andamento é justamente a que está recebendo gente.
-    Ver decisão D33.
-    """
+    """Sessões do turno. Endpoint próprio porque a vitrine esconde o que já
+    começou, e na porta é justamente isso que interessa. Ver decisão D33."""
     return [to_list_item(s) for s in SessionService(db).list_for_gate()]
 
 
@@ -79,13 +74,9 @@ compartilhado = APIRouter(prefix="/shared", tags=["Ingresso compartilhado"])
 def shared_ticket(share_token: uuid.UUID, db: DbSession = Depends(get_db)) -> TicketDetailOut:
     """Abre um ingresso por link, sem exigir conta.
 
-    Quem tem o link consegue entrar com o ingresso, e é assim que precisa ser:
-    comprar três lugares e mandar um para cada amigo é o caso de uso. Um link
-    que não deixasse a pessoa passar na portaria não serviria para nada.
-
-    O token na URL é opaco e diferente do código assinado, que vai no corpo da
-    resposta — assim o código de entrada não fica registrado em histórico de
-    navegador nem em log de servidor. Ver decisão D17.
+    Quem tem o link entra — comprar três lugares e mandar um para cada amigo é
+    o caso de uso. O token da URL é opaco e diferente do código assinado, para
+    o código de entrada não cair em histórico nem em log. Ver decisão D17.
     """
     ticket = GateService(db).by_share_token(share_token)
     if ticket is None:

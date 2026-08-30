@@ -52,10 +52,8 @@ class OrderService:
     def release_expired_holds(self) -> int:
         """Devolve ao estoque os assentos de pedidos que ninguém pagou.
 
-        Roda antes de qualquer leitura ou escrita de disponibilidade, em vez de
-        depender de tarefa agendada: sem processo de fundo no projeto, a
-        limpeza precisa acontecer no caminho de quem usa. O custo é um UPDATE
-        que quase sempre não encontra nada.
+        Roda no caminho de quem usa, e não em tarefa agendada: o projeto não
+        tem processo de fundo. Ver decisão D20.
         """
         now = datetime.now(timezone.utc)
 
@@ -149,9 +147,8 @@ class OrderService:
         try:
             self.db.commit()
         except IntegrityError:
-            # Duas compras simultâneas disputando a mesma poltrona: a checagem
-            # acima passou nas duas, e o índice único parcial derrubou a
-            # segunda. É o caminho normal sob concorrência, não um imprevisto.
+            # Duas compras simultâneas: a checagem acima passou nas duas e o
+            # índice derrubou a segunda. Caminho normal, não imprevisto.
             self.db.rollback()
             raise SeatTaken([s.seat_code for s in chosen])
 
@@ -178,9 +175,8 @@ class OrderService:
             for ticket in order.tickets:
                 ticket.status = TicketStatus.VALID
         else:
-            # Recusa devolve os assentos. Marcar CANCELLED basta: o índice
-            # único parcial ignora esse estado, então a poltrona volta a ficar
-            # livre sem nenhuma limpeza extra.
+            # Marcar CANCELLED basta: o índice parcial ignora esse estado, e a
+            # poltrona volta ao estoque sem limpeza extra.
             order.status = OrderStatus.DECLINED
             order.decline_reason = resultado.reason
             for ticket in order.tickets:
@@ -203,13 +199,9 @@ class OrderService:
     def cancel_for_session(self, session_id: uuid.UUID) -> int:
         """Cancela todos os pedidos vivos de uma sessão. Devolve quantos.
 
-        Quem chama é o organizador, pela sessão — o cliente não está por perto
-        para consentir. Por isso cada pedido fica marcado como cancelado pelo
-        organizador: é o que permite a tela do cliente dizer "o cinema
-        cancelou" em vez de deixá-lo achar que a desistência foi dele.
-
-        Ingresso já utilizado não é tocado, como no cancelamento comum: ele é
-        registro de quem entrou. Ver decisão D30.
+        Marca cada um como cancelado pelo organizador, para a tela do cliente
+        dizer "o cinema cancelou" em vez de deixá-lo achar que desistiu.
+        Ingresso utilizado não é tocado. Ver decisão D30.
         """
         pedidos = list(
             self.db.scalars(
@@ -227,12 +219,8 @@ class OrderService:
 
     @staticmethod
     def _mark_cancelled(order: Order, *, pelo_organizador: bool = False) -> None:
-        """A regra de o que acontece com o pedido e os ingressos ao cancelar.
-
-        Fica num lugar só porque os dois caminhos — o cliente desistindo e o
-        organizador cancelando a sessão — precisam concordar sobre o que
-        sobrevive. Não commita: quem chama decide o escopo da transação.
-        """
+        """O que acontece ao cancelar, num lugar só: os dois caminhos — cliente
+        desistindo e organizador cancelando — precisam concordar. Não commita."""
         order.status = OrderStatus.CANCELLED
         order.cancelled_by_organizer = pelo_organizador
         for ticket in order.tickets:
@@ -258,8 +246,7 @@ class OrderService:
         )
 
     def tickets_for_customer(self, customer_id: uuid.UUID) -> list[Ticket]:
-        """Só ingressos que valem alguma coisa. Reserva não paga e ingresso
-        cancelado não são documento, e poluiriam a carteira."""
+        """Só ingressos que valem entrada: reserva não paga não é documento."""
         self.release_expired_holds()
         return list(
             self.db.scalars(

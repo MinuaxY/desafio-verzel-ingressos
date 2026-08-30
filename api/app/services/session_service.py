@@ -20,17 +20,14 @@ from app.schemas.session import SessionCreate, SessionRepeat, SessionUpdate
 from app.services.order_service import OrderService
 from app.services.room_service import RoomNotFound, RoomService
 
-# Fuso em que as datas escolhidas pelo organizador são interpretadas. "Dia 24
-# às 19h" é hora local de quem vai ao cinema. Ver decisão D27.
+# "Dia 24 às 19h" é hora local de quem vai ao cinema. Ver decisão D27.
 LOCAL_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
-# Quanto tempo uma sessão continua aparecendo para a portaria depois de
-# começar. Uma sessão de duas horas com público chegando atrasado ainda está
-# recebendo gente; sumir da lista nesse momento é o pior instante possível.
+# A sessão continua na lista da portaria depois de começar: público atrasado
+# ainda está entrando. Ver decisão D33.
 GATE_GRACE_PERIOD = timedelta(hours=6)
 
-# Teto para a criação em lote. Uma programação de cinema não passa de algumas
-# semanas, e sem limite um engano criaria centenas de sessões.
+# Sem teto, um engano na seleção criaria centenas de sessões.
 MAX_BATCH_DATES = 60
 
 
@@ -106,12 +103,8 @@ class SessionService:
         )
 
     def days_on_billboard(self, *, days: int = 14, search: str | None = None) -> dict[date, int]:
-        """Quantas sessões há em cada dia daqui para a frente.
-
-        A barra de datas precisa saber quais dias têm o que mostrar: oferecer
-        um dia vazio como se fosse opção é convidar o clique que não leva a
-        lugar nenhum.
-        """
+        """Quantas sessões há em cada dia, para a barra de datas saber quais
+        dias oferecer como clicáveis."""
         now = datetime.now(timezone.utc)
         fim = datetime.combine(
             now.astimezone(LOCAL_TIMEZONE).date() + timedelta(days=days),
@@ -121,17 +114,10 @@ class SessionService:
         return self.sessions.days_with_sessions(from_time=now, until=fim, search=search)
 
     def list_for_gate(self) -> list[Session]:
-        """Sessões que a portaria pode estar conferindo agora.
+        """Sessões do turno da portaria: da que está em andamento às próximas.
 
-        A vitrine só mostra o que ainda vai começar, e faz sentido para quem
-        compra. Para quem está na porta, não: a sessão sumia da lista no
-        instante em que começava — bem no meio da entrada, com gente chegando
-        atrasada. Sem conseguir escolher a sessão, o operador perdia justamente
-        a checagem de "este ingresso é de outra sessão".
-
-        A janela vai de algumas horas atrás até o fim do dia seguinte: cobre a
-        sessão em andamento e as próximas do turno, sem despejar a programação
-        do mês num seletor. Ver decisão D33.
+        A vitrine esconde o que já começou, o que está certo para quem compra e
+        errado para quem está na porta. Ver decisão D33.
         """
         now = datetime.now(timezone.utc)
         items, _ = self.sessions.list_published(
@@ -204,11 +190,8 @@ class SessionService:
     def create_batch(self, organizer_id: uuid.UUID, data: SessionRepeat) -> dict:
         """Cria a mesma sessão em vários dias, no mesmo horário.
 
-        Dia em que a sala já está ocupada é **pulado**, e não aborta o lote:
-        obrigar a refazer a seleção inteira por causa de um dia ocupado joga
-        fora o trabalho de escolher os outros nove. O que ficou de fora volta
-        na resposta, com o motivo, para o organizador resolver esses casos.
-        Ver decisão D27.
+        Dia ocupado é pulado e volta em `skipped` com o motivo, em vez de
+        abortar o lote inteiro. Ver decisão D27.
         """
         created_sessions: list[Session] = []
         skipped: list[dict] = []
@@ -323,12 +306,8 @@ class SessionService:
         return self.sessions.save(session)
 
     def occupied_seat_count(self, session_id: uuid.UUID) -> int:
-        """Quantos ingressos desta sessão ocupam poltrona.
-
-        Ingresso cancelado pelo próprio cliente não conta: a poltrona voltou
-        para o estoque, e uma sessão em que todo mundo desistiu está vazia de
-        novo. Mesmo critério do índice que impede vender duas vezes.
-        """
+        """Ingressos que ocupam poltrona — mesmo critério do índice que impede
+        vender duas vezes, então desistência do cliente não conta."""
         return (
             self.db.scalar(
                 select(func.count())
@@ -346,14 +325,9 @@ class SessionService:
     ) -> dict[uuid.UUID, tuple[int, int]]:
         """Por sessão: (quantos ocupam poltrona, quantos existem ao todo).
 
-        As duas contagens respondem perguntas diferentes do painel. A primeira
-        diz se a sessão pode ser cancelada — cancelado não ocupa. A segunda diz
-        se ela pode ser **apagada**: uma sessão que um dia teve pedido não some,
-        mesmo que todos tenham sido cancelados depois, porque alguém pode
-        precisar rastrear o que aconteceu com aquela compra.
-
-        Uma consulta só para a lista inteira: uma por sessão transformaria o
-        painel em N+1 conforme a programação cresce.
+        A primeira contagem decide se dá para cancelar, a segunda se dá para
+        apagar — sessão que um dia teve pedido não some. Uma consulta só, para
+        o painel não virar N+1. Ver decisão D31.
         """
         if not session_ids:
             return {}
@@ -372,16 +346,10 @@ class SessionService:
     def cancel(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
         """Cancela a sessão — só enquanto ela estiver vazia.
 
-        Cancelar diz que a sessão **não vai acontecer**. Se alguém já comprou,
-        esse anúncio sozinho não resolve nada: a pessoa continuaria com um QR
-        na mão, e o sistema não tem como avisá-la nem como devolver o dinheiro.
-        Então a operação é recusada, e o organizador tem que lidar com quem
-        comprou antes — cancelando os pedidos — para só depois cancelar a
-        sessão.
-
-        Para tirar do cartaz uma sessão que **vai acontecer**, o caminho é
-        despublicar: para de vender e quem já tem ingresso entra normalmente.
-        Ver decisão D30.
+        Com ingresso vendido a operação é recusada: o sistema não avisa nem
+        estorna ninguém, então o anúncio sozinho deixaria a pessoa com um QR
+        morto. Para tirar do cartaz uma sessão que vai acontecer, o caminho é
+        despublicar. Ver decisão D30.
         """
         session = self.get_for_organizer(session_id, organizer_id)
         self._require_not_cancelled(session)
@@ -394,20 +362,11 @@ class SessionService:
         return self.sessions.save(session)
 
     def cancel_orders(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> int:
-        """Cancela de uma vez todos os pedidos da sessão. Devolve quantos.
+        """Cancela todos os pedidos da sessão. Devolve quantos.
 
-        É o passo que falta para conseguir cancelar uma sessão que já vendeu.
-        Fica separado do cancelamento da sessão de propósito: são duas
-        decisões diferentes — desfazer as compras de pessoas reais é a que
-        pesa, e embutir isso num botão chamado "cancelar sessão" faria o
-        organizador tomá-la sem perceber.
-
-        **Despublica antes**, e só então cancela. Não dá para esvaziar uma
-        sessão que continua vendendo: alguém compraria no meio da operação e o
-        organizador voltaria à mesma tela com um pedido novo. O despublicar é
-        commitado primeiro, o que fecha a porta de entrada — resta a janela de
-        um pedido que já estava em voo, e para esse a contagem devolvida
-        denuncia a diferença.
+        Passo separado do cancelamento da sessão de propósito: desfazer compras
+        de pessoas reais precisa ser pedido, não vir embutido. Despublica antes
+        de esvaziar, senão alguém compra no meio da operação. Ver decisão D30.
         """
         session = self.get_for_organizer(session_id, organizer_id)
         self._require_not_cancelled(session)

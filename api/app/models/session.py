@@ -51,9 +51,8 @@ class SessionStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
-# Duração presumida quando o catálogo não informa a do filme. Precisa existir
-# porque a sala é reservada pelo tempo que a sessão ocupa, e um valor ausente
-# viraria ocupação zero — a sala pareceria livre no minuto seguinte.
+# Sem isto, filme sem duração no catálogo viraria ocupação zero e a sala
+# pareceria livre no minuto seguinte.
 DEFAULT_RUNTIME_MINUTES = 120
 
 # Folga entre uma sessão e a seguinte na mesma sala: o público sai, a equipe
@@ -63,11 +62,8 @@ TURNAROUND_MINUTES = 20
 
 
 def occupation_end(starts_at: datetime, runtime_minutes: int | None) -> datetime:
-    """Até quando a sala fica indisponível por causa desta sessão.
-
-    Não é o fim do filme: inclui a folga de limpeza. O nome da coluna diz isso
-    — `occupies_until`, e não `ends_at`. Ver decisão D37.
-    """
+    """Até quando a sala fica indisponível. Inclui a folga de limpeza, então
+    não é o fim do filme — daí o nome. Ver decisão D37."""
     minutos = (runtime_minutes or DEFAULT_RUNTIME_MINUTES) + TURNAROUND_MINUTES
     return starts_at + timedelta(minutes=minutos)
 
@@ -81,11 +77,9 @@ class Session(Base):
     )
     room_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("rooms.id"), index=True)
 
-    # --- Cópia dos dados do filme -----------------------------------------
-    # Guardados na publicação, não consultados a cada exibição. Se o TMDb sair
-    # do ar, mudar o título traduzido ou trocar o pôster, o ingresso que alguém
-    # comprou precisa continuar mostrando o que foi vendido. Ingresso é
-    # documento, não consulta ao vivo. Ver decisão D13.
+    # --- Cópia dos dados do filme, feita na criação ----------------------
+    # Ingresso é documento, não consulta ao vivo: se o TMDb mudar o título ou
+    # sair do ar, o que foi vendido continua de pé. Ver decisão D13.
     catalog_id: Mapped[str] = mapped_column(String(40), index=True)
     movie_title: Mapped[str] = mapped_column(String(255))
     movie_overview: Mapped[str | None] = mapped_column(Text, default=None)
@@ -116,11 +110,9 @@ class Session(Base):
     # a reescrever os dados existentes quando o erro aparece. Ver decisão D14.
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
-    # Até quando a sala fica ocupada: início + duração do filme + folga de
-    # limpeza. Materializada, e não calculada na hora, porque a trava de
-    # sobreposição é um índice — e índice do Postgres só aceita expressão
-    # imutável. `timestamptz + interval` é apenas estável, então a soma precisa
-    # estar gravada. Ver decisão D37.
+    # Materializada porque a trava de sobreposição é um índice, e índice do
+    # Postgres exige expressão imutável — `timestamptz + interval` é apenas
+    # estável. Ver decisão D37.
     occupies_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     status: Mapped[SessionStatus] = mapped_column(
@@ -138,19 +130,11 @@ class Session(Base):
     )
 
     __table_args__ = (
-        # Alvo da chave composta de session_sector_prices. Redundante com a
-        # chave primária, e exigida pelo Postgres: uma chave estrangeira só
-        # aponta para colunas com unicidade declarada. Ver decisão D35.
+        # Alvo da chave composta de session_sector_prices: chave estrangeira
+        # só aponta para unicidade declarada. Ver decisão D35.
         UniqueConstraint("id", "room_id", name="uq_session_id_room"),
-        # Duas sessões não podem **se sobrepor** na mesma sala.
-        #
-        # Antes a trava comparava só igualdade de horário, então duas sessões
-        # de duas horas às 20:00 e às 20:01 não colidiam — a sala ficava com
-        # duas plateias. A pergunta certa não é "começam no mesmo instante",
-        # é "ocupam a sala ao mesmo tempo".
-        #
-        # Cancelada continua de fora, pela mesma razão da D31: ela não vai
-        # acontecer, então não ocupa nada. Ver decisões D6, D31 e D37.
+        # Duas sessões não podem se sobrepor na mesma sala. Cancelada fica de
+        # fora: não vai acontecer, então não ocupa. Ver decisões D31 e D37.
         ExcludeConstraint(
             ("room_id", "="),
             (func.tstzrange(starts_at, occupies_until), "&&"),
@@ -175,15 +159,8 @@ class Session(Base):
 
 
 class SessionSectorPrice(Base):
-    """Preço de um setor numa sessão.
-
-    O preço mora aqui, e não no setor, porque é decisão da sessão: a mesma sala
-    tem preço de terça e preço de sábado. Ver decisão D12.
-
-    Valor em centavos inteiros, nunca float: 0.1 + 0.2 não dá 0.3 em ponto
-    flutuante, e esse erro aparece no centavo depois que já há ingresso
-    emitido. Ver decisão D14.
-    """
+    """Preço de um setor numa sessão — a mesma sala tem preço de terça e de
+    sábado. Centavos inteiros, nunca float. Ver decisões D12 e D14."""
 
     __tablename__ = "session_sector_prices"
 
@@ -198,9 +175,8 @@ class SessionSectorPrice(Base):
 
     price_cents: Mapped[int] = mapped_column(Integer)
 
-    # As duas chaves são compostas e dividem `room_id`, então a sessão e o
-    # setor precisam ser da mesma sala para a linha existir. Sem `primaryjoin`
-    # explícito o SQLAlchemy não saberia qual das duas usar em cada lado.
+    # `primaryjoin` explícito: com duas chaves compostas dividindo `room_id`,
+    # o SQLAlchemy não sabe qual usar em cada lado.
     session: Mapped["Session"] = relationship(
         back_populates="prices",
         primaryjoin="SessionSectorPrice.session_id == Session.id",
@@ -213,17 +189,9 @@ class SessionSectorPrice(Base):
     )
 
     __table_args__ = (
-        # O preço aponta para um setor **da sala daquela sessão**, e quem
-        # garante isso é o banco.
-        #
-        # Antes, `session_id` e `sector_id` referenciavam suas tabelas de forma
-        # independente: nada impedia gravar o preço de um setor de outra sala.
-        # Só o serviço conferia, e invariante que vive apenas no serviço é
-        # invariante que a próxima rota esquece.
-        #
-        # A prova está no `room_id` compartilhado: a primeira chave exige que a
-        # sessão esteja nessa sala, a segunda exige o mesmo do setor. Sendo a
-        # mesma coluna, as duas falam da mesma sala. Ver decisão D35.
+        # As duas chaves compartilham `room_id`: uma exige que a sessão esteja
+        # nessa sala, a outra exige o mesmo do setor. Sendo a mesma coluna, o
+        # preço só aponta para setor da sala da sessão. Ver decisão D35.
         ForeignKeyConstraint(
             ["session_id", "room_id"],
             ["sessions.id", "sessions.room_id"],
@@ -237,8 +205,7 @@ class SessionSectorPrice(Base):
             ondelete="CASCADE",
         ),
         UniqueConstraint("session_id", "sector_id", name="uq_session_price_sector"),
-        # Mínimo de um centavo, alinhado com o contrato da API. O banco aceitava
-        # zero enquanto a aplicação já recusava — e sessão de graça deixa o
-        # cliente com um pedido que nunca pode ser pago. Ver decisões D33 e D35.
+        # Um centavo, alinhado com a API: sessão de graça deixa o cliente com
+        # um pedido que o pagamento simulado nunca aprova. Ver decisão D33.
         CheckConstraint("price_cents >= 1", name="ck_session_price_positive"),
     )

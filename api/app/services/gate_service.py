@@ -43,23 +43,17 @@ class GateService:
     ) -> CheckResult:
         ticket_id = ticket_code.verify(code)
         if ticket_id is None:
-            # Código forjado, digitado errado ou QR de outro sistema. Não
-            # distinguimos: para quem está na porta, o resultado é o mesmo, e
-            # detalhar ajudaria quem estivesse tentando adivinhar.
+            # Forjado, digitado errado ou de outro sistema: não distinguimos,
+            # porque detalhar ajudaria quem tenta adivinhar.
             return CheckResult(INVALID, "Código inválido")
 
         ticket = self.db.get(Ticket, ticket_id)
         if ticket is None:
             return CheckResult(INVALID, "Ingresso não encontrado")
 
-        # A sessão é conferida antes do ingresso, e de propósito.
-        #
-        # Cancelar a sessão já invalida os ingressos dela, então esta checagem
-        # é redundante no caminho normal. Ela existe porque a consequência de
-        # falhar é grave: alguém entrando numa sala que não vai exibir nada.
-        # Se um ingresso escapar da invalidação — por um estado que ainda não
-        # previmos, ou por dado antigo —, a porta continua fechada. Mesmo
-        # princípio da D6: duas verificações independentes. Ver decisão D30.
+        # Redundante no caminho normal, porque cancelar a sessão já invalida
+        # os ingressos. Fica porque falhar aqui é deixar alguém entrar numa
+        # sala que não vai exibir nada. Ver decisão D30.
         if ticket.session.status is SessionStatus.CANCELLED:
             return CheckResult(
                 INVALID,
@@ -73,9 +67,8 @@ class GateService:
         if ticket.status is TicketStatus.RESERVED:
             return CheckResult(INVALID, "Ingresso não pago", ticket)
 
-        # A sessão errada é checada antes do reuso de propósito: quem chegou na
-        # porta errada precisa ouvir isso, e não "já utilizado" por causa de uma
-        # entrada legítima em outra sala.
+        # Antes do reuso: quem errou a porta precisa ouvir isso, e não "já
+        # utilizado" por causa de uma entrada legítima em outra sala.
         if session_id is not None and ticket.session_id != session_id:
             return CheckResult(
                 WRONG_SESSION,
@@ -105,11 +98,7 @@ class GateService:
         )
 
     def by_share_token(self, token: uuid.UUID) -> Ticket | None:
-        """Ingresso aberto por link compartilhado.
-
-        Só leitura: o link mostra o ingresso, mas não é chave de entrada. Ver
-        decisão D17.
-        """
+        """Ingresso aberto por link compartilhado. Ver decisão D17."""
         from sqlalchemy import select
 
         return self.db.scalar(select(Ticket).where(Ticket.share_token == token))

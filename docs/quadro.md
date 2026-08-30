@@ -45,9 +45,9 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] 1.2 Preco de setor com garantia relacional no banco (D35)
 - [x] 1.3 Conflito de agenda por intervalo, nao por igualdade (D37)
 - [x] 1.4 CheckConstraint do preco alinhado com o minimo da API (veio junto da D35)
-- [ ] 2.1 Padronizar o idioma dos identificadores — ingles, decidido na D36  ← PROXIMA
-- [ ] 2.2 Enxugar comentario que repete a documentacao
-- [ ] 3.1 Rodada de produto no front-end
+- [x] 2.1 Identificadores do back-end em ingles (D36) — front medido e mantido
+- [x] 2.2 Comentario enxuto: o porque fica, o quee a duplicacao saem (D38)
+- [ ] 3.1 Rodada de produto no front-end  ← PROXIMA
 - [ ] 3.2 Testes E2E de checkout, portaria e gestao
 - [ ] Portaria pertencer a um organizador (surgiu da D34)
 

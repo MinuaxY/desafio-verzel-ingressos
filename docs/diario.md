@@ -349,3 +349,35 @@ acontecido antes: **regex sem âncora em rótulo que contém número**.
 
 ### Decisão tomada
 D37.
+
+---
+
+## Pós-devolutiva — 2.1 e 2.2, idioma e comentário
+
+Bloco 2 fechado. As duas etapas juntas porque tocam nos mesmos arquivos.
+
+**A primeira ferramenta de renomeação teve de ser jogada fora.** Usava expressão regular com
+limite de palavra e trocou dentro de strings: o CLI virou `create-organizador` e docstrings em
+português ganharam verbos em inglês no meio da frase — *"cancel exige resolver com quem
+comprou"*. Revertei tudo e refiz com o tokenizador do Python, trocando só tokens `NAME` por
+posição. O módulo tem um caso de prova mostrando que string, comentário e número passam
+intactos.
+
+**O caminho inverso também mordeu.** `@pytest.mark.parametrize` nomeia o argumento por *string*,
+e o `label()` do SQLAlchemy também. Como as strings ficaram intactas — corretamente —, oito
+decoradores e um label quebraram e precisaram ser alinhados a mão. Foi o único jeito de
+descobrir: rodando a suíte.
+
+**Medi antes de decidir sobre o front, e a medição mudou a decisão.** Ia renomear os 31
+arquivos, mas a crítica era sobre alternar idiomas *dentro da mesma unidade*, e no front isso
+não acontece: 24 declarações portuguesas, 1 inglesa, zero arquivos misturando. O back-end é que
+misturava. Renomear o front seria um refactor grande, sem tokenizador de TypeScript, para
+corrigir um problema que não existe lá.
+
+**No comentário, parei antes do número.** `order_service.py` foi de 18% para 13% e `session.py`
+de 38% para 31%. Podia ter ido mais fundo, mas o que restou responde por que a coluna é
+materializada, por que o `primaryjoin` é explícito, por que a duração presumida existe — nada
+disso se lê no código. Cortar a partir daí seria apagar informação para melhorar a métrica.
+
+### Decisões tomadas
+D36 (ampliada) e D38.

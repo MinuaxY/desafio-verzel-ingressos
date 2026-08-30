@@ -722,9 +722,63 @@ código chama o tempo todo, e é o que um revisor espera encontrar. Português n
 seria igualmente defensável como convenção — só custaria quase quatro vezes mais para chegar no
 mesmo lugar.
 
-**A varredura é a etapa 2.1.** O código escrito daqui em diante já nasce em inglês: as
-constraints e a coluna da D35 são o primeiro exemplo. O `app/admin.py` da D34 ficou em
-português por ter sido escrito antes desta decisão, e entra na varredura como o resto.
+**A varredura foi feita na etapa 2.1:** as 42 funções em português viraram zero, e com elas
+variáveis, constantes, exceções e quatro parâmetros de query — `busca`, `dia`, `dias` e
+`por_pagina` também eram contrato, então o front acompanhou no mesmo commit.
+
+**Duas exceções deliberadas, e não esquecimento:**
+
+*Os nomes dos testes ficam em português.* A devolutiva pediu convenção única em "serviços,
+exceções, variáveis e contratos" — código. `test_o_banco_recusa_setor_de_outra_sala` não é
+identificador chamado por ninguém: é a especificação legível do comportamento, e traduzi-la
+piora a leitura sem ganhar nada.
+
+*Os comandos do CLI ficam em português.* `python -m app.admin criar-organizador` fala com quem
+opera a plataforma, e o resto da saída do comando é em português. Traduzir só o verbo deixaria
+a interface bilíngue.
+
+**O front-end ficou como estava, e isso foi medido antes de decidir.** A crítica era alternar
+os dois idiomas *dentro da mesma unidade de código*. No front isso não acontece: 24
+declarações com raiz portuguesa contra 1 inglesa, e **zero arquivos misturando**. Renomear 31
+arquivos — componentes, rotas, testes — traria o risco de um refactor grande sem tokenizador de
+TypeScript, para corrigir um problema que não existe ali. O back-end era o que misturava, e é
+onde os frameworks já falam inglês.
+
+**A ferramenta de renomeação teve de ser refeita.** A primeira usava expressão regular com
+limite de palavra e trocou dentro de strings e comentários: o CLI virou `create-organizador` e
+docstrings em português ganharam verbos em inglês no meio da frase. A segunda usa o tokenizador
+do Python e só troca tokens `NAME`, por posição, de trás para frente.
+
+O caminho inverso também mordeu: `@pytest.mark.parametrize` nomeia o argumento **por string**, e
+o `label()` do SQLAlchemy também. Como as strings ficaram intactas — corretamente —, oito
+decoradores e um label precisaram ser alinhados a mão.
+
+**`alembic/versions` não foi tocado.** Migration é registro histórico do que rodou no banco;
+reescrevê-la falsificaria o passado e arriscaria o replay.
+
+---
+
+## D38 — O comentário guarda o porquê, não o quê
+
+**Apontado na devolutiva:** trechos diretos vinham acompanhados de blocos explicando em detalhe
+decisões **já registradas** em `docs/decisoes.md`. O código parecia narrado, e não escrito para
+manutenção. `order_service.py` e `session.py` foram citados pelo nome.
+
+**A crítica é justa, e o padrão era meu.** Escrevi esses blocos ao longo do projeto inteiro.
+
+**Regra adotada:** o código diz *o quê*, o comentário diz *o porquê não-óbvio*, a documentação
+guarda o contexto e o trade-off. Explicação longa de decisão vira ponteiro curto — `Ver decisão
+D30` — em vez de repetir o conteúdo do documento.
+
+**Resultado nos dois arquivos citados:** `order_service.py` de 18% para 13% de prosa,
+`session.py` de 38% para 31%.
+
+**Por que parei em 31% e não fui atrás de um número menor.** O que restou em `session.py` são
+comentários de duas linhas respondendo por que a duração presumida existe, por que
+`occupies_until` é materializada, por que o `primaryjoin` é explícito, por que as duas chaves
+compartilham `room_id`. Nenhum deles é recuperável lendo o código — é exatamente o
+"comportamento realmente não óbvio" que a devolutiva mandou manter. Perseguir a porcentagem a
+partir daqui seria apagar informação para melhorar uma métrica.
 
 ---
 

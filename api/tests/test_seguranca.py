@@ -1,7 +1,7 @@
 """Proteções de borda: limite de tentativas, cabeçalhos e vazamento de erro."""
 import pytest
 
-from app.core.throttle import MAX_TENTATIVAS, Throttle, login_attempts
+from app.core.throttle import MAX_ATTEMPTS, Throttle, login_attempts
 
 CLIENTE = {
     "name": "Cli", "email": "cli@seg.dev", "password": "senhaforte123",
@@ -10,9 +10,9 @@ CLIENTE = {
 
 @pytest.fixture(autouse=True)
 def limpa_throttle():
-    login_attempts.limpar_tudo()
+    login_attempts.clear_all()
     yield
-    login_attempts.limpar_tudo()
+    login_attempts.clear_all()
 
 
 class TestLimiteDeTentativas:
@@ -22,7 +22,7 @@ class TestLimiteDeTentativas:
     def test_erra_ate_o_limite_e_e_bloqueado(self, client):
         client.post("/auth/register", json=CLIENTE)
 
-        for _ in range(MAX_TENTATIVAS):
+        for _ in range(MAX_ATTEMPTS):
             r = client.post(
                 "/auth/login", json={"email": CLIENTE["email"], "password": "erradaerrada"}
             )
@@ -38,7 +38,7 @@ class TestLimiteDeTentativas:
         """Depois de bloqueado, nem acertar libera — senão bastaria acertar na
         tentativa seguinte para zerar a contagem."""
         client.post("/auth/register", json=CLIENTE)
-        for _ in range(MAX_TENTATIVAS):
+        for _ in range(MAX_ATTEMPTS):
             client.post(
                 "/auth/login", json={"email": CLIENTE["email"], "password": "erradaerrada"}
             )
@@ -51,7 +51,7 @@ class TestLimiteDeTentativas:
     def test_acertar_antes_do_limite_zera_a_contagem(self, client):
         """Quem digitou errado e depois acertou não carrega o histórico."""
         client.post("/auth/register", json=CLIENTE)
-        for _ in range(MAX_TENTATIVAS - 1):
+        for _ in range(MAX_ATTEMPTS - 1):
             client.post(
                 "/auth/login", json={"email": CLIENTE["email"], "password": "erradaerrada"}
             )
@@ -73,7 +73,7 @@ class TestLimiteDeTentativas:
         client.post("/auth/register", json=CLIENTE)
         client.post("/auth/register", json={**CLIENTE, "email": "outro@seg.dev"})
 
-        for _ in range(MAX_TENTATIVAS + 1):
+        for _ in range(MAX_ATTEMPTS + 1):
             client.post(
                 "/auth/login", json={"email": CLIENTE["email"], "password": "erradaerrada"}
             )
@@ -85,7 +85,7 @@ class TestLimiteDeTentativas:
 
     def test_cadastro_nao_e_bloqueado_pelo_login(self, client):
         client.post("/auth/register", json=CLIENTE)
-        for _ in range(MAX_TENTATIVAS + 1):
+        for _ in range(MAX_ATTEMPTS + 1):
             client.post(
                 "/auth/login", json={"email": CLIENTE["email"], "password": "erradaerrada"}
             )
@@ -96,26 +96,26 @@ class TestLimiteDeTentativas:
 
 class TestThrottleIsolado:
     def test_libera_depois_da_janela(self):
-        t = Throttle(maximo=2, janela=0)
-        t.registrar("x")
-        t.registrar("x")
+        t = Throttle(maximum=2, window=0)
+        t.record("x")
+        t.record("x")
         assert t.blocked_for("x") == 0
 
     def test_conta_por_chave(self):
-        t = Throttle(maximo=1, janela=60)
-        t.registrar("a")
+        t = Throttle(maximum=1, window=60)
+        t.record("a")
         assert t.blocked_for("a") > 0
         assert t.blocked_for("b") == 0
 
     def test_liberar_zera(self):
-        t = Throttle(maximo=1, janela=60)
-        t.registrar("a")
-        t.liberar("a")
+        t = Throttle(maximum=1, window=60)
+        t.record("a")
+        t.clear("a")
         assert t.blocked_for("a") == 0
 
     def test_devolve_segundos_restantes(self):
-        t = Throttle(maximo=1, janela=60)
-        t.registrar("a")
+        t = Throttle(maximum=1, window=60)
+        t.record("a")
         assert 1 <= t.blocked_for("a") <= 60
 
 
