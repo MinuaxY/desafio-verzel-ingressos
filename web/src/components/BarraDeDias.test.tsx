@@ -18,12 +18,17 @@ function daquiA(dias: number): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-/** O rótulo que o componente escreve para a data, para achar o botão. */
+/** O rótulo que o componente escreve para a data, ancorado no início.
+ *
+ *  Sem a âncora, `/1 de setembro/` casa também com "11 de setembro" e "21 de
+ *  setembro" — e a barra mostra duas semanas, então dependendo do dia em que a
+ *  suíte roda os dois aparecem juntos e a busca falha por ambiguidade. Mesma
+ *  armadilha de `Poltrona A1` casando com `A10`. */
 function rotuloDe(dias: number): RegExp {
   const d = new Date();
   d.setDate(d.getDate() + dias);
   const mes = d.toLocaleDateString("pt-BR", { month: "long" });
-  return new RegExp(`${d.getDate()} de ${mes}`, "i");
+  return new RegExp(`^${d.getDate()} de ${mes}`, "i");
 }
 
 afterEach(() => vi.useRealTimers());

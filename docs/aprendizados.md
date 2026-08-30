@@ -269,6 +269,23 @@ o que ela conta muda.
 
 ---
 
+## 16. Teste que depende da data falha no dia errado, não no dia do erro.
+
+**O que aconteceu:** um teste da barra de datas quebrou sem que eu tivesse tocado no front.
+`/1 de setembro/` casava também com "11 de setembro", e a barra mostra duas semanas — só que
+isso só produz ambiguidade quando o intervalo mostrado contém os dois. Estava latente desde que
+o teste foi escrito e apareceu porque a suíte rodou em 30/08.
+
+Foi a **segunda vez** que a mesma armadilha apareceu no projeto: antes tinha sido `Poltrona A1`
+casando com `A10`, `A11` e `A12`.
+
+**A lição:** regex sem âncora sobre rótulo que contém número é bomba-relógio, e o teste que a
+contém passa com folga até o dia em que não passa. Quando o dado é gerado a partir de `hoje`, a
+suíte tem uma dimensão a mais que ninguém está olhando — e a falha chega meses depois, longe do
+commit que a criou.
+
+---
+
 ## O que faria diferente no próximo
 
 1. **Perguntar sobre o não-escrito no dia 1**, não no dia 3.
@@ -283,3 +300,5 @@ o que ela conta muda.
    testes dela. O cancelamento passou em todos os testes e não fazia nada.
 7. **Conferir a documentação contra o código antes de entregar**, como se fosse revisão de
    código. Foi o que achou a última leva de erros, e nenhum deles era de programação.
+8. **Ancorar toda busca de teste feita por texto com número dentro**, e desconfiar de teste que
+   monta o dado a partir de `hoje`.

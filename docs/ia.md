@@ -185,5 +185,5 @@ e não de documento escrito depois para parecer organizado.
 - [`backlog.md`](backlog.md) — requisitos, o que foi entregue, e o que ficou fora de propósito.
 - [`quadro.md`](quadro.md) — o kanban ao fim do projeto, com uma coluna para o que foi avaliado
   e descartado.
-- [`aprendizados.md`](aprendizados.md) — as 15 lições que ficaram, cada uma amarrada ao
+- [`aprendizados.md`](aprendizados.md) — as 16 lições que ficaram, cada uma amarrada ao
   episódio que a originou.

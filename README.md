@@ -567,7 +567,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |
-| [`aprendizados.md`](docs/aprendizados.md) | As **15 lições** que ficaram, cada uma amarrada ao episódio concreto que a originou |
+| [`aprendizados.md`](docs/aprendizados.md) | As **16 lições** que ficaram, cada uma amarrada ao episódio concreto que a originou |
 | [`ia.md`](docs/ia.md) | Onde a IA entrou, onde não entrou, e onde ela errou |
 
 Os quatro primeiros são espelhos de um vault do Obsidian usado durante o projeto — por isso o

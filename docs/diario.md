@@ -341,5 +341,11 @@ filme, arredondando para o próximo quarto de hora. Ficou mais realista do que a
 Menos quebra do que eu previa: dos 254 testes, só os 3 de concorrência falharam, porque montam a
 sessão direto sem passar pelo serviço.
 
+**Um teste do front quebrou sem eu ter tocado nele.** `/1 de setembro/` casa também com "11 de
+setembro", e a barra mostra duas semanas — dependendo do dia em que a suíte roda, os dois
+aparecem juntos e a busca falha por ambiguidade. Estava latente desde que o teste foi escrito, e
+hoje calhou de ser 30/08. Mesma armadilha de `Poltrona A1` casando com `A10`, que já tinha
+acontecido antes: **regex sem âncora em rótulo que contém número**.
+
 ### Decisão tomada
 D37.
