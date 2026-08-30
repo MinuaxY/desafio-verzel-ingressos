@@ -352,7 +352,7 @@ class TestCriacaoEmLote:
         assert len(corpo["created"]) == 2
         assert len(corpo["skipped"]) == 1
         assert corpo["skipped"][0]["date"] == dias_a_frente(3)[0]
-        assert "sess" in corpo["skipped"][0]["reason"].lower()
+        assert "ocupada" in corpo["skipped"][0]["reason"].lower()
 
     def test_data_no_passado_e_pulada(self, client):
         headers = auth(client, ORGANIZADOR)
@@ -1170,3 +1170,194 @@ class TestPrecoPertenceASalaDaSessao:
         cria_sessao(client, headers, sala)
 
         assert client.delete(f"/rooms/{sala['id']}", headers=headers).status_code == 409
+
+
+class TestSalaOcupadaPorIntervalo:
+    """A sala é reservada pelo tempo que a sessão ocupa. Ver decisão D37.
+
+    Antes a trava comparava só igualdade de horário: duas sessões de duas horas
+    na mesma sala, às 20:00 e às 20:01, passavam — e a sala ficava com duas
+    plateias.
+    """
+
+    def _sessao(self, client, headers, sala, *, dias=3, hora=20, minuto=0, filme=0):
+        quando = (datetime.now(timezone.utc) + timedelta(days=dias)).replace(
+            hour=hora, minute=minuto, second=0, microsecond=0
+        )
+        return client.post(
+            "/organizer/sessions",
+            json={
+                "catalog_id": FixtureProvider().items[filme].id,
+                "room_id": sala["id"],
+                "starts_at": quando.isoformat(),
+                "prices": [
+                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                ],
+            },
+            headers=headers,
+        )
+
+    def test_um_minuto_depois_nao_cabe(self, client):
+        """O caso exato que a regra antiga deixava passar."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        assert self._sessao(client, headers, sala, hora=20, minuto=0).status_code == 201
+        segunda = self._sessao(client, headers, sala, hora=20, minuto=1)
+        assert segunda.status_code == 409
+        assert "sala" in segunda.json()["detail"].lower()
+
+    def test_no_meio_do_filme_nao_cabe(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        self._sessao(client, headers, sala, hora=20, minuto=0)
+        assert self._sessao(client, headers, sala, hora=21, minuto=30).status_code == 409
+
+    def test_depois_de_a_sala_liberar_cabe(self, client):
+        """O filme tem 143 min; com a folga de limpeza a sala libera 22:43."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        self._sessao(client, headers, sala, hora=20, minuto=0)
+        assert self._sessao(client, headers, sala, hora=22, minuto=45).status_code == 201
+
+    def test_encostar_nao_e_sobrepor(self, client):
+        """Começar exatamente quando a sala libera é permitido: o intervalo é
+        fechado no início e aberto no fim."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        primeira = self._sessao(client, headers, sala, hora=20, minuto=0).json()
+        livre = datetime.fromisoformat(primeira["starts_at"]) + timedelta(minutes=143 + 20)
+
+        r = client.post(
+            "/organizer/sessions",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "starts_at": livre.isoformat(),
+                "prices": [
+                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                ],
+            },
+            headers=headers,
+        )
+        assert r.status_code == 201
+
+    def test_salas_diferentes_no_mesmo_horario_convivem(self, client):
+        headers = auth(client, ORGANIZADOR)
+        uma = cria_sala(client, headers, nome="Sala Um")
+        outra = cria_sala(client, headers, nome="Sala Dois")
+
+        assert self._sessao(client, headers, uma, hora=20).status_code == 201
+        assert self._sessao(client, headers, outra, hora=20).status_code == 201
+
+    def test_sessao_cancelada_nao_ocupa(self, client):
+        """A D31 continua valendo: cancelada não vai acontecer, então libera o
+        horário — agora o intervalo inteiro, e não só o instante."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        primeira = self._sessao(client, headers, sala, hora=20).json()
+        assert self._sessao(client, headers, sala, hora=21).status_code == 409
+
+        client.post(f"/organizer/sessions/{primeira['id']}/cancel", headers=headers)
+        assert self._sessao(client, headers, sala, hora=21).status_code == 201
+
+    def test_o_banco_recusa_por_baixo_do_servico(self, client):
+        """A trava não é só a checagem em Python: é constraint de exclusão."""
+        import uuid as U
+
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models.session import Session, occupation_end
+
+        from tests.conftest import TestSession
+
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        primeira = self._sessao(client, headers, sala, hora=20).json()
+
+        comeca = datetime.fromisoformat(primeira["starts_at"]) + timedelta(minutes=30)
+        db = TestSession()
+        try:
+            db.add(
+                Session(
+                    organizer_id=U.UUID(client.get("/auth/me", headers=headers).json()["id"]),
+                    room_id=U.UUID(sala["id"]),
+                    catalog_id="x",
+                    movie_title="Colidente",
+                    movie_runtime_minutes=100,
+                    starts_at=comeca,
+                    occupies_until=occupation_end(comeca, 100),
+                )
+            )
+            with pytest.raises(IntegrityError):
+                db.commit()
+        finally:
+            db.rollback()
+            db.close()
+
+    def test_mover_o_horario_para_cima_de_outra_e_recusado(self, client):
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+
+        self._sessao(client, headers, sala, dias=3, hora=20)
+        movel = self._sessao(client, headers, sala, dias=5, hora=20).json()
+
+        colide = (datetime.now(timezone.utc) + timedelta(days=3)).replace(
+            hour=21, minute=0, second=0, microsecond=0
+        )
+        r = client.patch(
+            f"/organizer/sessions/{movel['id']}",
+            json={"starts_at": colide.isoformat()},
+            headers=headers,
+        )
+        assert r.status_code == 409
+
+    def test_a_sessao_nao_conflita_consigo_mesma_ao_ser_movida(self, client):
+        """Mover trinta minutos para frente sobrepõe o próprio intervalo antigo
+        — e isso não pode ser tratado como conflito."""
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        sessao = self._sessao(client, headers, sala, dias=3, hora=20).json()
+
+        novo = datetime.fromisoformat(sessao["starts_at"]) + timedelta(minutes=30)
+        r = client.patch(
+            f"/organizer/sessions/{sessao['id']}",
+            json={"starts_at": novo.isoformat()},
+            headers=headers,
+        )
+        assert r.status_code == 200
+
+    def test_o_lote_pula_o_dia_que_nao_cabe(self, client):
+        """O lote informa o horário em hora local (D27), e a sessão existente
+        foi criada em UTC — então o horário do lote é derivado dela, e não
+        escrito à mão."""
+        from zoneinfo import ZoneInfo
+
+        headers = auth(client, ORGANIZADOR)
+        sala = cria_sala(client, headers)
+        existente = self._sessao(client, headers, sala, dias=3, hora=20).json()
+
+        local = datetime.fromisoformat(existente["starts_at"]).astimezone(
+            ZoneInfo("America/Sao_Paulo")
+        ) + timedelta(minutes=30)
+
+        r = client.post(
+            "/organizer/sessions/batch",
+            json={
+                "catalog_id": FixtureProvider().items[0].id,
+                "room_id": sala["id"],
+                "dates": [local.date().isoformat(), (local + timedelta(days=1)).date().isoformat()],
+                "time_of_day": local.strftime("%H:%M"),
+                "prices": [
+                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                ],
+            },
+            headers=headers,
+        ).json()
+        assert len(r["created"]) == 1
+        assert len(r["skipped"]) == 1
+        assert "sala" in r["skipped"][0]["reason"].lower()

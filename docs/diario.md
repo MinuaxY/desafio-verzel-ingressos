@@ -315,3 +315,31 @@ arquivos e separá-los dobraria o trabalho.
 
 **Também na fila, fora do backlog original:** a portaria valida ingresso de qualquer
 organizador, porque um usuário GATE não pertence a cinema nenhum. Apareceu durante a D34.
+
+---
+
+## Pós-devolutiva — 1.3, a sala reservada por intervalo
+
+Fecha o bloco 1. A trava de agenda comparava só igualdade de horário: duas sessões de duas horas
+às 20:00 e às 20:01 na mesma sala passavam sem violar nada.
+
+O caminho previsto — `EXCLUDE USING gist` — funcionou, mas com uma surpresa no meio. Tentei
+calcular o intervalo na própria expressão do índice e o Postgres recusou: **`timestamptz +
+interval` é estável, não imutável**, e índice exige imutável. Coluna gerada falha igual. Testei
+as duas hipóteses no banco antes de escolher, em vez de descobrir na migration.
+
+Duas coisas que só apareceram implementando:
+
+**A migration precisou resolver 27 pares sobrepostos** nos dados existentes. Cancelar um de cada
+par, preferindo manter quem já vendeu ingresso — um dos pares tinha venda, e a sessão
+sobreviveu. Cancelar em vez de apagar porque cancelada não ocupa (D31) e o registro fica.
+
+**O seed produzia a própria sobreposição.** A grade fixa tinha intervalos de 150 a 180 minutos e
+o filme mais longo ocupa 192. Reescrevi a programação para empilhar pela duração real de cada
+filme, arredondando para o próximo quarto de hora. Ficou mais realista do que a grade fixa era.
+
+Menos quebra do que eu previa: dos 254 testes, só os 3 de concorrência falharam, porque montam a
+sessão direto sem passar pelo serviço.
+
+### Decisão tomada
+D37.

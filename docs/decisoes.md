@@ -728,6 +728,69 @@ português por ter sido escrito antes desta decisão, e entra na varredura como 
 
 ---
 
+## D37 — A sala é reservada pelo intervalo, não pelo instante
+
+**Apontado na devolutiva:** o conflito de agenda considerava apenas igualdade de `room_id` e
+`starts_at`. Duas sessões de duas horas na mesma sala, às 20:00 e às 20:01, não violavam nada —
+e a sala ficava com duas plateias.
+
+A pergunta estava errada, como na D31. Não é *"começam no mesmo instante"*, é *"ocupam a sala
+ao mesmo tempo"*.
+
+**Escolhido:** constraint de exclusão sobre o intervalo ocupado.
+
+```sql
+EXCLUDE USING gist (
+    room_id WITH =,
+    tstzrange(starts_at, occupies_until) WITH &&
+) WHERE (status <> 'CANCELLED')
+```
+
+Ocupação é **início + duração do filme + folga de limpeza**, e não só a duração: o público sai,
+a equipe limpa, a próxima entra. Sem a folga, duas sessões coladas passariam pela trava e a
+sala teria plateia entrando enquanto a outra ainda sai.
+
+**A coluna `occupies_until` é materializada, e isso não foi escolha estética.** Tentei calcular
+na própria expressão do índice e o Postgres recusou:
+
+```
+ERROR: functions in index expression must be marked IMMUTABLE
+```
+
+`timestamptz + interval` é apenas **estável**, não imutável — somar meses depende do fuso. Coluna
+gerada (`GENERATED ALWAYS AS ... STORED`) falha pelo mesmo motivo. Então a soma precisa estar
+gravada, e quem grava é a aplicação, numa função só: `occupation_end()`. O `CHECK
+(occupies_until > starts_at)` impede o caso em que a ocupação vazia passaria sem sobrepor nada.
+
+**O nome é `occupies_until`, e não `ends_at`,** porque não é o fim do filme: é quando a sala
+volta a estar livre. Nome que promete uma coisa e entrega outra é o começo do próximo defeito.
+
+**Encostar não é sobrepor.** `tstzrange` é fechado no início e aberto no fim, então uma sessão
+pode começar exatamente no minuto em que a sala libera. É o que um cinema faz.
+
+**O índice antigo foi removido.** Começar no mesmo instante é caso particular de sobrepor, e a
+exclusão já cobre. Duas travas dizendo quase a mesma coisa é o tipo de duplicidade que faz quem
+lê duvidar de qual vale.
+
+**A migration teve de resolver os dados existentes:** havia **27 pares sobrepostos**, criados
+sob a regra antiga. Ela cancela uma sessão de cada par — cancelar e não apagar, porque cancelada
+não ocupa a sala (D31) e o registro continua existindo. A escolha de qual cancelar não é
+arbitrária: **sai a que tem menos ingresso vendido**, porque cancelar uma sessão vendida
+quebraria a promessa que a D30 protege; no empate, sai a que começa depois. Um dos 27 pares
+tinha ingresso vendido, e a sessão sobreviveu.
+
+**O seed produzia a própria sobreposição.** A grade fixa tinha intervalos de 150 a 180 minutos,
+e o filme mais longo do catálogo ocupa 192. Em vez de alargar a grade, a programação passou a
+ser **empilhada a partir da duração real** de cada filme, arredondando para o próximo quarto de
+hora — que é como um cinema monta a grade, e resolve na origem em vez de esconder. O seed também
+passou a consultar a ocupação antes de inserir: ele grava direto no banco, sem passar pelo
+serviço, então precisa respeitar a trava por conta própria.
+
+**Efeito colateral que valeu:** em `criar`, a busca do filme subiu para antes da checagem de
+sala ocupada. A trava agora depende da duração, e a duração vem do catálogo.
+
+---
+
 ## Decisões que estavam pendentes
 
 Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma

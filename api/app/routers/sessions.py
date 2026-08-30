@@ -112,7 +112,9 @@ def _traduz(erro: Exception) -> HTTPException:
         return HTTPException(status.HTTP_404_NOT_FOUND, "Sessão não encontrada")
     if isinstance(erro, RoomBusy):
         return HTTPException(
-            status.HTTP_409_CONFLICT, "Já existe uma sessão nessa sala nesse horário"
+            status.HTTP_409_CONFLICT,
+            "A sala está ocupada nesse intervalo. Uma sessão reserva a sala pelo tempo do "
+            "filme mais a limpeza, então o horário precisa cair depois que a anterior libera.",
         )
     if isinstance(erro, SessionInThePast):
         return HTTPException(

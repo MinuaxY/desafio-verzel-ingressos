@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session as DbSession
 
 from app.catalog.factory import get_catalog_provider
 from app.models.order import OCUPAM_ASSENTO, Ticket
-from app.models.session import Session, SessionSectorPrice, SessionStatus
+from app.models.session import (
+    Session,
+    SessionSectorPrice,
+    SessionStatus,
+    occupation_end,
+)
 from app.repositories.room_repository import RoomRepository
 from app.repositories.session_repository import SessionRepository
 from app.schemas.session import SessionCreate, SessionRepeat, SessionUpdate
@@ -38,7 +43,11 @@ class SessionNotFound(Exception):
 
 
 class RoomBusy(Exception):
-    """Já existe sessão nessa sala nesse horário."""
+    """A sala já está ocupada em alguma parte desse intervalo.
+
+    Não é colisão de horário de início: uma sessão reserva a sala pelo tempo do
+    filme mais a folga de limpeza. Ver decisão D37.
+    """
 
 
 class SessionInThePast(Exception):
@@ -159,12 +168,16 @@ class SessionService:
 
         self._exige_futuro(dados.starts_at)
 
-        if self.sessions.exists_at(sala.id, dados.starts_at):
-            raise RoomBusy
-
+        # O filme é buscado antes da trava de sala ocupada, e não depois: a
+        # trava passou a comparar intervalos, e o intervalo depende da duração
+        # do filme. Ver decisão D37.
         filme = get_catalog_provider().get(dados.catalog_id)
         if filme is None:
             raise MovieNotFound
+
+        ocupa_ate = occupation_end(dados.starts_at, filme.runtime_minutes)
+        if self.sessions.overlaps(sala.id, dados.starts_at, ocupa_ate):
+            raise RoomBusy
 
         precos = self._monta_precos(sala, {p.sector_id: p.price_cents for p in dados.prices})
 
@@ -181,6 +194,7 @@ class SessionService:
             movie_year=filme.release_year,
             movie_age_rating=filme.age_rating,
             starts_at=dados.starts_at,
+            occupies_until=ocupa_ate,
             audio=dados.audio,
             screen_format=dados.screen_format,
             status=SessionStatus.PUBLISHED if dados.publish else SessionStatus.DRAFT,
@@ -218,7 +232,9 @@ class SessionService:
                     )
                 )
             except RoomBusy:
-                puladas.append({"date": dia, "reason": "Já havia sessão nessa sala nesse horário"})
+                puladas.append(
+                    {"date": dia, "reason": "A sala já estava ocupada nesse intervalo"}
+                )
             except SessionInThePast:
                 puladas.append({"date": dia, "reason": "Data e horário já passaram"})
 
@@ -259,9 +275,18 @@ class SessionService:
             if self.tem_ingressos(session_id):
                 raise SessionHasTickets
             self._exige_futuro(dados.starts_at)
-            if self.sessions.exists_at(sessao.room_id, dados.starts_at):
+
+            # A duração vem da cópia guardada na própria sessão, não de uma
+            # nova consulta ao catálogo: o filme é o mesmo, e o que o ingresso
+            # promete é o que foi gravado na venda. Ver decisões D13 e D37.
+            ocupa_ate = occupation_end(dados.starts_at, sessao.movie_runtime_minutes)
+            if self.sessions.overlaps(
+                sessao.room_id, dados.starts_at, ocupa_ate, ignoring=sessao.id
+            ):
                 raise RoomBusy
+
             sessao.starts_at = dados.starts_at
+            sessao.occupies_until = ocupa_ate
 
         if dados.audio is not None:
             sessao.audio = dados.audio

@@ -103,27 +103,39 @@ class SessionRepository:
             )
         )
 
-    def exists_at(self, room_id: uuid.UUID, starts_at: datetime) -> bool:
-        """A sala está ocupada nesse horário?
+    def overlaps(
+        self,
+        room_id: uuid.UUID,
+        starts_at: datetime,
+        occupies_until: datetime,
+        *,
+        ignoring: uuid.UUID | None = None,
+    ) -> bool:
+        """A sala já está ocupada em alguma parte desse intervalo?
 
-        Sessão cancelada **não** ocupa. A pergunta não é "existe alguma linha",
-        e sim "existe alguma sessão que vai acontecer" — e cancelada é
-        justamente o anúncio de que não vai. Contá-la deixaria o horário preso
-        para sempre, já que cancelar não tem volta.
+        Substituiu uma comparação por igualdade de horário, que só pegava duas
+        sessões começando no mesmo instante: às 20:00 e às 20:01 dois filmes de
+        duas horas passavam, e a sala ficava com duas plateias.
 
-        É a mesma regra do índice parcial que impede vender a poltrona duas
-        vezes: cancelado não ocupa. Ver decisão D31.
+        Sessão cancelada não conta — ela não vai acontecer, então não ocupa
+        nada. Mesma regra da D31.
+
+        `ignoring` serve para a edição: ao mudar o horário de uma sessão, ela
+        não pode conflitar consigo mesma. Ver decisão D37.
         """
-        return (
-            self.db.scalar(
-                select(Session.id).where(
-                    Session.room_id == room_id,
-                    Session.starts_at == starts_at,
-                    Session.status != SessionStatus.CANCELLED,
-                )
-            )
-            is not None
-        )
+        condicoes = [
+            Session.room_id == room_id,
+            Session.status != SessionStatus.CANCELLED,
+            # Sobreposição de intervalos: começa antes de o outro acabar e
+            # acaba depois de o outro começar. Encostar não é sobrepor — uma
+            # sessão pode começar exatamente quando a sala é liberada.
+            Session.starts_at < occupies_until,
+            Session.occupies_until > starts_at,
+        ]
+        if ignoring is not None:
+            condicoes.append(Session.id != ignoring)
+
+        return self.db.scalar(select(Session.id).where(*condicoes).limit(1)) is not None
 
     def create(self, sessao: Session, precos: list[SessionSectorPrice]) -> Session:
         sessao.prices = precos

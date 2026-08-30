@@ -20,7 +20,7 @@ from app.catalog.fixture import FixtureProvider
 from app.config import get_settings
 from app.models.order import Order, OrderStatus, Ticket, TicketStatus
 from app.models.room import Room, Sector
-from app.models.session import Session, SessionSectorPrice, SessionStatus
+from app.models.session import Session, SessionSectorPrice, SessionStatus, occupation_end
 from app.models.user import Role, User
 from app.schemas.order import OrderCreate, SeatSelection
 from app.services.order_service import OrderService, SeatTaken
@@ -72,14 +72,23 @@ def arena(engine_concorrente):
         db.flush()
 
         filme = FixtureProvider().items[0]
+        comeca = datetime.now(timezone.utc) + timedelta(days=3)
         sessao = Session(
             organizer_id=organizador.id,
             room_id=sala.id,
             catalog_id=filme.id,
             movie_title=filme.title,
-            starts_at=datetime.now(timezone.utc) + timedelta(days=3),
+            movie_runtime_minutes=filme.runtime_minutes,
+            starts_at=comeca,
+            # Montada sem passar pelo serviço, então a ocupação da sala vem da
+            # mesma função que ele usa. Ver decisão D37.
+            occupies_until=occupation_end(comeca, filme.runtime_minutes),
             status=SessionStatus.PUBLISHED,
-            prices=[SessionSectorPrice(sector_id=sala.sectors[0].id, price_cents=3000)],
+            prices=[
+                SessionSectorPrice(
+                    sector_id=sala.sectors[0].id, room_id=sala.id, price_cents=3000
+                )
+            ],
         )
         db.add(sessao)
         db.commit()

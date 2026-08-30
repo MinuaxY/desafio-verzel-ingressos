@@ -13,6 +13,7 @@ Os filmes vêm do provedor local, não do TMDb: o seed precisa funcionar sem red
 e sem chave, e produzir sempre o mesmo resultado. Ver decisão D8.
 """
 import sys
+import uuid
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -32,6 +33,7 @@ from app.models.session import (
     Session,
     SessionSectorPrice,
     SessionStatus,
+    occupation_end,
 )
 from app.models.user import Role, User
 
@@ -178,21 +180,23 @@ SALAS = [
 
 DIAS_DE_PROGRAMACAO = 10
 
-# (indice da sala, hora, minuto). As salas nao começam juntas: numa
+# Horario da primeira sessao de cada sala. As salas nao abrem juntas: numa
 # multiplex real os horarios sao escalonados para a bilheteria e a portaria nao
 # receberem tres plateias no mesmo minuto.
-GRADE = [
-    (0, 14, 0),
-    (0, 17, 0),
-    (0, 20, 0),
-    (0, 22, 30),
-    (1, 15, 30),
-    (1, 18, 30),
-    (1, 21, 15),
-    (2, 16, 0),
-    (2, 19, 0),
-    (2, 21, 45),
-]
+PRIMEIRA_SESSAO = [time(14, 0), time(15, 30), time(16, 0)]
+
+# Depois da ultima sessao que comeca antes disso, a sala fecha.
+ULTIMA_ENTRADA = time(22, 30)
+
+# As sessoes seguintes nao saem de uma grade fixa: sao empilhadas a partir da
+# duracao real de cada filme mais a folga de limpeza, e arredondadas para cima
+# no proximo quarto de hora.
+#
+# A grade fixa anterior tinha intervalos de 150 a 180 minutos, e o filme mais
+# longo do catalogo ocupa 192 -- o proprio seed produzia sobreposicao, e a
+# trava da D37 passou a recusa-la. Empilhar pela duracao real resolve na
+# origem, e e como um cinema monta a programacao de verdade.
+ARREDONDA_PARA_MINUTOS = 15
 
 # Combinacoes de exibicao, percorridas em rodizio. Variadas de proposito: quem
 # abrir a vitrine ve as quatro possibilidades, em vez de dez sessoes iguais.
@@ -239,27 +243,55 @@ def _monta_setores(spec: list[dict]) -> list[Sector]:
 def _programacao(agora: datetime) -> list[tuple[int, datetime, int]]:
     """A grade inteira: (índice da sala, quando, índice do filme).
 
+    Cada sala é preenchida empilhando sessões a partir da duração real do filme
+    escolhido, e não de horários fixos: a sala só volta a receber público
+    quando a sessão anterior libera. É assim que a programação nunca produz a
+    sobreposição que a D37 recusa.
+
     Devolve só o que ainda está no futuro — rodar o seed às 21h não deve criar
     a sessão das 14h de hoje, que já teria passado.
 
-    O filme de cada faixa avança um pouco a cada dia, em vez de ser sorteado:
-    o cartaz muda ao longo da semana como o de um cinema de verdade, e o mesmo
-    filme reaparece em dias e salas diferentes, que é o que dá o que buscar e
-    o que filtrar. Sendo determinístico, duas execuções produzem a mesma coisa.
+    O filme de cada faixa avança um pouco a cada dia, em vez de ser sorteado: o
+    cartaz muda ao longo da semana como o de um cinema de verdade, e o mesmo
+    filme reaparece em dias e salas diferentes, que é o que dá o que buscar e o
+    que filtrar. Sendo determinístico, duas execuções produzem a mesma coisa.
     """
-    total_filmes = len(FixtureProvider().items)
+    filmes = FixtureProvider().items
     hoje = agora.date()
     grade: list[tuple[int, datetime, int]] = []
+    proximo_filme = 0
 
     for dia in range(DIAS_DE_PROGRAMACAO):
         data = hoje + timedelta(days=dia)
-        for faixa, (sala, hora, minuto) in enumerate(GRADE):
-            quando = datetime.combine(data, time(hora, minuto), tzinfo=FUSO_LOCAL)
-            if quando <= agora:
-                continue
-            grade.append((sala, quando, (dia * 3 + faixa) % total_filmes))
+
+        for sala, abertura in enumerate(PRIMEIRA_SESSAO):
+            quando = datetime.combine(data, abertura, tzinfo=FUSO_LOCAL)
+            fecha = datetime.combine(data, ULTIMA_ENTRADA, tzinfo=FUSO_LOCAL)
+
+            while quando <= fecha:
+                indice = proximo_filme % len(filmes)
+                proximo_filme += 1
+
+                if quando > agora:
+                    grade.append((sala, quando, indice))
+
+                quando = _proximo_horario(quando, filmes[indice].runtime_minutes)
 
     return grade
+
+
+def _proximo_horario(comeca: datetime, duracao: int | None) -> datetime:
+    """Quando a sala pode receber a próxima plateia, em hora redonda.
+
+    Arredondar para cima é o que faz a programação parecer de cinema: ninguém
+    anuncia sessão às 19h07. Para cima, e nunca para baixo, senão a sessão
+    seguinte começaria antes de a sala estar livre.
+    """
+    livre = occupation_end(comeca, duracao)
+    sobra = livre.minute % ARREDONDA_PARA_MINUTOS
+    if sobra:
+        livre += timedelta(minutes=ARREDONDA_PARA_MINUTOS - sobra)
+    return livre.replace(second=0, microsecond=0)
 
 
 def _completa_campos_faltantes(sessao: Session, filme) -> list[str]:
@@ -337,11 +369,18 @@ def run() -> None:
         #
         # Cancelada fica de fora: ela não ocupa mais o horário, e o seed pode
         # reocupá-lo como qualquer criação faria. Ver decisão D31.
-        ja_existem = {
-            (s.room_id, s.starts_at): s
-            for s in db.query(Session).filter(Session.status != SessionStatus.CANCELLED)
-        }
+        vivas = list(db.query(Session).filter(Session.status != SessionStatus.CANCELLED))
+        ja_existem = {(s.room_id, s.starts_at): s for s in vivas}
 
+        # Os intervalos que cada sala já tem ocupados. O seed grava direto no
+        # banco, sem passar pelo serviço, então precisa respeitar a trava de
+        # sobreposição por conta própria — senão a primeira colisão derruba a
+        # execução inteira com uma violação de constraint. Ver decisão D37.
+        ocupacao: dict[uuid.UUID, list[tuple[datetime, datetime]]] = {}
+        for s in vivas:
+            ocupacao.setdefault(s.room_id, []).append((s.starts_at, s.occupies_until))
+
+        pulados = 0
         novas = 0
         remendadas = 0
         por_dia: dict[date, int] = {}
@@ -354,6 +393,17 @@ def run() -> None:
             if existente is not None:
                 if _completa_campos_faltantes(existente, filme):
                     remendadas += 1
+                continue
+
+            livre_em = occupation_end(quando, filme.runtime_minutes)
+            if any(
+                quando < fim and livre_em > inicio
+                for inicio, fim in ocupacao.get(sala.id, ())
+            ):
+                # Horário já ocupado por uma sessão de execução anterior, com
+                # outra duração. Pular é o certo: o seed completa a programação,
+                # não a reescreve.
+                pulados += 1
                 continue
 
             audio, formato = EXIBICOES[(indice_filme + quando.hour) % len(EXIBICOES)]
@@ -370,6 +420,7 @@ def run() -> None:
                     movie_year=filme.release_year,
                     movie_age_rating=filme.age_rating,
                     starts_at=quando,
+                    occupies_until=occupation_end(quando, filme.runtime_minutes),
                     audio=audio,
                     screen_format=formato,
                     status=SessionStatus.PUBLISHED,
@@ -383,6 +434,7 @@ def run() -> None:
                     ],
                 )
             )
+            ocupacao.setdefault(sala.id, []).append((quando, livre_em))
             novas += 1
             por_dia[quando.date()] = por_dia.get(quando.date(), 0) + 1
 
@@ -397,6 +449,8 @@ def run() -> None:
             )
         if remendadas:
             criados.append(f"{remendadas} sessões existentes completadas")
+        if pulados:
+            existentes.append(f"{pulados} horários já ocupados por sessões anteriores")
         if not novas and not remendadas:
             existentes.append("programação (nenhum horário novo a criar)")
 

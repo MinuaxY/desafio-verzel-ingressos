@@ -5,20 +5,21 @@ quando (sala e horário) e por quanto (preço de cada setor).
 """
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import (
     CheckConstraint,
+    func,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
     ForeignKeyConstraint,
-    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -48,6 +49,27 @@ class SessionStatus(str, enum.Enum):
     DRAFT = "DRAFT"
     PUBLISHED = "PUBLISHED"
     CANCELLED = "CANCELLED"
+
+
+# Duração presumida quando o catálogo não informa a do filme. Precisa existir
+# porque a sala é reservada pelo tempo que a sessão ocupa, e um valor ausente
+# viraria ocupação zero — a sala pareceria livre no minuto seguinte.
+DEFAULT_RUNTIME_MINUTES = 120
+
+# Folga entre uma sessão e a seguinte na mesma sala: o público sai, a equipe
+# limpa, a próxima entra. Sem ela, duas sessões coladas passariam pela trava e
+# a sala teria plateia entrando enquanto a outra ainda sai.
+TURNAROUND_MINUTES = 20
+
+
+def occupation_end(starts_at: datetime, runtime_minutes: int | None) -> datetime:
+    """Até quando a sala fica indisponível por causa desta sessão.
+
+    Não é o fim do filme: inclui a folga de limpeza. O nome da coluna diz isso
+    — `occupies_until`, e não `ends_at`. Ver decisão D37.
+    """
+    minutos = (runtime_minutes or DEFAULT_RUNTIME_MINUTES) + TURNAROUND_MINUTES
+    return starts_at + timedelta(minutes=minutos)
 
 
 class Session(Base):
@@ -94,6 +116,13 @@ class Session(Base):
     # a reescrever os dados existentes quando o erro aparece. Ver decisão D14.
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
+    # Até quando a sala fica ocupada: início + duração do filme + folga de
+    # limpeza. Materializada, e não calculada na hora, porque a trava de
+    # sobreposição é um índice — e índice do Postgres só aceita expressão
+    # imutável. `timestamptz + interval` é apenas estável, então a soma precisa
+    # estar gravada. Ver decisão D37.
+    occupies_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
     status: Mapped[SessionStatus] = mapped_column(
         SAEnum(SessionStatus, name="session_status"), default=SessionStatus.DRAFT, index=True
     )
@@ -109,23 +138,28 @@ class Session(Base):
     )
 
     __table_args__ = (
-        # A mesma sala não pode ter duas sessões no mesmo instante — mas
-        # cancelada não conta, porque ela não vai acontecer. Índice parcial e
-        # não constraint, pela mesma razão do índice de poltrona: só o banco
-        # decide o empate entre duas criações simultâneas, e uma constraint
-        # cega deixaria o horário da cancelada preso para sempre.
-        # Ver decisões D6 e D31.
         # Alvo da chave composta de session_sector_prices. Redundante com a
         # chave primária, e exigida pelo Postgres: uma chave estrangeira só
         # aponta para colunas com unicidade declarada. Ver decisão D35.
         UniqueConstraint("id", "room_id", name="uq_session_id_room"),
-        Index(
-            "uq_sessao_sala_horario",
-            "room_id",
-            "starts_at",
-            unique=True,
-            postgresql_where=(status != SessionStatus.CANCELLED),
+        # Duas sessões não podem **se sobrepor** na mesma sala.
+        #
+        # Antes a trava comparava só igualdade de horário, então duas sessões
+        # de duas horas às 20:00 e às 20:01 não colidiam — a sala ficava com
+        # duas plateias. A pergunta certa não é "começam no mesmo instante",
+        # é "ocupam a sala ao mesmo tempo".
+        #
+        # Cancelada continua de fora, pela mesma razão da D31: ela não vai
+        # acontecer, então não ocupa nada. Ver decisões D6, D31 e D37.
+        ExcludeConstraint(
+            ("room_id", "="),
+            (func.tstzrange(starts_at, occupies_until), "&&"),
+            name="ex_session_room_overlap",
+            using="gist",
+            where=(status != SessionStatus.CANCELLED),
         ),
+        # Ocupação vazia passaria pela trava acima sem sobrepor nada.
+        CheckConstraint("occupies_until > starts_at", name="ck_session_occupation"),
     )
 
     @property

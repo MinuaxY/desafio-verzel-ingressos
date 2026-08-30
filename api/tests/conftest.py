@@ -10,7 +10,7 @@ os.environ["DATABASE_URL"] = "postgresql+psycopg://verzel:verzel@localhost:5432/
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.config import get_settings
@@ -28,6 +28,13 @@ TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 @pytest.fixture(scope="session", autouse=True)
 def schema():
+    # btree_gist é o que permite combinar igualdade (room_id) com sobreposição
+    # de intervalo na mesma constraint de exclusão. A migration cria a extensão
+    # em produção; aqui as tabelas nascem do metadata, então ela precisa existir
+    # antes. Ver decisão D37.
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
+
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield
