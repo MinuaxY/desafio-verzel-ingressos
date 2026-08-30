@@ -32,20 +32,20 @@ def usa_fixture_provider(monkeypatch):
     get_catalog_provider.cache_clear()
 
 
-def auth(client, dados):
+def auth(client, data):
     """Papel privilegiado não sai do cadastro público. Ver conftest."""
-    return cria_conta(client, dados)
+    return cria_conta(client, data)
 
 
-def cria_sessao(client, headers, sala, filme, **extra):
-    quando = (datetime.now(timezone.utc) + timedelta(days=2, hours=extra.pop("h", 0)))
+def cria_sessao(client, headers, room, movie, **extra):
+    starts_at = (datetime.now(timezone.utc) + timedelta(days=2, hours=extra.pop("h", 0)))
     return client.post(
         "/organizer/sessions",
         json={
-            "catalog_id": filme.id,
-            "room_id": sala["id"],
-            "starts_at": quando.replace(microsecond=0).isoformat(),
-            "prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 3000}],
+            "catalog_id": movie.id,
+            "room_id": room["id"],
+            "starts_at": starts_at.replace(microsecond=0).isoformat(),
+            "prices": [{"sector_id": room["sectors"][0]["id"], "price_cents": 3000}],
             "publish": True,
             **extra,
         },
@@ -77,49 +77,49 @@ class TestExtracaoDaClassificacao:
         ]}]}
         assert _classificacao_brasileira(bruto) is None
 
-    @pytest.mark.parametrize("entrada", [None, {}, {"results": []}])
-    def test_ausencia_de_dado_nao_quebra(self, entrada):
-        assert _classificacao_brasileira(entrada) is None
+    @pytest.mark.parametrize("payload", [None, {}, {"results": []}])
+    def test_ausencia_de_dado_nao_quebra(self, payload):
+        assert _classificacao_brasileira(payload) is None
 
 
 class TestClassificacaoNaSessao:
     def test_e_copiada_do_catalogo(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
-        filme = next(f for f in FixtureProvider().items if f.age_rating)
+        room = client.post("/rooms", json=SALA, headers=headers).json()
+        movie = next(f for f in FixtureProvider().items if f.age_rating)
 
-        r = cria_sessao(client, headers, sala, filme)
+        r = cria_sessao(client, headers, room, movie)
         assert r.status_code == 201
-        assert r.json()["movie"]["age_rating"] == filme.age_rating
+        assert r.json()["movie"]["age_rating"] == movie.age_rating
 
     def test_filme_sem_classificacao_nao_impede_a_sessao(self, client):
         """Nem todo filme tem classificação brasileira registrada, e isso não
         pode travar a publicação."""
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
+        room = client.post("/rooms", json=SALA, headers=headers).json()
         sem = next((f for f in FixtureProvider().items if not f.age_rating), None)
         if sem is None:
             pytest.skip("o fixture atual não tem filme sem classificação")
 
-        r = cria_sessao(client, headers, sala, sem)
+        r = cria_sessao(client, headers, room, sem)
         assert r.status_code == 201
         assert r.json()["movie"]["age_rating"] is None
 
     def test_aparece_na_vitrine_publica(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
-        filme = next(f for f in FixtureProvider().items if f.age_rating)
-        cria_sessao(client, headers, sala, filme)
+        room = client.post("/rooms", json=SALA, headers=headers).json()
+        movie = next(f for f in FixtureProvider().items if f.age_rating)
+        cria_sessao(client, headers, room, movie)
 
         item = client.get("/sessions").json()["items"][0]
-        assert item["age_rating"] == filme.age_rating
+        assert item["age_rating"] == movie.age_rating
 
 
 class TestFormatoDaSessao:
     def test_padrao_e_legendado_2d(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
-        corpo = cria_sessao(client, headers, sala, FixtureProvider().items[0]).json()
+        room = client.post("/rooms", json=SALA, headers=headers).json()
+        corpo = cria_sessao(client, headers, room, FixtureProvider().items[0]).json()
         assert corpo["audio"] == "SUBTITLED"
         assert corpo["screen_format"] == "TWO_D"
 
@@ -128,28 +128,28 @@ class TestFormatoDaSessao:
     )
     def test_respeita_a_escolha_do_organizador(self, client, audio, formato):
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
+        room = client.post("/rooms", json=SALA, headers=headers).json()
         corpo = cria_sessao(
-            client, headers, sala, FixtureProvider().items[0], audio=audio, screen_format=formato
+            client, headers, room, FixtureProvider().items[0], audio=audio, screen_format=formato
         ).json()
         assert corpo["audio"] == audio
         assert corpo["screen_format"] == formato
 
     def test_valor_invalido_e_recusado(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
-        r = cria_sessao(client, headers, sala, FixtureProvider().items[0], audio="CANTADO")
+        room = client.post("/rooms", json=SALA, headers=headers).json()
+        r = cria_sessao(client, headers, room, FixtureProvider().items[0], audio="CANTADO")
         assert r.status_code == 422
 
     def test_mesmo_filme_com_sessoes_diferentes(self, client):
         """É o ponto de áudio e formato serem da sessão: o mesmo título roda
         dublado num horário e legendado noutro."""
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
-        filme = FixtureProvider().items[0]
+        room = client.post("/rooms", json=SALA, headers=headers).json()
+        movie = FixtureProvider().items[0]
 
-        a = cria_sessao(client, headers, sala, filme, h=0, audio="DUBBED")
-        b = cria_sessao(client, headers, sala, filme, h=3, audio="SUBTITLED")
+        a = cria_sessao(client, headers, room, movie, h=0, audio="DUBBED")
+        b = cria_sessao(client, headers, room, movie, h=3, audio="SUBTITLED")
 
         assert a.status_code == b.status_code == 201
         assert a.json()["movie"]["title"] == b.json()["movie"]["title"]
@@ -157,11 +157,11 @@ class TestFormatoDaSessao:
 
     def test_pode_ser_alterado_depois(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
-        sessao = cria_sessao(client, headers, sala, FixtureProvider().items[0]).json()
+        room = client.post("/rooms", json=SALA, headers=headers).json()
+        session = cria_sessao(client, headers, room, FixtureProvider().items[0]).json()
 
         r = client.patch(
-            f"/organizer/sessions/{sessao['id']}",
+            f"/organizer/sessions/{session['id']}",
             json={"audio": "DUBBED", "screen_format": "THREE_D"},
             headers=headers,
         )

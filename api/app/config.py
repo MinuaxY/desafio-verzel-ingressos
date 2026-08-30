@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     @field_validator("database_url")
     @classmethod
-    def normaliza_driver(cls, v: str) -> str:
+    def normalize_driver(cls, v: str) -> str:
         """Aceita a URL do jeito que as plataformas de hospedagem entregam.
 
         Render, Railway, Neon e Supabase fornecem `postgresql://…` (ou o

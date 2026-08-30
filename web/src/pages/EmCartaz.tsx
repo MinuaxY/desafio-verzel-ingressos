@@ -26,8 +26,8 @@ export function EmCartaz() {
   useEffect(() => {
     setCarregando(true);
     const query = new URLSearchParams();
-    if (busca) query.set("busca", busca);
-    if (dia) query.set("dia", dia);
+    if (busca) query.set("search", busca);
+    if (dia) query.set("day", dia);
     const sufixo = query.toString() ? `?${query}` : "";
 
     request<SessionPage>(`/sessions${sufixo}`, { auth: false })
@@ -42,7 +42,7 @@ export function EmCartaz() {
   // A barra de datas acompanha a busca, mas não o dia escolhido: ela precisa
   // continuar mostrando os outros dias para dar como voltar.
   useEffect(() => {
-    const query = busca ? `?busca=${encodeURIComponent(busca)}` : "";
+    const query = busca ? `?search=${encodeURIComponent(busca)}` : "";
     request<DayInCartaz[]>(`/sessions/days${query}`, { auth: false })
       .then(setDias)
       .catch(() => setDias([]));

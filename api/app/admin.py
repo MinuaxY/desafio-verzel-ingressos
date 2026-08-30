@@ -29,19 +29,19 @@ from app.models.user import Role, User
 if sys.stdout.encoding and sys.stdout.encoding.lower().replace("-", "") != "utf8":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-SENHA_MINIMA = 8
+MIN_PASSWORD_LENGTH = 8
 
 
-def _pede_senha() -> str:
-    senha = getpass.getpass("Senha: ")
-    if len(senha) < SENHA_MINIMA:
-        raise SystemExit(f"A senha precisa de ao menos {SENHA_MINIMA} caracteres.")
-    if senha != getpass.getpass("Repita a senha: "):
+def _ask_password() -> str:
+    password = getpass.getpass("Senha: ")
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise SystemExit(f"A senha precisa de ao menos {MIN_PASSWORD_LENGTH} caracteres.")
+    if password != getpass.getpass("Repita a senha: "):
         raise SystemExit("As senhas não conferem.")
-    return senha
+    return password
 
 
-def criar(nome: str, email: str, papel: Role, senha: str | None = None) -> None:
+def create(name: str, email: str, role: Role, password: str | None = None) -> None:
     db = SessionLocal()
     try:
         if db.query(User).filter(User.email == email).first():
@@ -49,42 +49,42 @@ def criar(nome: str, email: str, papel: Role, senha: str | None = None) -> None:
 
         db.add(
             User(
-                name=nome,
+                name=name,
                 email=email,
-                password_hash=hash_password(senha or _pede_senha()),
-                role=papel,
+                password_hash=hash_password(password or _ask_password()),
+                role=role,
             )
         )
         db.commit()
-        print(f"Criado: {nome} <{email}> como {papel.value}")
+        print(f"Criado: {name} <{email}> como {role.value}")
     finally:
         db.close()
 
 
-def promover(email: str, papel: Role) -> None:
+def promote(email: str, role: Role) -> None:
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.email == email).first()
         if user is None:
             raise SystemExit(f"Não há conta com o e-mail {email}.")
 
-        anterior = user.role
-        user.role = papel
+        previous = user.role
+        user.role = role
         db.commit()
-        print(f"{email}: {anterior.value} → {papel.value}")
+        print(f"{email}: {previous.value} → {role.value}")
     finally:
         db.close()
 
 
-def listar() -> None:
+def list_all() -> None:
     db = SessionLocal()
     try:
-        contas = db.query(User).order_by(User.role, User.email).all()
-        if not contas:
+        accounts = db.query(User).order_by(User.role, User.email).all()
+        if not accounts:
             print("Nenhuma conta cadastrada.")
             return
         print(f"{'PAPEL':<12} {'E-MAIL':<34} NOME")
-        for u in contas:
+        for u in accounts:
             print(f"{u.role.value:<12} {u.email:<34} {u.name}")
     finally:
         db.close()
@@ -95,26 +95,26 @@ def main(argv: list[str]) -> None:
         print(__doc__)
         raise SystemExit(1)
 
-    comando, *resto = argv
+    command, *rest = argv
 
-    if comando == "listar":
-        listar()
-    elif comando in ("criar-organizador", "criar-portaria"):
-        if len(resto) != 2:
-            raise SystemExit(f'Uso: python -m app.admin {comando} "Nome" email@dominio')
-        papel = Role.ORGANIZER if comando == "criar-organizador" else Role.GATE
-        criar(resto[0], resto[1], papel)
-    elif comando == "promover":
-        if len(resto) != 2:
+    if command == "listar":
+        list_all()
+    elif command in ("criar-organizador", "criar-portaria"):
+        if len(rest) != 2:
+            raise SystemExit(f'Uso: python -m app.admin {command} "Nome" email@dominio')
+        role = Role.ORGANIZER if command == "criar-organizador" else Role.GATE
+        create(rest[0], rest[1], role)
+    elif command == "promover":
+        if len(rest) != 2:
             raise SystemExit("Uso: python -m app.admin promover email@dominio PAPEL")
         try:
-            papel = Role(resto[1].upper())
+            role = Role(rest[1].upper())
         except ValueError:
-            validos = ", ".join(p.value for p in Role)
-            raise SystemExit(f"Papel inválido. Use um de: {validos}")
-        promover(resto[0], papel)
+            valid_ids = ", ".join(p.value for p in Role)
+            raise SystemExit(f"Papel inválido. Use um de: {valid_ids}")
+        promote(rest[0], role)
     else:
-        raise SystemExit(f"Comando desconhecido: {comando}\n{__doc__}")
+        raise SystemExit(f"Comando desconhecido: {command}\n{__doc__}")
 
 
 if __name__ == "__main__":

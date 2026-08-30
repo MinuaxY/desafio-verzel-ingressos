@@ -17,7 +17,7 @@ from app.models.session import SessionStatus
 
 
 @dataclass(frozen=True)
-class Resultado:
+class CheckResult:
     result: str
     message: str
     ticket: Ticket | None = None
@@ -34,23 +34,23 @@ class GateService:
     def __init__(self, db: DbSession) -> None:
         self.db = db
 
-    def validar(
+    def check(
         self,
-        codigo: str,
+        code: str,
         *,
         operador_id: uuid.UUID,
         session_id: uuid.UUID | None = None,
-    ) -> Resultado:
-        ticket_id = ticket_code.conferir(codigo)
+    ) -> CheckResult:
+        ticket_id = ticket_code.verify(code)
         if ticket_id is None:
             # Código forjado, digitado errado ou QR de outro sistema. Não
             # distinguimos: para quem está na porta, o resultado é o mesmo, e
             # detalhar ajudaria quem estivesse tentando adivinhar.
-            return Resultado(INVALID, "Código inválido")
+            return CheckResult(INVALID, "Código inválido")
 
-        ingresso = self.db.get(Ticket, ticket_id)
-        if ingresso is None:
-            return Resultado(INVALID, "Ingresso não encontrado")
+        ticket = self.db.get(Ticket, ticket_id)
+        if ticket is None:
+            return CheckResult(INVALID, "Ingresso não encontrado")
 
         # A sessão é conferida antes do ingresso, e de propósito.
         #
@@ -60,51 +60,51 @@ class GateService:
         # Se um ingresso escapar da invalidação — por um estado que ainda não
         # previmos, ou por dado antigo —, a porta continua fechada. Mesmo
         # princípio da D6: duas verificações independentes. Ver decisão D30.
-        if ingresso.session.status is SessionStatus.CANCELLED:
-            return Resultado(
+        if ticket.session.status is SessionStatus.CANCELLED:
+            return CheckResult(
                 INVALID,
-                f"A sessão de {ingresso.session.movie_title} foi cancelada",
-                ingresso,
+                f"A sessão de {ticket.session.movie_title} foi cancelada",
+                ticket,
             )
 
-        if ingresso.status is TicketStatus.CANCELLED:
-            return Resultado(INVALID, "Ingresso cancelado", ingresso)
+        if ticket.status is TicketStatus.CANCELLED:
+            return CheckResult(INVALID, "Ingresso cancelado", ticket)
 
-        if ingresso.status is TicketStatus.RESERVED:
-            return Resultado(INVALID, "Ingresso não pago", ingresso)
+        if ticket.status is TicketStatus.RESERVED:
+            return CheckResult(INVALID, "Ingresso não pago", ticket)
 
         # A sessão errada é checada antes do reuso de propósito: quem chegou na
         # porta errada precisa ouvir isso, e não "já utilizado" por causa de uma
         # entrada legítima em outra sala.
-        if session_id is not None and ingresso.session_id != session_id:
-            return Resultado(
+        if session_id is not None and ticket.session_id != session_id:
+            return CheckResult(
                 WRONG_SESSION,
-                f"Este ingresso é para {ingresso.session.movie_title}, em outra sessão",
-                ingresso,
+                f"Este ingresso é para {ticket.session.movie_title}, em outra sessão",
+                ticket,
             )
 
-        if ingresso.status is TicketStatus.USED:
-            return Resultado(
+        if ticket.status is TicketStatus.USED:
+            return CheckResult(
                 ALREADY_USED,
-                f"Ingresso já utilizado em {ingresso.used_at:%d/%m às %H:%M}",
-                ingresso,
-                ingresso.used_at,
+                f"Ingresso já utilizado em {ticket.used_at:%d/%m às %H:%M}",
+                ticket,
+                ticket.used_at,
             )
 
-        ingresso.status = TicketStatus.USED
-        ingresso.used_at = datetime.now(timezone.utc)
-        ingresso.used_by_id = operador_id
+        ticket.status = TicketStatus.USED
+        ticket.used_at = datetime.now(timezone.utc)
+        ticket.used_by_id = operador_id
         self.db.commit()
-        self.db.refresh(ingresso)
+        self.db.refresh(ticket)
 
-        return Resultado(
+        return CheckResult(
             VALID,
-            f"Entrada liberada — {ingresso.sector.name}, poltrona {ingresso.seat_code}",
-            ingresso,
-            ingresso.used_at,
+            f"Entrada liberada — {ticket.sector.name}, poltrona {ticket.seat_code}",
+            ticket,
+            ticket.used_at,
         )
 
-    def por_share_token(self, token: uuid.UUID) -> Ticket | None:
+    def by_share_token(self, token: uuid.UUID) -> Ticket | None:
         """Ingresso aberto por link compartilhado.
 
         Só leitura: o link mostra o ingresso, mas não é chave de entrada. Ver

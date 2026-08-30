@@ -1,15 +1,15 @@
 """Agrega os models para que o Alembic enxergue todas as tabelas."""
 from app.models.order import (  # noqa: F401
-    MINUTOS_PARA_PAGAR,
-    OCUPAM_ASSENTO,
+    MINUTES_TO_PAY,
+    OCCUPY_SEAT,
     Order,
     OrderStatus,
     Ticket,
     TicketStatus,
 )
 from app.models.room import (  # noqa: F401
-    MAX_FILEIRAS,
-    MAX_POLTRONAS_POR_FILEIRA,
+    MAX_ROWS,
+    MAX_SEATS_PER_ROW,
     Room,
     SeatAttribute,
     SeatKind,

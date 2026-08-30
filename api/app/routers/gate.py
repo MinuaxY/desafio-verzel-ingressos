@@ -18,15 +18,15 @@ from app.services.gate_service import GateService
 from app.services.order_service import OrderService
 from app.services.session_service import SessionService
 
-portaria = APIRouter(
+gate = APIRouter(
     prefix="/gate",
     tags=["Portaria"],
     dependencies=[Depends(require_role(Role.GATE))],
 )
 
 
-@portaria.get("/sessions", response_model=list[SessionListItem])
-def sessoes_da_portaria(db: DbSession = Depends(get_db)) -> list[SessionListItem]:
+@gate.get("/sessions", response_model=list[SessionListItem])
+def gate_sessions(db: DbSession = Depends(get_db)) -> list[SessionListItem]:
     """Sessões que a portaria pode estar conferindo agora.
 
     Endpoint próprio, e não a vitrine: a vitrine esconde o que já começou,
@@ -34,12 +34,12 @@ def sessoes_da_portaria(db: DbSession = Depends(get_db)) -> list[SessionListItem
     a sessão em andamento é justamente a que está recebendo gente.
     Ver decisão D33.
     """
-    return [to_list_item(s) for s in SessionService(db).listar_para_portaria()]
+    return [to_list_item(s) for s in SessionService(db).list_for_gate()]
 
 
-@portaria.post("/validate", response_model=GateResultOut)
-def validar(
-    dados: GateCheckIn,
+@gate.post("/validate", response_model=GateResultOut)
+def check(
+    data: GateCheckIn,
     user: User = Depends(require_role(Role.GATE)),
     db: DbSession = Depends(get_db),
 ) -> GateResultOut:
@@ -50,20 +50,20 @@ def validar(
     resposta bem-sucedida a uma pergunta legítima, e a tela precisa dela para
     mostrar o resultado em vez de um erro.
     """
-    resultado = GateService(db).validar(
-        dados.code, operador_id=user.id, session_id=dados.session_id
+    resultado = GateService(db).check(
+        data.code, operador_id=user.id, session_id=data.session_id
     )
 
-    ingresso = None
+    ticket = None
     if resultado.ticket is not None:
-        ingresso = to_ticket_detail(
-            resultado.ticket, codigo=OrderService.codigo_do(resultado.ticket)
+        ticket = to_ticket_detail(
+            resultado.ticket, code=OrderService.code_for(resultado.ticket)
         )
 
     return GateResultOut(
         result=resultado.result,
         message=resultado.message,
-        ticket=ingresso,
+        ticket=ticket,
         used_at=resultado.used_at,
     )
 
@@ -76,7 +76,7 @@ compartilhado = APIRouter(prefix="/shared", tags=["Ingresso compartilhado"])
 
 
 @compartilhado.get("/{share_token}", response_model=TicketDetailOut)
-def ver_compartilhado(share_token: uuid.UUID, db: DbSession = Depends(get_db)) -> TicketDetailOut:
+def shared_ticket(share_token: uuid.UUID, db: DbSession = Depends(get_db)) -> TicketDetailOut:
     """Abre um ingresso por link, sem exigir conta.
 
     Quem tem o link consegue entrar com o ingresso, e é assim que precisa ser:
@@ -87,7 +87,7 @@ def ver_compartilhado(share_token: uuid.UUID, db: DbSession = Depends(get_db)) -
     resposta — assim o código de entrada não fica registrado em histórico de
     navegador nem em log de servidor. Ver decisão D17.
     """
-    ingresso = GateService(db).por_share_token(share_token)
-    if ingresso is None:
+    ticket = GateService(db).by_share_token(share_token)
+    if ticket is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Ingresso não encontrado")
-    return to_ticket_detail(ingresso, codigo=OrderService.codigo_do(ingresso))
+    return to_ticket_detail(ticket, code=OrderService.code_for(ticket))

@@ -155,95 +155,95 @@ class GateResultOut(BaseModel):
 # --------------------------------------------------------------------------
 
 
-def _tipo_do_assento(ingresso) -> SeatKind | None:
+def _seat_kind_of(ticket) -> SeatKind | None:
     marcado = next(
-        (s for s in ingresso.sector.special_seats if s.seat_code == ingresso.seat_code), None
+        (s for s in ticket.sector.special_seats if s.seat_code == ticket.seat_code), None
     )
     return marcado.kind if marcado else None
 
 
-def to_ticket_out(ingresso, *, codigo: str | None = None) -> TicketOut:
+def to_ticket_out(ticket, *, code: str | None = None) -> TicketOut:
     return TicketOut(
-        id=ingresso.id,
-        order_id=ingresso.order_id,
-        seat_code=ingresso.seat_code,
-        sector_name=ingresso.sector.name,
-        seat_kind=_tipo_do_assento(ingresso),
-        price_cents=ingresso.price_cents,
-        status=ingresso.status,
-        used_at=ingresso.used_at,
-        code=codigo,
-        share_token=ingresso.share_token if codigo else None,
+        id=ticket.id,
+        order_id=ticket.order_id,
+        seat_code=ticket.seat_code,
+        sector_name=ticket.sector.name,
+        seat_kind=_seat_kind_of(ticket),
+        price_cents=ticket.price_cents,
+        status=ticket.status,
+        used_at=ticket.used_at,
+        code=code,
+        share_token=ticket.share_token if code else None,
     )
 
 
-def to_ticket_detail(ingresso, *, codigo: str | None = None) -> TicketDetailOut:
-    base = to_ticket_out(ingresso, codigo=codigo)
-    sessao = ingresso.session
+def to_ticket_detail(ticket, *, code: str | None = None) -> TicketDetailOut:
+    base = to_ticket_out(ticket, code=code)
+    session = ticket.session
     return TicketDetailOut(
         **base.model_dump(),
-        movie_title=sessao.movie_title,
-        movie_poster_url=sessao.movie_poster_url,
-        starts_at=sessao.starts_at,
-        room_name=sessao.room.name,
-        room_location=sessao.room.location,
+        movie_title=session.movie_title,
+        movie_poster_url=session.movie_poster_url,
+        starts_at=session.starts_at,
+        room_name=session.room.name,
+        room_location=session.room.location,
     )
 
 
-def to_order_out(pedido, *, codigo_de=None) -> OrderOut:
-    sessao = pedido.session
+def to_order_out(order, *, code_for=None) -> OrderOut:
+    session = order.session
     return OrderOut(
-        id=pedido.id,
-        session_id=pedido.session_id,
-        movie_title=sessao.movie_title,
-        starts_at=sessao.starts_at,
-        room_name=sessao.room.name,
-        status=pedido.status,
-        total_cents=pedido.total_cents,
-        created_at=pedido.created_at,
-        expires_at=pedido.expires_at if pedido.status == OrderStatus.PENDING else None,
-        paid_at=pedido.paid_at,
-        decline_reason=pedido.decline_reason,
-        cancelled_by_organizer=pedido.cancelled_by_organizer,
+        id=order.id,
+        session_id=order.session_id,
+        movie_title=session.movie_title,
+        starts_at=session.starts_at,
+        room_name=session.room.name,
+        status=order.status,
+        total_cents=order.total_cents,
+        created_at=order.created_at,
+        expires_at=order.expires_at if order.status == OrderStatus.PENDING else None,
+        paid_at=order.paid_at,
+        decline_reason=order.decline_reason,
+        cancelled_by_organizer=order.cancelled_by_organizer,
         tickets=[
-            to_ticket_out(t, codigo=codigo_de(t) if codigo_de else None)
-            for t in sorted(pedido.tickets, key=lambda t: (t.sector.display_order, t.seat_code))
+            to_ticket_out(t, code=code_for(t) if code_for else None)
+            for t in sorted(order.tickets, key=lambda t: (t.sector.display_order, t.seat_code))
         ],
     )
 
 
-def to_seat_map(sessao, ocupados: set) -> SeatMapOut:
-    precos = {p.sector_id: p.price_cents for p in sessao.prices}
-    setores = []
+def to_seat_map(session, occupied: set) -> SeatMapOut:
+    prices = {p.sector_id: p.price_cents for p in session.prices}
+    sectors = []
     livres = 0
 
-    for setor in sorted(sessao.room.sectors, key=lambda s: s.display_order):
-        marcados = {a.seat_code: a.kind for a in setor.special_seats}
-        assentos = []
-        for codigo in setor.seat_codes:
-            tomado = (setor.id, codigo) in ocupados
+    for sector in sorted(session.room.sectors, key=lambda s: s.display_order):
+        marcados = {a.seat_code: a.kind for a in sector.special_seats}
+        seats = []
+        for code in sector.seat_codes:
+            tomado = (sector.id, code) in occupied
             livres += 0 if tomado else 1
-            assentos.append(SeatOut(code=codigo, taken=tomado, kind=marcados.get(codigo)))
+            seats.append(SeatOut(code=code, taken=tomado, kind=marcados.get(code)))
 
-        setores.append(
+        sectors.append(
             SectorMapOut(
-                id=setor.id,
-                name=setor.name,
-                rows=setor.rows,
-                seats_per_row=setor.seats_per_row,
-                display_order=setor.display_order,
-                price_cents=precos.get(setor.id, 0),
-                aisles=sorted(setor.aisles or []),
-                seats=assentos,
+                id=sector.id,
+                name=sector.name,
+                rows=sector.rows,
+                seats_per_row=sector.seats_per_row,
+                display_order=sector.display_order,
+                price_cents=prices.get(sector.id, 0),
+                aisles=sorted(sector.aisles or []),
+                seats=seats,
             )
         )
 
     return SeatMapOut(
-        session_id=sessao.id,
-        movie_title=sessao.movie_title,
-        starts_at=sessao.starts_at,
-        room_name=sessao.room.name,
-        capacity=sessao.room.capacity,
+        session_id=session.id,
+        movie_title=session.movie_title,
+        starts_at=session.starts_at,
+        room_name=session.room.name,
+        capacity=session.room.capacity,
         available=livres,
-        sectors=setores,
+        sectors=sectors,
     )

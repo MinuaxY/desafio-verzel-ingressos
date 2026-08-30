@@ -26,21 +26,21 @@ router = APIRouter(
 
 
 @router.get("", response_model=list[RoomOut])
-def listar(
+def list_all(
     user: User = Depends(require_role(Role.ORGANIZER)),
     db: DbSession = Depends(get_db),
 ) -> list[RoomOut]:
-    return [RoomOut.model_validate(r) for r in RoomService(db).listar(user.id)]
+    return [RoomOut.model_validate(r) for r in RoomService(db).list_all(user.id)]
 
 
 @router.post("", response_model=RoomOut, status_code=status.HTTP_201_CREATED)
-def criar(
-    dados: RoomIn,
+def create(
+    data: RoomIn,
     user: User = Depends(require_role(Role.ORGANIZER)),
     db: DbSession = Depends(get_db),
 ) -> RoomOut:
     try:
-        return RoomOut.model_validate(RoomService(db).criar(user.id, dados))
+        return RoomOut.model_validate(RoomService(db).create(user.id, data))
     except RoomNameAlreadyUsed:
         raise HTTPException(status.HTTP_409_CONFLICT, "Você já tem uma sala com esse nome")
     except RoomTooTall as e:
@@ -52,33 +52,33 @@ def criar(
     except SeatOutsideSector as e:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
-            f"O setor {e.setor} não tem estas poltronas: {', '.join(e.codigos)}",
+            f"O setor {e.sector} não tem estas poltronas: {', '.join(e.codigos)}",
         )
 
 
 @router.get("/{room_id}", response_model=RoomOut)
-def detalhar(
+def detail(
     room_id: uuid.UUID,
     user: User = Depends(require_role(Role.ORGANIZER)),
     db: DbSession = Depends(get_db),
 ) -> RoomOut:
     try:
-        return RoomOut.model_validate(RoomService(db).obter_do_organizador(room_id, user.id))
+        return RoomOut.model_validate(RoomService(db).get_for_organizer(room_id, user.id))
     except RoomNotFound:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sala não encontrada")
 
 
 @router.patch("/{room_id}", response_model=RoomOut)
-def atualizar(
+def update(
     room_id: uuid.UUID,
-    dados: RoomUpdate,
+    data: RoomUpdate,
     user: User = Depends(require_role(Role.ORGANIZER)),
     db: DbSession = Depends(get_db),
 ) -> RoomOut:
     """Altera a sala. Nome e endereço sempre; geometria só enquanto a sala não
     tiver nenhuma sessão."""
     try:
-        return RoomOut.model_validate(RoomService(db).atualizar(room_id, user.id, dados))
+        return RoomOut.model_validate(RoomService(db).update(room_id, user.id, data))
     except RoomNotFound:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sala não encontrada")
     except RoomNameAlreadyUsed:
@@ -98,12 +98,12 @@ def atualizar(
     except SeatOutsideSector as e:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
-            f"O setor {e.setor} não tem estas poltronas: {', '.join(e.codigos)}",
+            f"O setor {e.sector} não tem estas poltronas: {', '.join(e.codigos)}",
         )
 
 
 @router.delete("/{room_id}")
-def remover(
+def remove(
     room_id: uuid.UUID,
     user: User = Depends(require_role(Role.ORGANIZER)),
     db: DbSession = Depends(get_db),
@@ -114,16 +114,16 @@ def remover(
     passada aponta para ela. Sala com sessão futura não é removida.
     """
     try:
-        sala = RoomService(db).remover(room_id, user.id)
+        room = RoomService(db).remove(room_id, user.id)
     except RoomNotFound:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Sala não encontrada")
     except RoomInUse as e:
-        plural = "sessões futuras" if e.sessoes > 1 else "sessão futura"
+        plural = "sessões futuras" if e.sessions > 1 else "sessão futura"
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"Esta sala tem {e.sessoes} {plural}. Cancele ou despublique antes de removê-la.",
+            f"Esta sala tem {e.sessions} {plural}. Cancele ou despublique antes de removê-la.",
         )
 
-    if sala is None:
+    if room is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    return RoomOut.model_validate(sala)
+    return RoomOut.model_validate(room)

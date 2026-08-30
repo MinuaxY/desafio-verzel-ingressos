@@ -156,7 +156,7 @@ describe("busca", () => {
       const urls = fetchFalso.mock.calls
         .map(([url]) => String(url))
         .filter((u) => !u.includes("/days"));
-      expect(urls.some((u) => u.includes("busca=toy"))).toBe(true);
+      expect(urls.some((u) => u.includes("search=toy"))).toBe(true);
     });
   });
 

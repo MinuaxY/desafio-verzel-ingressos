@@ -24,13 +24,13 @@ from app.config import get_settings
 # 20 caracteres base32 carregam 100 bits de assinatura. Sobra folga contra
 # tentativa por força bruta e o QR continua pequeno o bastante para leitura
 # rápida em câmera de celular.
-TAMANHO_ASSINATURA = 20
+SIGNATURE_LENGTH = 20
 
 
 def _assina(ticket_id: uuid.UUID) -> str:
     segredo = get_settings().ticket_secret.encode("utf-8")
     digest = hmac.new(segredo, ticket_id.bytes, hashlib.sha256).digest()
-    return base64.b32encode(digest).decode("ascii")[:TAMANHO_ASSINATURA]
+    return base64.b32encode(digest).decode("ascii")[:SIGNATURE_LENGTH]
 
 
 def _id_curto(ticket_id: uuid.UUID) -> str:
@@ -43,21 +43,21 @@ def _id_curto(ticket_id: uuid.UUID) -> str:
     return base64.b32encode(ticket_id.bytes).decode("ascii").rstrip("=")
 
 
-def gerar(ticket_id: uuid.UUID) -> str:
+def issue(ticket_id: uuid.UUID) -> str:
     return f"{_id_curto(ticket_id)}.{_assina(ticket_id)}"
 
 
-def conferir(codigo: str) -> uuid.UUID | None:
+def verify(code: str) -> uuid.UUID | None:
     """Devolve o id do ingresso se o código for autêntico; None se não for.
 
     Aceita o código com espaços ou em minúsculas: quem digita na portaria está
     olhando para um papel, não copiando e colando.
     """
-    limpo = codigo.strip().replace(" ", "").replace("-", "").upper()
+    limpo = code.strip().replace(" ", "").replace("-", "").upper()
     if limpo.count(".") != 1:
         return None
 
-    parte_id, assinatura = limpo.split(".")
+    parte_id, signature = limpo.split(".")
 
     try:
         bruto = base64.b32decode(parte_id + "=" * (-len(parte_id) % 8))
@@ -69,7 +69,7 @@ def conferir(codigo: str) -> uuid.UUID | None:
     # caractere diferente vaza, pelo tempo de resposta, quanto do código estava
     # certo — e isso é o suficiente para descobrir uma assinatura tentativa
     # após tentativa.
-    if not hmac.compare_digest(assinatura, _assina(ticket_id)):
+    if not hmac.compare_digest(signature, _assina(ticket_id)):
         return None
 
     return ticket_id

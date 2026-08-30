@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
-from app.models.room import MAX_FILEIRAS, Room
+from app.models.room import MAX_ROWS, Room
 from app.models.session import Session, SessionStatus
 from app.repositories.room_repository import RoomRepository
 from app.schemas.room import RoomIn, RoomUpdate
@@ -34,9 +34,9 @@ class RoomTooTall(Exception):
 class RoomInUse(Exception):
     """A sala tem sessão futura: não sai do ar enquanto houver o que exibir."""
 
-    def __init__(self, sessoes: int) -> None:
-        self.sessoes = sessoes
-        super().__init__(str(sessoes))
+    def __init__(self, sessions: int) -> None:
+        self.sessions = sessions
+        super().__init__(str(sessions))
 
 
 class RoomLayoutLocked(Exception):
@@ -51,10 +51,10 @@ class RoomLayoutLocked(Exception):
 class SeatOutsideSector(Exception):
     """Marcaram como acessível uma poltrona que não existe na geometria."""
 
-    def __init__(self, setor: str, codigos: list[str]) -> None:
-        self.setor = setor
+    def __init__(self, sector: str, codigos: list[str]) -> None:
+        self.sector = sector
         self.codigos = codigos
-        super().__init__(f"{setor}: {', '.join(codigos)}")
+        super().__init__(f"{sector}: {', '.join(codigos)}")
 
 
 class RoomService:
@@ -62,24 +62,24 @@ class RoomService:
         self.db = db
         self.rooms = RoomRepository(db)
 
-    def listar(self, organizer_id: uuid.UUID) -> list[Room]:
+    def list_all(self, organizer_id: uuid.UUID) -> list[Room]:
         return self.rooms.list_by_organizer(organizer_id)
 
-    def criar(self, organizer_id: uuid.UUID, dados: RoomIn) -> Room:
-        if self.rooms.get_by_name(organizer_id, dados.name):
+    def create(self, organizer_id: uuid.UUID, data: RoomIn) -> Room:
+        if self.rooms.get_by_name(organizer_id, data.name):
             raise RoomNameAlreadyUsed
 
-        self._valida_altura(dados)
-        self._valida_assentos_especiais(dados)
+        self._valida_altura(data)
+        self._valida_assentos_especiais(data)
 
         return self.rooms.create(
             organizer_id=organizer_id,
-            name=dados.name,
-            location=dados.location,
-            sectors=[s.model_dump() for s in dados.sectors],
+            name=data.name,
+            location=data.location,
+            sectors=[s.model_dump() for s in data.sectors],
         )
 
-    def obter_do_organizador(self, room_id: uuid.UUID, organizer_id: uuid.UUID) -> Room:
+    def get_for_organizer(self, room_id: uuid.UUID, organizer_id: uuid.UUID) -> Room:
         """Sala inexistente e sala de outro organizador são erros distintos.
 
         Quem não é dono recebe 'não encontrada', e não 'não é sua': confirmar a
@@ -91,16 +91,16 @@ class RoomService:
         return room
 
     @staticmethod
-    def _valida_altura(dados: RoomIn) -> None:
+    def _valida_altura(data: RoomIn) -> None:
         """As fileiras da sala são contínuas e nomeadas por letra, então a soma
         de todos os setores precisa caber no alfabeto. Sem esta trava, o setor
         seguinte à fileira Z receberia caracteres que não são letras."""
-        total = sum(s.rows for s in dados.sectors)
-        if total > MAX_FILEIRAS:
+        total = sum(s.rows for s in data.sectors)
+        if total > MAX_ROWS:
             raise RoomTooTall(total)
 
     @staticmethod
-    def _valida_assentos_especiais(dados: RoomIn) -> None:
+    def _valida_assentos_especiais(data: RoomIn) -> None:
         """Poltrona acessível precisa existir na geometria do setor.
 
         Sem essa trava, marcar a Z9 num setor que vai só até a fileira H seria
@@ -112,22 +112,22 @@ class RoomService:
         perguntar ao model qual é o offset de cada um.
         """
         offset = 0
-        for setor in sorted(dados.sectors, key=lambda s: (s.display_order, s.name)):
-            if setor.special_seats:
-                letras = {chr(ord("A") + offset + i) for i in range(setor.rows)}
+        for sector in sorted(data.sectors, key=lambda s: (s.display_order, s.name)):
+            if sector.special_seats:
+                letras = {chr(ord("A") + offset + i) for i in range(sector.rows)}
                 fora = [
                     s.seat_code
-                    for s in setor.special_seats
+                    for s in sector.special_seats
                     if s.seat_code[0] not in letras
-                    or not (1 <= int(s.seat_code[1:] or 0) <= setor.seats_per_row)
+                    or not (1 <= int(s.seat_code[1:] or 0) <= sector.seats_per_row)
                 ]
                 if fora:
-                    raise SeatOutsideSector(setor.name, fora)
-            offset += setor.rows
+                    raise SeatOutsideSector(sector.name, fora)
+            offset += sector.rows
 
     # -- edição --------------------------------------------------------------
 
-    def sessoes_da_sala(self, room_id: uuid.UUID) -> tuple[int, int]:
+    def session_counts(self, room_id: uuid.UUID) -> tuple[int, int]:
         """Quantas sessões a sala tem no total, e quantas ainda vão acontecer."""
         total = (
             self.db.scalar(
@@ -149,38 +149,38 @@ class RoomService:
         )
         return total, futuras
 
-    def atualizar(self, room_id: uuid.UUID, organizer_id: uuid.UUID, dados: RoomUpdate) -> Room:
+    def update(self, room_id: uuid.UUID, organizer_id: uuid.UUID, data: RoomUpdate) -> Room:
         """Nome e endereço, sempre. Geometria, só enquanto a sala for nova.
 
         Trocar o layout depois de existir sessão faria a poltrona vendida
         apontar para um lugar que não existe mais. Ver decisão D29.
         """
-        sala = self.obter_do_organizador(room_id, organizer_id)
+        room = self.get_for_organizer(room_id, organizer_id)
 
-        if dados.name is not None and dados.name != sala.name:
-            existente = self.rooms.get_by_name(organizer_id, dados.name)
-            if existente is not None and existente.id != sala.id:
+        if data.name is not None and data.name != room.name:
+            existente = self.rooms.get_by_name(organizer_id, data.name)
+            if existente is not None and existente.id != room.id:
                 raise RoomNameAlreadyUsed
-            sala.name = dados.name
+            room.name = data.name
 
-        if dados.location is not None:
-            sala.location = dados.location or None
+        if data.location is not None:
+            room.location = data.location or None
 
-        if dados.sectors is not None:
-            total, _ = self.sessoes_da_sala(room_id)
+        if data.sectors is not None:
+            total, _ = self.session_counts(room_id)
             if total > 0:
                 raise RoomLayoutLocked
 
-            molde = RoomIn(name=sala.name, location=sala.location, sectors=dados.sectors)
+            molde = RoomIn(name=room.name, location=room.location, sectors=data.sectors)
             self._valida_altura(molde)
             self._valida_assentos_especiais(molde)
-            self.rooms.replace_sectors(sala, [s.model_dump() for s in dados.sectors])
+            self.rooms.replace_sectors(room, [s.model_dump() for s in data.sectors])
 
-        return self.rooms.save(sala)
+        return self.rooms.save(room)
 
     # -- remoção -------------------------------------------------------------
 
-    def remover(self, room_id: uuid.UUID, organizer_id: uuid.UUID) -> Room | None:
+    def remove(self, room_id: uuid.UUID, organizer_id: uuid.UUID) -> Room | None:
         """Apaga a sala se ela nunca serviu; desativa se já serviu.
 
         Sala com sessão futura não sai de jeito nenhum — há gente podendo
@@ -194,14 +194,14 @@ class RoomService:
 
         Devolve a sala desativada, ou None quando ela foi apagada.
         """
-        sala = self.obter_do_organizador(room_id, organizer_id)
-        total, futuras = self.sessoes_da_sala(room_id)
+        room = self.get_for_organizer(room_id, organizer_id)
+        total, futuras = self.session_counts(room_id)
 
         if futuras > 0:
             raise RoomInUse(futuras)
 
         if total == 0:
-            self.rooms.delete(sala)
+            self.rooms.delete(room)
             return None
 
-        return self.rooms.deactivate(sala)
+        return self.rooms.deactivate(room)

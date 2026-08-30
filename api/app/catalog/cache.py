@@ -17,11 +17,11 @@ class TTLCache:
         entry = self._data.get(key)
         if entry is None:
             return None
-        expira_em, valor = entry
+        expira_em, amount = entry
         if time.monotonic() > expira_em:
             del self._data[key]
             return None
-        return valor
+        return amount
 
     def set(self, key: str, value: Any) -> None:
         self._data[key] = (time.monotonic() + self.ttl, value)

@@ -53,68 +53,68 @@ def arena(engine_concorrente):
     Sessao = sessionmaker(bind=engine_concorrente)
     db = Sessao()
     try:
-        organizador = User(
+        organizer = User(
             name="Org", email="org@conc.dev", password_hash="x", role=Role.ORGANIZER
         )
         clientes = [
             User(name=f"C{i}", email=f"c{i}@conc.dev", password_hash="x", role=Role.CUSTOMER)
             for i in range(DISPUTANTES)
         ]
-        db.add_all([organizador, *clientes])
+        db.add_all([organizer, *clientes])
         db.flush()
 
-        sala = Room(
-            organizer_id=organizador.id,
+        room = Room(
+            organizer_id=organizer.id,
             name="Arena",
             sectors=[Sector(name="Plateia", rows=2, seats_per_row=4)],
         )
-        db.add(sala)
+        db.add(room)
         db.flush()
 
-        filme = FixtureProvider().items[0]
+        movie = FixtureProvider().items[0]
         comeca = datetime.now(timezone.utc) + timedelta(days=3)
-        sessao = Session(
-            organizer_id=organizador.id,
-            room_id=sala.id,
-            catalog_id=filme.id,
-            movie_title=filme.title,
-            movie_runtime_minutes=filme.runtime_minutes,
+        session = Session(
+            organizer_id=organizer.id,
+            room_id=room.id,
+            catalog_id=movie.id,
+            movie_title=movie.title,
+            movie_runtime_minutes=movie.runtime_minutes,
             starts_at=comeca,
             # Montada sem passar pelo serviço, então a ocupação da sala vem da
             # mesma função que ele usa. Ver decisão D37.
-            occupies_until=occupation_end(comeca, filme.runtime_minutes),
+            occupies_until=occupation_end(comeca, movie.runtime_minutes),
             status=SessionStatus.PUBLISHED,
             prices=[
                 SessionSectorPrice(
-                    sector_id=sala.sectors[0].id, room_id=sala.id, price_cents=3000
+                    sector_id=room.sectors[0].id, room_id=room.id, price_cents=3000
                 )
             ],
         )
-        db.add(sessao)
+        db.add(session)
         db.commit()
 
-        dados = {
-            "session_id": sessao.id,
-            "sector_id": sala.sectors[0].id,
+        data = {
+            "session_id": session.id,
+            "sector_id": room.sectors[0].id,
             "clientes": [c.id for c in clientes],
         }
     finally:
         db.close()
 
-    return dados
+    return data
 
 
 def _disputar(engine, arena, cliente_id, assento, largada, resultados, indice):
     Sessao = sessionmaker(bind=engine)
     db = Sessao()
     try:
-        pedido = OrderCreate(
+        order = OrderCreate(
             session_id=arena["session_id"],
             seats=[SeatSelection(sector_id=arena["sector_id"], seat_code=assento)],
         )
         largada.wait()  # todas as threads partem juntas
         try:
-            OrderService(db).criar(cliente_id, pedido)
+            OrderService(db).create(cliente_id, order)
             resultados[indice] = "comprou"
         except SeatTaken:
             resultados[indice] = "recusado"
@@ -192,13 +192,13 @@ def test_poltronas_diferentes_nao_se_atrapalham(engine_concorrente, arena):
     distintos ao mesmo tempo devem todas conseguir."""
     largada = threading.Barrier(DISPUTANTES)
     resultados: list[str | None] = [None] * DISPUTANTES
-    assentos = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"]
+    seats = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"]
 
     threads = [
         threading.Thread(
             target=_disputar,
             args=(
-                engine_concorrente, arena, arena["clientes"][i], assentos[i],
+                engine_concorrente, arena, arena["clientes"][i], seats[i],
                 largada, resultados, i,
             ),
         )

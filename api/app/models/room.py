@@ -49,8 +49,8 @@ class SeatKind(str, enum.Enum):
 
 # Limites de sanidade. Uma sala real não tem 200 fileiras, e o mapa de assentos
 # precisa caber numa tela.
-MAX_FILEIRAS = 26  # A até Z
-MAX_POLTRONAS_POR_FILEIRA = 40
+MAX_ROWS = 26  # A até Z
+MAX_SEATS_PER_ROW = 40
 
 
 class Room(Base):
@@ -117,9 +117,9 @@ class Sector(Base):
         # Alvo da chave composta de session_sector_prices, que usa (id, room_id)
         # para provar que o setor é da sala da sessão. Ver decisão D35.
         UniqueConstraint("id", "room_id", name="uq_sector_id_room"),
-        CheckConstraint(f"rows > 0 AND rows <= {MAX_FILEIRAS}", name="ck_setor_fileiras"),
+        CheckConstraint(f"rows > 0 AND rows <= {MAX_ROWS}", name="ck_setor_fileiras"),
         CheckConstraint(
-            f"seats_per_row > 0 AND seats_per_row <= {MAX_POLTRONAS_POR_FILEIRA}",
+            f"seats_per_row > 0 AND seats_per_row <= {MAX_SEATS_PER_ROW}",
             name="ck_setor_poltronas",
         ),
     )
@@ -154,11 +154,11 @@ class Sector(Base):
         Com 12 poltronas e corredores em [3, 9], devolve [3, 6, 3].
         """
         cortes = sorted({c for c in (self.aisles or []) if 0 < c < self.seats_per_row})
-        tamanhos, anterior = [], 0
+        tamanhos, previous = [], 0
         for corte in cortes:
-            tamanhos.append(corte - anterior)
-            anterior = corte
-        tamanhos.append(self.seats_per_row - anterior)
+            tamanhos.append(corte - previous)
+            previous = corte
+        tamanhos.append(self.seats_per_row - previous)
         return tamanhos
 
     @property
@@ -186,11 +186,11 @@ class Sector(Base):
         Impede marcar como acessível uma poltrona que não existe — Z9 num setor
         que vai só até a fileira H.
         """
-        codigo = seat_code.strip().upper()
-        if len(codigo) < 2 or not codigo[1:].isdigit():
+        code = seat_code.strip().upper()
+        if len(code) < 2 or not code[1:].isdigit():
             return False
-        numero = int(codigo[1:])
-        return codigo[0] in self.row_letters and 1 <= numero <= self.seats_per_row
+        numero = int(code[1:])
+        return code[0] in self.row_letters and 1 <= numero <= self.seats_per_row
 
 
 class SeatAttribute(Base):

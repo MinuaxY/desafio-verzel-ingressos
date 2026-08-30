@@ -22,25 +22,25 @@ MOTIVOS = {
 
 
 @dataclass(frozen=True)
-class ResultadoPagamento:
-    aprovado: bool
-    motivo: str | None = None
+class PaymentResult:
+    approved: bool
+    reason: str | None = None
 
 
-def _so_digitos(numero: str) -> str:
+def _digits_only(numero: str) -> str:
     return "".join(c for c in numero if c.isdigit())
 
 
-def processar(card_number: str, valor_cents: int) -> ResultadoPagamento:
-    numero = _so_digitos(card_number)
+def process(card_number: str, amount_cents: int) -> PaymentResult:
+    numero = _digits_only(card_number)
 
     if not 13 <= len(numero) <= 19:
-        return ResultadoPagamento(False, "Número de cartão inválido")
+        return PaymentResult(False, "Número de cartão inválido")
 
     if numero in MOTIVOS:
-        return ResultadoPagamento(False, MOTIVOS[numero])
+        return PaymentResult(False, MOTIVOS[numero])
 
-    if valor_cents <= 0:
-        return ResultadoPagamento(False, "Valor inválido")
+    if amount_cents <= 0:
+        return PaymentResult(False, "Valor inválido")
 
-    return ResultadoPagamento(True)
+    return PaymentResult(True)

@@ -16,14 +16,14 @@ ORGANIZADOR = {
 }
 
 
-def registra(client, dados):
+def registra(client, data):
     """Cadastro público, cru — é o que estes testes exercitam."""
-    return client.post("/auth/register", json=dados)
+    return client.post("/auth/register", json=data)
 
 
-def token_de(client, dados):
+def token_de(client, data):
     """Token de qualquer papel. Privilegiado não sai do cadastro público."""
-    return cria_conta(client, dados)["Authorization"].removeprefix("Bearer ")
+    return cria_conta(client, data)["Authorization"].removeprefix("Bearer ")
 
 
 class TestCadastro:
@@ -49,9 +49,9 @@ class TestCadastro:
         )
         assert r.status_code == 200
 
-    @pytest.mark.parametrize("senha", ["curta", "1234567"])
-    def test_senha_curta_e_recusada(self, client, senha):
-        r = registra(client, {**CLIENTE, "password": senha})
+    @pytest.mark.parametrize("password", ["curta", "1234567"])
+    def test_senha_curta_e_recusada(self, client, password):
+        r = registra(client, {**CLIENTE, "password": password})
         assert r.status_code == 422
 
 
@@ -158,10 +158,10 @@ class TestFronteiraDeConfianca:
 
     def test_o_fluxo_administrativo_continua_criando_papel_privilegiado(self, client):
         """A porta legítima: `python -m app.admin`, que grava direto no banco."""
-        from app.admin import criar
+        from app.admin import create
         from app.models.user import Role
 
-        criar("Organizadora Real", "real@admin.dev", Role.ORGANIZER, senha="senhaforte123")
+        create("Organizadora Real", "real@admin.dev", Role.ORGANIZER, password="senhaforte123")
         entrou = client.post(
             "/auth/login", json={"email": "real@admin.dev", "password": "senhaforte123"}
         )

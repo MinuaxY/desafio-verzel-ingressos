@@ -26,7 +26,7 @@ from app.db import Base
 
 # Quanto tempo os assentos ficam presos esperando o pagamento. Sem isso, um
 # cliente que abandona o checkout travaria a poltrona para sempre.
-MINUTOS_PARA_PAGAR = 15
+MINUTES_TO_PAY = 15
 
 
 class OrderStatus(str, enum.Enum):
@@ -46,7 +46,7 @@ class TicketStatus(str, enum.Enum):
 
 # Estados em que o ingresso ainda ocupa a poltrona. CANCELLED não ocupa — é
 # exatamente o que o índice único parcial ignora.
-OCUPAM_ASSENTO = (TicketStatus.RESERVED, TicketStatus.VALID, TicketStatus.USED)
+OCCUPY_SEAT = (TicketStatus.RESERVED, TicketStatus.VALID, TicketStatus.USED)
 
 
 class Order(Base):
@@ -70,7 +70,7 @@ class Order(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc) + timedelta(minutes=MINUTOS_PARA_PAGAR),
+        default=lambda: datetime.now(timezone.utc) + timedelta(minutes=MINUTES_TO_PAY),
     )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 

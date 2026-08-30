@@ -37,7 +37,7 @@ export function Inicio() {
   const [pagina, setPagina] = useState<SessionPage | null>(null);
 
   useEffect(() => {
-    request<SessionPage>(`/sessions?por_pagina=${NA_PREVIA}`, { auth: false })
+    request<SessionPage>(`/sessions?per_page=${NA_PREVIA}`, { auth: false })
       .then(setPagina)
       .catch(() => setPagina(null));
   }, []);

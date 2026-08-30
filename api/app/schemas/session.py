@@ -11,18 +11,18 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.session import AudioType, ScreenFormat, SessionStatus
 from app.schemas.room import SectorOut
 
-PRECO_MAXIMO_CENTAVOS = 100_000_00  # R$ 100.000, trava contra erro de digitação
+MAX_PRICE_CENTS = 100_000_00  # R$ 100.000, trava contra erro de digitação
 
 # O mínimo é um centavo, e não zero. Sessão de graça parecia inofensiva, mas o
 # pagamento simulado recusa valor zero — o cliente reservava a poltrona e não
 # conseguia pagar nunca, ficando com um pedido morto. A tela de criação já
 # exigia preço maior que zero; a API é que discordava dela. Ver decisão D33.
-PRECO_MINIMO_CENTAVOS = 1
+MIN_PRICE_CENTS = 1
 
 
 class SectorPriceIn(BaseModel):
     sector_id: uuid.UUID
-    price_cents: int = Field(ge=PRECO_MINIMO_CENTAVOS, le=PRECO_MAXIMO_CENTAVOS)
+    price_cents: int = Field(ge=MIN_PRICE_CENTS, le=MAX_PRICE_CENTS)
 
 
 class SessionCreate(BaseModel):
@@ -36,7 +36,7 @@ class SessionCreate(BaseModel):
 
     @field_validator("starts_at")
     @classmethod
-    def exige_fuso(cls, v: datetime) -> datetime:
+    def require_timezone(cls, v: datetime) -> datetime:
         # Sem fuso não dá para saber que instante é esse. Recusar na entrada é
         # melhor que adivinhar e gravar errado.
         if v.tzinfo is None:
@@ -45,7 +45,7 @@ class SessionCreate(BaseModel):
 
     @field_validator("prices")
     @classmethod
-    def um_preco_por_setor(cls, v: list[SectorPriceIn]) -> list[SectorPriceIn]:
+    def one_price_per_sector(cls, v: list[SectorPriceIn]) -> list[SectorPriceIn]:
         ids = [p.sector_id for p in v]
         if len(ids) != len(set(ids)):
             raise ValueError("Há mais de um preço para o mesmo setor")
@@ -73,7 +73,7 @@ class SessionRepeat(BaseModel):
 
     @field_validator("prices")
     @classmethod
-    def um_preco_por_setor(cls, v: list[SectorPriceIn]) -> list[SectorPriceIn]:
+    def one_price_per_sector(cls, v: list[SectorPriceIn]) -> list[SectorPriceIn]:
         ids = [p.sector_id for p in v]
         if len(ids) != len(set(ids)):
             raise ValueError("Há mais de um preço para o mesmo setor")
@@ -93,7 +93,7 @@ class SessionUpdate(BaseModel):
 
     @field_validator("starts_at")
     @classmethod
-    def exige_fuso(cls, v: datetime | None) -> datetime | None:
+    def require_timezone(cls, v: datetime | None) -> datetime | None:
         if v is not None and v.tzinfo is None:
             raise ValueError("Informe o horário com fuso")
         return v
@@ -194,59 +194,59 @@ class DayInCartaz(BaseModel):
 # --------------------------------------------------------------------------
 
 
-def to_movie_out(sessao) -> MovieOut:
+def to_movie_out(session) -> MovieOut:
     return MovieOut(
-        catalog_id=sessao.catalog_id,
-        title=sessao.movie_title,
-        overview=sessao.movie_overview,
-        poster_url=sessao.movie_poster_url,
-        backdrop_url=sessao.movie_backdrop_url,
-        runtime_minutes=sessao.movie_runtime_minutes,
-        year=sessao.movie_year,
-        age_rating=sessao.movie_age_rating,
+        catalog_id=session.catalog_id,
+        title=session.movie_title,
+        overview=session.movie_overview,
+        poster_url=session.movie_poster_url,
+        backdrop_url=session.movie_backdrop_url,
+        runtime_minutes=session.movie_runtime_minutes,
+        year=session.movie_year,
+        age_rating=session.movie_age_rating,
     )
 
 
 def to_session_out(
-    sessao, *, vendidos: int | None = None, teve_ingressos: bool | None = None
+    session, *, sold: int | None = None, teve_ingressos: bool | None = None
 ) -> SessionOut:
-    faixa = sessao.price_range_cents
+    faixa = session.price_range_cents
     return SessionOut(
-        id=sessao.id,
-        movie=to_movie_out(sessao),
-        room_id=sessao.room_id,
-        room_name=sessao.room.name,
-        room_location=sessao.room.location,
-        starts_at=sessao.starts_at,
-        status=sessao.status,
-        audio=sessao.audio,
-        screen_format=sessao.screen_format,
-        capacity=sessao.room.capacity,
+        id=session.id,
+        movie=to_movie_out(session),
+        room_id=session.room_id,
+        room_name=session.room.name,
+        room_location=session.room.location,
+        starts_at=session.starts_at,
+        status=session.status,
+        audio=session.audio,
+        screen_format=session.screen_format,
+        capacity=session.room.capacity,
         prices=[
             SectorPriceOut(sector=SectorOut.model_validate(p.sector), price_cents=p.price_cents)
-            for p in sorted(sessao.prices, key=lambda p: p.sector.display_order)
+            for p in sorted(session.prices, key=lambda p: p.sector.display_order)
         ],
         min_price_cents=faixa[0] if faixa else None,
         max_price_cents=faixa[1] if faixa else None,
-        tickets_sold=vendidos,
+        tickets_sold=sold,
         has_tickets=teve_ingressos,
     )
 
 
-def to_list_item(sessao) -> SessionListItem:
-    faixa = sessao.price_range_cents
+def to_list_item(session) -> SessionListItem:
+    faixa = session.price_range_cents
     return SessionListItem(
-        id=sessao.id,
-        title=sessao.movie_title,
-        poster_url=sessao.movie_poster_url,
-        year=sessao.movie_year,
-        runtime_minutes=sessao.movie_runtime_minutes,
-        age_rating=sessao.movie_age_rating,
-        audio=sessao.audio,
-        screen_format=sessao.screen_format,
-        starts_at=sessao.starts_at,
-        room_name=sessao.room.name,
-        room_location=sessao.room.location,
+        id=session.id,
+        title=session.movie_title,
+        poster_url=session.movie_poster_url,
+        year=session.movie_year,
+        runtime_minutes=session.movie_runtime_minutes,
+        age_rating=session.movie_age_rating,
+        audio=session.audio,
+        screen_format=session.screen_format,
+        starts_at=session.starts_at,
+        room_name=session.room.name,
+        room_location=session.room.location,
         min_price_cents=faixa[0] if faixa else None,
         max_price_cents=faixa[1] if faixa else None,
     )

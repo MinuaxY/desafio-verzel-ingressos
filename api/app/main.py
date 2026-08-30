@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.core.seguranca_http import instalar as instalar_seguranca
+from app.core.seguranca_http import install as instalar_seguranca
 from app.routers import auth, catalog, gate, orders, rooms, sessions
 
 settings = get_settings()
@@ -32,7 +32,7 @@ app.include_router(sessions.gestao)
 app.include_router(orders.mapa)
 app.include_router(orders.compra)
 app.include_router(orders.carteira)
-app.include_router(gate.portaria)
+app.include_router(gate.gate)
 app.include_router(gate.compartilhado)
 
 

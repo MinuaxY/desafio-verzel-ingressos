@@ -39,27 +39,27 @@ def usa_fixture_provider(monkeypatch):
     get_catalog_provider.cache_clear()
 
 
-def auth(client, dados):
+def auth(client, data):
     """Papel privilegiado não sai do cadastro público. Ver conftest."""
-    return cria_conta(client, dados)
+    return cria_conta(client, data)
 
 
-def cria_sala(client, headers, nome="Sala Melhorias"):
-    return client.post("/rooms", json={**SALA, "name": nome}, headers=headers).json()
+def cria_sala(client, headers, name="Sala Melhorias"):
+    return client.post("/rooms", json={**SALA, "name": name}, headers=headers).json()
 
 
-def cria_sessao(client, headers, sala, *, dias=2, hora=20, publicar=False):
-    quando = (datetime.now(timezone.utc) + timedelta(days=dias)).replace(
+def cria_sessao(client, headers, room, *, days=2, hora=20, publish=False):
+    starts_at = (datetime.now(timezone.utc) + timedelta(days=days)).replace(
         hour=hora, minute=0, second=0, microsecond=0
     )
     return client.post(
         "/organizer/sessions",
         json={
             "catalog_id": FixtureProvider().items[0].id,
-            "room_id": sala["id"],
-            "starts_at": quando.isoformat(),
-            "prices": [{"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]],
-            "publish": publicar,
+            "room_id": room["id"],
+            "starts_at": starts_at.isoformat(),
+            "prices": [{"sector_id": s["id"], "price_cents": 3000} for s in room["sectors"]],
+            "publish": publish,
         },
         headers=headers,
     )
@@ -73,10 +73,10 @@ def cria_sessao(client, headers, sala, *, dias=2, hora=20, publicar=False):
 class TestEdicaoDeSala:
     def test_muda_nome_e_endereco(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
         r = client.patch(
-            f"/rooms/{sala['id']}",
+            f"/rooms/{room['id']}",
             json={"name": "Sala Renomeada", "location": "Zona Sul"},
             headers=headers,
         )
@@ -86,9 +86,9 @@ class TestEdicaoDeSala:
 
     def test_campo_ausente_fica_como_esta(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        r = client.patch(f"/rooms/{sala['id']}", json={"name": "Só o nome"}, headers=headers)
+        r = client.patch(f"/rooms/{room['id']}", json={"name": "Só o nome"}, headers=headers)
         assert r.json()["location"] == "Centro"
 
     def test_nome_repetido_e_recusado(self, client):
@@ -101,18 +101,18 @@ class TestEdicaoDeSala:
 
     def test_manter_o_proprio_nome_nao_e_conflito(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
         r = client.patch(
-            f"/rooms/{sala['id']}", json={"name": sala["name"], "location": "Nova"}, headers=headers
+            f"/rooms/{room['id']}", json={"name": room["name"], "location": "Nova"}, headers=headers
         )
         assert r.status_code == 200
 
     def test_geometria_muda_enquanto_a_sala_e_nova(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
         r = client.patch(
-            f"/rooms/{sala['id']}",
+            f"/rooms/{room['id']}",
             json={
                 "sectors": [
                     {"name": "Plateia", "rows": 4, "seats_per_row": 8, "aisles": [4]},
@@ -129,11 +129,11 @@ class TestEdicaoDeSala:
         """Ingresso vendido aponta para uma poltrona específica; mudar o layout
         faria aquele lugar deixar de existir. Ver decisão D29."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room)
 
         r = client.patch(
-            f"/rooms/{sala['id']}",
+            f"/rooms/{room['id']}",
             json={"sectors": [{"name": "Plateia", "rows": 9, "seats_per_row": 9}]},
             headers=headers,
         )
@@ -142,20 +142,20 @@ class TestEdicaoDeSala:
 
     def test_nome_continua_editavel_com_sessao(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room)
 
         r = client.patch(
-            f"/rooms/{sala['id']}", json={"name": "Sala 1 (reformada)"}, headers=headers
+            f"/rooms/{room['id']}", json={"name": "Sala 1 (reformada)"}, headers=headers
         )
         assert r.status_code == 200
 
     def test_geometria_invalida_e_recusada(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
         r = client.patch(
-            f"/rooms/{sala['id']}",
+            f"/rooms/{room['id']}",
             json={
                 "sectors": [
                     {
@@ -171,8 +171,8 @@ class TestEdicaoDeSala:
         assert r.status_code == 422
 
     def test_sala_de_outro_responde_404(self, client):
-        sala = cria_sala(client, auth(client, ORGANIZADOR))
-        r = client.patch(f"/rooms/{sala['id']}", json={"name": "X"}, headers=auth(client, OUTRO))
+        room = cria_sala(client, auth(client, ORGANIZADOR))
+        r = client.patch(f"/rooms/{room['id']}", json={"name": "X"}, headers=auth(client, OUTRO))
         assert r.status_code == 404
 
 
@@ -184,52 +184,52 @@ class TestEdicaoDeSala:
 class TestExclusaoDeSessao:
     def test_rascunho_sem_ingresso_e_apagado(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room).json()
 
-        apagar = client.delete(f"/organizer/sessions/{sessao['id']}", headers=headers)
+        apagar = client.delete(f"/organizer/sessions/{session['id']}", headers=headers)
         assert apagar.status_code == 204
         assert client.get(
-            f"/organizer/sessions/{sessao['id']}", headers=headers
+            f"/organizer/sessions/{session['id']}", headers=headers
         ).status_code == 404
 
     def test_sessao_publicada_nao_e_apagada(self, client):
         """Sai do cartaz com despublicar, não com exclusão."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
-        r = client.delete(f"/organizer/sessions/{sessao['id']}", headers=headers)
+        r = client.delete(f"/organizer/sessions/{session['id']}", headers=headers)
         assert r.status_code == 409
         assert "Despublique" in r.json()["detail"]
 
     def test_sessao_com_ingresso_nao_e_apagada(self, client):
         """Quem comprou precisa continuar enxergando o que comprou."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
-        cliente = auth(client, CLIENTE)
+        customer = auth(client, CLIENTE)
         client.post(
             "/orders",
             json={
-                "session_id": sessao["id"],
-                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A1"}],
+                "session_id": session["id"],
+                "seats": [{"sector_id": room["sectors"][0]["id"], "seat_code": "A1"}],
             },
-            headers=cliente,
+            headers=customer,
         )
-        client.post(f"/organizer/sessions/{sessao['id']}/unpublish", headers=headers)
+        client.post(f"/organizer/sessions/{session['id']}/unpublish", headers=headers)
 
-        r = client.delete(f"/organizer/sessions/{sessao['id']}", headers=headers)
+        r = client.delete(f"/organizer/sessions/{session['id']}", headers=headers)
         assert r.status_code == 409
         assert "ingressos" in r.json()["detail"]
 
     def test_sessao_de_outro_responde_404(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room).json()
 
-        r = client.delete(f"/organizer/sessions/{sessao['id']}", headers=auth(client, OUTRO))
+        r = client.delete(f"/organizer/sessions/{session['id']}", headers=auth(client, OUTRO))
         assert r.status_code == 404
 
 
@@ -237,21 +237,21 @@ class TestEdicaoDeSessaoComIngresso:
     def test_horario_nao_muda_com_ingresso_vendido(self, client):
         """O sistema não tem como avisar quem já comprou."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
         client.post(
             "/orders",
             json={
-                "session_id": sessao["id"],
-                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A1"}],
+                "session_id": session["id"],
+                "seats": [{"sector_id": room["sectors"][0]["id"], "seat_code": "A1"}],
             },
             headers=auth(client, CLIENTE),
         )
 
         novo = (datetime.now(timezone.utc) + timedelta(days=5)).replace(microsecond=0)
         r = client.patch(
-            f"/organizer/sessions/{sessao['id']}",
+            f"/organizer/sessions/{session['id']}",
             json={"starts_at": novo.isoformat()},
             headers=headers,
         )
@@ -261,21 +261,21 @@ class TestEdicaoDeSessaoComIngresso:
         """Preço novo vale para quem ainda vai comprar; não mexe no que já foi
         vendido, porque o ingresso guarda o valor pago."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
         client.post(
             "/orders",
             json={
-                "session_id": sessao["id"],
-                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A1"}],
+                "session_id": session["id"],
+                "seats": [{"sector_id": room["sectors"][0]["id"], "seat_code": "A1"}],
             },
             headers=auth(client, CLIENTE),
         )
 
         r = client.patch(
-            f"/organizer/sessions/{sessao['id']}",
-            json={"prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 4500}]},
+            f"/organizer/sessions/{session['id']}",
+            json={"prices": [{"sector_id": room["sectors"][0]["id"], "price_cents": 4500}]},
             headers=headers,
         )
         assert r.status_code == 200
@@ -293,23 +293,23 @@ def dias_a_frente(*offsets: int) -> list[str]:
 
 
 class TestCriacaoEmLote:
-    def corpo(self, sala, datas, hora="19:00:00", **extra):
+    def corpo(self, room, datas, hora="19:00:00", **extra):
         return {
             "catalog_id": FixtureProvider().items[0].id,
-            "room_id": sala["id"],
+            "room_id": room["id"],
             "dates": datas,
             "time_of_day": hora,
-            "prices": [{"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]],
+            "prices": [{"sector_id": s["id"], "price_cents": 3000} for s in room["sectors"]],
             **extra,
         }
 
     def test_cria_uma_sessao_por_dia(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
         r = client.post(
             "/organizer/sessions/batch",
-            json=self.corpo(sala, dias_a_frente(2, 3, 4)),
+            json=self.corpo(room, dias_a_frente(2, 3, 4)),
             headers=headers,
         )
         assert r.status_code == 201
@@ -318,34 +318,34 @@ class TestCriacaoEmLote:
 
     def test_todas_com_o_mesmo_horario_e_filme(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        criadas = client.post(
+        created_sessions = client.post(
             "/organizer/sessions/batch",
-            json=self.corpo(sala, dias_a_frente(2, 5), hora="21:30:00"),
+            json=self.corpo(room, dias_a_frente(2, 5), hora="21:30:00"),
             headers=headers,
         ).json()["created"]
 
-        titulos = {s["movie"]["title"] for s in criadas}
+        titulos = {s["movie"]["title"] for s in created_sessions}
         assert len(titulos) == 1
-        for s in criadas:
+        for s in created_sessions:
             assert s["starts_at"].endswith(("00:30:00Z", "21:30:00Z"))
 
     def test_dias_ocupados_sao_pulados_e_reportados(self, client):
         """Um dia ocupado não joga fora o trabalho de escolher os outros."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
         # Ocupa o dia 3 no mesmo horário.
         client.post(
             "/organizer/sessions/batch",
-            json=self.corpo(sala, dias_a_frente(3)),
+            json=self.corpo(room, dias_a_frente(3)),
             headers=headers,
         )
 
         r = client.post(
             "/organizer/sessions/batch",
-            json=self.corpo(sala, dias_a_frente(2, 3, 4)),
+            json=self.corpo(room, dias_a_frente(2, 3, 4)),
             headers=headers,
         )
         corpo = r.json()
@@ -356,11 +356,11 @@ class TestCriacaoEmLote:
 
     def test_data_no_passado_e_pulada(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
         r = client.post(
             "/organizer/sessions/batch",
-            json=self.corpo(sala, dias_a_frente(-3, 2)),
+            json=self.corpo(room, dias_a_frente(-3, 2)),
             headers=headers,
         )
         corpo = r.json()
@@ -370,43 +370,43 @@ class TestCriacaoEmLote:
 
     def test_datas_repetidas_viram_uma_so(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
         um_dia = dias_a_frente(2)
 
         r = client.post(
             "/organizer/sessions/batch",
-            json=self.corpo(sala, um_dia * 3),
+            json=self.corpo(room, um_dia * 3),
             headers=headers,
         )
         assert len(r.json()["created"]) == 1
 
     def test_pode_publicar_o_lote_inteiro(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        criadas = client.post(
+        created_sessions = client.post(
             "/organizer/sessions/batch",
-            json=self.corpo(sala, dias_a_frente(2, 3), publish=True),
+            json=self.corpo(room, dias_a_frente(2, 3), publish=True),
             headers=headers,
         ).json()["created"]
 
-        assert all(s["status"] == "PUBLISHED" for s in criadas)
+        assert all(s["status"] == "PUBLISHED" for s in created_sessions)
         assert client.get("/sessions").json()["total"] == 2
 
     def test_sem_data_e_recusado(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
         r = client.post(
-            "/organizer/sessions/batch", json=self.corpo(sala, []), headers=headers
+            "/organizer/sessions/batch", json=self.corpo(room, []), headers=headers
         )
         assert r.status_code == 422
 
     def test_cliente_nao_cria_lote(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
         r = client.post(
             "/organizer/sessions/batch",
-            json=self.corpo(sala, dias_a_frente(2)),
+            json=self.corpo(room, dias_a_frente(2)),
             headers=auth(client, CLIENTE),
         )
         assert r.status_code == 403
@@ -420,56 +420,56 @@ class TestCriacaoEmLote:
 class TestFiltroPorDia:
     def test_lista_so_as_sessoes_do_dia(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala, dias=2, hora=19, publicar=True)
-        cria_sessao(client, headers, sala, dias=5, hora=19, publicar=True)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room, days=2, hora=19, publish=True)
+        cria_sessao(client, headers, room, days=5, hora=19, publish=True)
 
         assert client.get("/sessions").json()["total"] == 2
 
         alvo = client.get("/sessions").json()["items"][0]["starts_at"][:10]
-        so_um_dia = client.get("/sessions", params={"dia": alvo}).json()
+        so_um_dia = client.get("/sessions", params={"day": alvo}).json()
         assert so_um_dia["total"] == 1
 
     def test_dia_sem_sessao_devolve_vazio(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala, dias=2, publicar=True)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room, days=2, publish=True)
 
         vazio = (date.today() + timedelta(days=9)).isoformat()
-        assert client.get("/sessions", params={"dia": vazio}).json()["total"] == 0
+        assert client.get("/sessions", params={"day": vazio}).json()["total"] == 0
 
     def test_filtro_por_dia_combina_com_busca(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala, dias=2, publicar=True)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room, days=2, publish=True)
 
         alvo = client.get("/sessions").json()["items"][0]
-        dia = alvo["starts_at"][:10]
+        day = alvo["starts_at"][:10]
 
-        achou = client.get("/sessions", params={"dia": dia, "busca": alvo["title"][:5]})
+        achou = client.get("/sessions", params={"day": day, "search": alvo["title"][:5]})
         assert achou.json()["total"] == 1
-        assert client.get("/sessions", params={"dia": dia, "busca": "zzzz"}).json()["total"] == 0
+        assert client.get("/sessions", params={"day": day, "search": "zzzz"}).json()["total"] == 0
 
     def test_dia_invalido_e_recusado(self, client):
-        assert client.get("/sessions", params={"dia": "ontem"}).status_code == 422
+        assert client.get("/sessions", params={"day": "ontem"}).status_code == 422
 
 
 class TestDiasEmCartaz:
     def test_lista_os_dias_com_sessao_e_a_contagem(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala, dias=2, hora=16, publicar=True)
-        cria_sessao(client, headers, sala, dias=2, hora=21, publicar=True)
-        cria_sessao(client, headers, sala, dias=6, hora=19, publicar=True)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room, days=2, hora=16, publish=True)
+        cria_sessao(client, headers, room, days=2, hora=21, publish=True)
+        cria_sessao(client, headers, room, days=6, hora=19, publish=True)
 
-        dias = client.get("/sessions/days").json()
-        assert len(dias) == 2
-        assert sorted(d["total"] for d in dias) == [1, 2]
+        days = client.get("/sessions/days").json()
+        assert len(days) == 2
+        assert sorted(d["total"] for d in days) == [1, 2]
 
     def test_rascunho_nao_conta(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala, dias=2, publicar=False)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room, days=2, publish=False)
 
         assert client.get("/sessions/days").json() == []
 
@@ -489,28 +489,28 @@ class TestDiasEmCartaz:
 # ==========================================================================
 
 
-def compra_paga(client, sessao, sala, cliente=CLIENTE, assento="A1"):
+def compra_paga(client, session, room, customer=CLIENTE, assento="A1"):
     """Compra uma poltrona e paga, devolvendo o pedido já com o ingresso."""
-    h = auth(client, cliente)
-    pedido = client.post(
+    h = auth(client, customer)
+    order = client.post(
         "/orders",
         json={
-            "session_id": sessao["id"],
-            "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": assento}],
+            "session_id": session["id"],
+            "seats": [{"sector_id": room["sectors"][0]["id"], "seat_code": assento}],
         },
         headers=h,
     ).json()
-    pago = client.post(f"/orders/{pedido['id']}/pay", json=CARTAO_OK, headers=h).json()
+    pago = client.post(f"/orders/{order['id']}/pay", json=CARTAO_OK, headers=h).json()
     return pago, h
 
 
 class TestCancelamentoDeSessao:
     def test_sessao_vazia_cancela(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
-        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        r = client.post(f"/organizer/sessions/{session['id']}/cancel", headers=headers)
         assert r.status_code == 200
         assert r.json()["status"] == "CANCELLED"
 
@@ -518,64 +518,64 @@ class TestCancelamentoDeSessao:
         """O ponto da D30: cancelar não avisa nem reembolsa ninguém, então
         cancelar por cima de quem comprou seria só esconder o problema."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        compra_paga(client, session, room)
 
-        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        r = client.post(f"/organizer/sessions/{session['id']}/cancel", headers=headers)
         assert r.status_code == 409
         assert "1 ingresso" in r.json()["detail"]
 
         # e a sessao continua de pe
-        atual = client.get(f"/organizer/sessions/{sessao['id']}", headers=headers).json()
+        atual = client.get(f"/organizer/sessions/{session['id']}", headers=headers).json()
         assert atual["status"] == "PUBLISHED"
 
     def test_reserva_nao_paga_tambem_segura(self, client):
         """A poltrona está fora do estoque desde a reserva; para o mapa de
         assentos ela é tão ocupada quanto uma paga."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
         client.post(
             "/orders",
             json={
-                "session_id": sessao["id"],
-                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A1"}],
+                "session_id": session["id"],
+                "seats": [{"sector_id": room["sectors"][0]["id"], "seat_code": "A1"}],
             },
             headers=auth(client, CLIENTE),
         )
 
-        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        r = client.post(f"/organizer/sessions/{session['id']}/cancel", headers=headers)
         assert r.status_code == 409
 
     def test_desistencia_do_cliente_libera_o_cancelamento(self, client):
         """Se todo mundo desistiu, a sessão está vazia de novo e volta a poder
         ser cancelada."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        pedido, h_cliente = compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        order, h_cliente = compra_paga(client, session, room)
 
         assert client.post(
-            f"/organizer/sessions/{sessao['id']}/cancel", headers=headers
+            f"/organizer/sessions/{session['id']}/cancel", headers=headers
         ).status_code == 409
 
-        client.post(f"/orders/{pedido['id']}/cancel", headers=h_cliente)
+        client.post(f"/orders/{order['id']}/cancel", headers=h_cliente)
 
         assert client.post(
-            f"/organizer/sessions/{sessao['id']}/cancel", headers=headers
+            f"/organizer/sessions/{session['id']}/cancel", headers=headers
         ).status_code == 200
 
     def test_despublicar_continua_livre_com_ingresso(self, client):
         """Despublicar é o caminho para tirar do cartaz sem quebrar promessa:
         para de vender e quem já comprou continua com o ingresso de pé."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        pedido, _ = compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        order, _ = compra_paga(client, session, room)
 
-        r = client.post(f"/organizer/sessions/{sessao['id']}/unpublish", headers=headers)
+        r = client.post(f"/organizer/sessions/{session['id']}/unpublish", headers=headers)
         assert r.status_code == 200
         assert r.json()["status"] == "DRAFT"
 
@@ -583,21 +583,21 @@ class TestCancelamentoDeSessao:
         porteiro = auth(client, {
             "name": "Porteiro", "email": "p@melh.dev", "password": "senhaforte123", "role": "GATE",
         })
-        codigo = pedido["tickets"][0]["code"]
+        code = order["tickets"][0]["code"]
         assert client.post(
-            "/gate/validate", json={"code": codigo}, headers=porteiro
+            "/gate/validate", json={"code": code}, headers=porteiro
         ).json()["result"] == "VALID"
 
     def test_o_painel_informa_quantos_foram_vendidos(self, client):
         """É o número que desabilita o botão de cancelar na interface."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
         lista = client.get("/organizer/sessions", headers=headers).json()
         assert lista[0]["tickets_sold"] == 0
 
-        compra_paga(client, sessao, sala)
+        compra_paga(client, session, room)
         lista = client.get("/organizer/sessions", headers=headers).json()
         assert lista[0]["tickets_sold"] == 1
 
@@ -614,16 +614,16 @@ class TestPortariaEsessaoCancelada:
         from app.models.session import Session, SessionStatus
 
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        pedido, _ = compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        order, _ = compra_paga(client, session, room)
 
         # Cancelamento forcado no banco: a API recusaria, e o que se testa aqui
         # e justamente a rede de seguranca embaixo dela.
         from tests.conftest import TestSession
 
         db = TestSession()
-        s = db.get(Session, uuid.UUID(sessao["id"]))
+        s = db.get(Session, uuid.UUID(session["id"]))
         s.status = SessionStatus.CANCELLED
         db.commit()
         db.close()
@@ -633,7 +633,7 @@ class TestPortariaEsessaoCancelada:
             "password": "senhaforte123", "role": "GATE",
         })
         r = client.post(
-            "/gate/validate", json={"code": pedido["tickets"][0]["code"]}, headers=porteiro
+            "/gate/validate", json={"code": order["tickets"][0]["code"]}, headers=porteiro
         ).json()
         assert r["result"] == "INVALID"
         assert "cancelada" in r["message"].lower()
@@ -644,39 +644,39 @@ class TestCancelamentoEmMassaDePedidos:
         """O caminho completo: a sessão que não pode ser cancelada passa a
         poder, depois que o organizador desfez as compras explicitamente."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        compra_paga(client, sessao, sala, assento="A1")
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        compra_paga(client, session, room, assento="A1")
 
         assert client.post(
-            f"/organizer/sessions/{sessao['id']}/cancel", headers=headers
+            f"/organizer/sessions/{session['id']}/cancel", headers=headers
         ).status_code == 409
 
-        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
+        r = client.post(f"/organizer/sessions/{session['id']}/cancel-orders", headers=headers)
         assert r.status_code == 200
         assert r.json()["cancelled"] == 1
         assert r.json()["session"]["tickets_sold"] == 0
 
         assert client.post(
-            f"/organizer/sessions/{sessao['id']}/cancel", headers=headers
+            f"/organizer/sessions/{session['id']}/cancel", headers=headers
         ).status_code == 200
 
     def test_despublica_antes_de_esvaziar(self, client):
         """Não dá para esvaziar uma sessão que continua vendendo."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        compra_paga(client, session, room)
 
-        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
+        r = client.post(f"/organizer/sessions/{session['id']}/cancel-orders", headers=headers)
         assert r.json()["session"]["status"] == "DRAFT"
 
         # e a sessao fora do cartaz nao aceita compra nova
         nova = client.post(
             "/orders",
             json={
-                "session_id": sessao["id"],
-                "seats": [{"sector_id": sala["sectors"][0]["id"], "seat_code": "A2"}],
+                "session_id": session["id"],
+                "seats": [{"sector_id": room["sectors"][0]["id"], "seat_code": "A2"}],
             },
             headers=auth(client, {
                 "name": "Outra Cliente", "email": "outra@melh.dev",
@@ -690,108 +690,108 @@ class TestCancelamentoEmMassaDePedidos:
         """O ponto todo da operação: sem essa marca, o cliente leria apenas
         'cancelado' e concluiria que a desistência foi dele."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        pedido, h_cliente = compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        order, h_cliente = compra_paga(client, session, room)
 
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
+        client.post(f"/organizer/sessions/{session['id']}/cancel-orders", headers=headers)
 
-        atual = client.get(f"/orders/{pedido['id']}", headers=h_cliente).json()
+        atual = client.get(f"/orders/{order['id']}", headers=h_cliente).json()
         assert atual["status"] == "CANCELLED"
         assert atual["cancelled_by_organizer"] is True
 
     def test_desistencia_do_cliente_nao_e_marcada_como_do_cinema(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        pedido, h_cliente = compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        order, h_cliente = compra_paga(client, session, room)
 
-        client.post(f"/orders/{pedido['id']}/cancel", headers=h_cliente)
+        client.post(f"/orders/{order['id']}/cancel", headers=h_cliente)
 
-        atual = client.get(f"/orders/{pedido['id']}", headers=h_cliente).json()
+        atual = client.get(f"/orders/{order['id']}", headers=h_cliente).json()
         assert atual["cancelled_by_organizer"] is False
 
     def test_o_ingresso_sai_da_carteira(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        _, h_cliente = compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        _, h_cliente = compra_paga(client, session, room)
 
         assert len(client.get("/me/tickets", headers=h_cliente).json()) == 1
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
+        client.post(f"/organizer/sessions/{session['id']}/cancel-orders", headers=headers)
         assert client.get("/me/tickets", headers=h_cliente).json() == []
 
     def test_o_qr_para_de_passar_na_portaria(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        pedido, _ = compra_paga(client, sessao, sala)
-        codigo = pedido["tickets"][0]["code"]
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        order, _ = compra_paga(client, session, room)
+        code = order["tickets"][0]["code"]
 
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
+        client.post(f"/organizer/sessions/{session['id']}/cancel-orders", headers=headers)
 
         porteiro = auth(client, {
             "name": "Porteiro Tres", "email": "p3@melh.dev",
             "password": "senhaforte123", "role": "GATE",
         })
-        r = client.post("/gate/validate", json={"code": codigo}, headers=porteiro).json()
+        r = client.post("/gate/validate", json={"code": code}, headers=porteiro).json()
         assert r["result"] == "INVALID"
 
     def test_quem_ja_entrou_continua_tendo_entrado(self, client):
         """Ingresso utilizado é registro de quem passou pela porta. Cancelar o
         pedido depois não pode reescrever esse fato."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        pedido, _ = compra_paga(client, sessao, sala)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        order, _ = compra_paga(client, session, room)
 
         porteiro = auth(client, {
             "name": "Porteiro Quatro", "email": "p4@melh.dev",
             "password": "senhaforte123", "role": "GATE",
         })
         client.post(
-            "/gate/validate", json={"code": pedido["tickets"][0]["code"]}, headers=porteiro
+            "/gate/validate", json={"code": order["tickets"][0]["code"]}, headers=porteiro
         )
 
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
+        client.post(f"/organizer/sessions/{session['id']}/cancel-orders", headers=headers)
 
         r = client.post(
-            "/gate/validate", json={"code": pedido["tickets"][0]["code"]}, headers=porteiro
+            "/gate/validate", json={"code": order["tickets"][0]["code"]}, headers=porteiro
         ).json()
         assert r["result"] == "ALREADY_USED"
 
         # e a poltrona dele continua ocupada, entao a sessao nao ficou "vazia"
         assert client.post(
-            f"/organizer/sessions/{sessao['id']}/cancel", headers=headers
+            f"/organizer/sessions/{session['id']}/cancel", headers=headers
         ).status_code == 409
 
     def test_sessao_sem_pedido_nenhum_devolve_zero(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
-        r = client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
+        r = client.post(f"/organizer/sessions/{session['id']}/cancel-orders", headers=headers)
         assert r.status_code == 200
         assert r.json()["cancelled"] == 0
 
     def test_sessao_de_outro_organizador_nao_e_alcancavel(self, client):
         dono = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, dono)
-        sessao = cria_sessao(client, dono, sala, publicar=True).json()
-        compra_paga(client, sessao, sala)
+        room = cria_sala(client, dono)
+        session = cria_sessao(client, dono, room, publish=True).json()
+        compra_paga(client, session, room)
 
         r = client.post(
-            f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=auth(client, OUTRO)
+            f"/organizer/sessions/{session['id']}/cancel-orders", headers=auth(client, OUTRO)
         )
         assert r.status_code == 404
 
     def test_cliente_nao_cancela_pedido_dos_outros(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
         r = client.post(
-            f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=auth(client, CLIENTE)
+            f"/organizer/sessions/{session['id']}/cancel-orders", headers=auth(client, CLIENTE)
         )
         assert r.status_code == 403
 
@@ -802,46 +802,46 @@ class TestSessaoCanceladaLiberaOHorario:
         para sempre. Sessao cancelada nao vai acontecer, entao a sala esta
         livre. Ver decisao D31."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        client.post(f"/organizer/sessions/{session['id']}/cancel", headers=headers)
 
-        r = cria_sessao(client, headers, sala, publicar=True)
+        r = cria_sessao(client, headers, room, publish=True)
         assert r.status_code == 201
-        assert r.json()["id"] != sessao["id"]
+        assert r.json()["id"] != session["id"]
 
     def test_duas_sessoes_vivas_continuam_brigando_pela_sala(self, client):
         """A trava original nao foi afrouxada: so parou de contar a cancelada."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala, publicar=True)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room, publish=True)
 
-        assert cria_sessao(client, headers, sala, publicar=True).status_code == 409
+        assert cria_sessao(client, headers, room, publish=True).status_code == 409
 
     def test_rascunho_tambem_continua_ocupando(self, client):
         """Rascunho vai acontecer assim que for publicado."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cria_sessao(client, headers, sala, publicar=False)
+        room = cria_sala(client, headers)
+        cria_sessao(client, headers, room, publish=False)
 
-        assert cria_sessao(client, headers, sala, publicar=True).status_code == 409
+        assert cria_sessao(client, headers, room, publish=True).status_code == 409
 
     def test_o_lote_nao_pula_mais_o_dia_da_cancelada(self, client):
         """O lote usava a mesma checagem e pulava o dia com um motivo falso."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, dias=3, hora=20, publicar=True).json()
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, days=3, hora=20, publish=True).json()
+        client.post(f"/organizer/sessions/{session['id']}/cancel", headers=headers)
 
         r = client.post(
             "/organizer/sessions/batch",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
+                "room_id": room["id"],
                 "dates": dias_a_frente(3, 4),
                 "time_of_day": "20:00",
                 "prices": [
-                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                    {"sector_id": s["id"], "price_cents": 3000} for s in room["sectors"]
                 ],
                 "publish": True,
             },
@@ -852,17 +852,17 @@ class TestSessaoCanceladaLiberaOHorario:
 
     def test_mover_uma_sessao_para_o_horario_da_cancelada(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        cancelada = cria_sessao(client, headers, sala, dias=3, hora=20).json()
+        room = cria_sala(client, headers)
+        cancelada = cria_sessao(client, headers, room, days=3, hora=20).json()
         client.post(f"/organizer/sessions/{cancelada['id']}/cancel", headers=headers)
 
-        outra = cria_sessao(client, headers, sala, dias=5, hora=22).json()
-        quando = (datetime.now(timezone.utc) + timedelta(days=3)).replace(
+        outra = cria_sessao(client, headers, room, days=5, hora=22).json()
+        starts_at = (datetime.now(timezone.utc) + timedelta(days=3)).replace(
             hour=20, minute=0, second=0, microsecond=0
         )
         r = client.patch(
             f"/organizer/sessions/{outra['id']}",
-            json={"starts_at": quando.isoformat()},
+            json={"starts_at": starts_at.isoformat()},
             headers=headers,
         )
         assert r.status_code == 200
@@ -873,35 +873,35 @@ class TestExclusaoDeSessaoCancelada:
         """Ela não é histórico de coisa nenhuma: estava vazia quando foi
         cancelada, senão o cancelamento teria sido recusado."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        client.post(f"/organizer/sessions/{session['id']}/cancel", headers=headers)
 
         assert client.delete(
-            f"/organizer/sessions/{sessao['id']}", headers=headers
+            f"/organizer/sessions/{session['id']}", headers=headers
         ).status_code == 204
         assert client.get("/organizer/sessions", headers=headers).json() == []
 
     def test_cancelada_que_teve_pedido_fica_como_registro(self, client):
         """Alguém pode precisar rastrear o que aconteceu com aquela compra."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
-        compra_paga(client, sessao, sala)
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel-orders", headers=headers)
-        client.post(f"/organizer/sessions/{sessao['id']}/cancel", headers=headers)
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
+        compra_paga(client, session, room)
+        client.post(f"/organizer/sessions/{session['id']}/cancel-orders", headers=headers)
+        client.post(f"/organizer/sessions/{session['id']}/cancel", headers=headers)
 
         assert client.delete(
-            f"/organizer/sessions/{sessao['id']}", headers=headers
+            f"/organizer/sessions/{session['id']}", headers=headers
         ).status_code == 409
 
     def test_o_painel_diz_qual_das_duas_e(self, client):
         """É o campo que decide se o botão de excluir aparece."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        limpa = cria_sessao(client, headers, sala, dias=2, publicar=True).json()
-        suja = cria_sessao(client, headers, sala, dias=4, publicar=True).json()
-        compra_paga(client, suja, sala)
+        room = cria_sala(client, headers)
+        limpa = cria_sessao(client, headers, room, days=2, publish=True).json()
+        suja = cria_sessao(client, headers, room, days=4, publish=True).json()
+        compra_paga(client, suja, room)
         client.post(f"/organizer/sessions/{suja['id']}/cancel-orders", headers=headers)
 
         painel = {s["id"]: s for s in client.get("/organizer/sessions", headers=headers).json()}
@@ -920,17 +920,17 @@ class TestDefeitosDaRevisao:
         a reserva expirar. A tela de criação já exigia preço; a API é que
         discordava dela."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
+        room = cria_sala(client, headers)
+        starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
             hour=20, minute=0, second=0, microsecond=0
         )
         r = client.post(
             "/organizer/sessions",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
-                "starts_at": quando.isoformat(),
-                "prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 0}],
+                "room_id": room["id"],
+                "starts_at": starts_at.isoformat(),
+                "prices": [{"sector_id": room["sectors"][0]["id"], "price_cents": 0}],
             },
             headers=headers,
         )
@@ -939,17 +939,17 @@ class TestDefeitosDaRevisao:
     def test_um_centavo_continua_valendo(self, client):
         """A trava é contra o zero, não contra preço baixo."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
+        room = cria_sala(client, headers)
+        starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
             hour=20, minute=0, second=0, microsecond=0
         )
         r = client.post(
             "/organizer/sessions",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
-                "starts_at": quando.isoformat(),
-                "prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 1}],
+                "room_id": room["id"],
+                "starts_at": starts_at.isoformat(),
+                "prices": [{"sector_id": room["sectors"][0]["id"], "price_cents": 1}],
             },
             headers=headers,
         )
@@ -957,12 +957,12 @@ class TestDefeitosDaRevisao:
 
     def test_edicao_tambem_nao_zera_o_preco(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room).json()
 
         r = client.patch(
-            f"/organizer/sessions/{sessao['id']}",
-            json={"prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 0}]},
+            f"/organizer/sessions/{session['id']}",
+            json={"prices": [{"sector_id": room["sectors"][0]["id"], "price_cents": 0}]},
             headers=headers,
         )
         assert r.status_code == 422
@@ -983,11 +983,11 @@ class TestDefeitosDaRevisao:
         from tests.conftest import TestSession
 
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
         db = TestSession()
-        obj = db.get(Session, U.UUID(sessao["id"]))
+        obj = db.get(Session, U.UUID(session["id"]))
         obj.starts_at = datetime.now(timezone.utc) - timedelta(minutes=20)
         db.commit()
         db.close()
@@ -1000,7 +1000,7 @@ class TestDefeitosDaRevisao:
         assert client.get("/sessions").json()["total"] == 0
         # a portaria, sim
         lista = client.get("/gate/sessions", headers=porteiro).json()
-        assert [s["id"] for s in lista] == [sessao["id"]]
+        assert [s["id"] for s in lista] == [session["id"]]
 
     def test_a_portaria_nao_ve_a_sessao_de_ontem(self, client):
         """A janela é do turno, não do histórico."""
@@ -1011,11 +1011,11 @@ class TestDefeitosDaRevisao:
         from tests.conftest import TestSession
 
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = cria_sessao(client, headers, sala, publicar=True).json()
+        room = cria_sala(client, headers)
+        session = cria_sessao(client, headers, room, publish=True).json()
 
         db = TestSession()
-        obj = db.get(Session, U.UUID(sessao["id"]))
+        obj = db.get(Session, U.UUID(session["id"]))
         obj.starts_at = datetime.now(timezone.utc) - timedelta(days=1)
         db.commit()
         db.close()
@@ -1054,17 +1054,17 @@ class TestPrecoPertenceASalaDaSessao:
         from tests.conftest import TestSession
 
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers, nome="Sala A")
-        outra = cria_sala(client, headers, nome="Sala B")
-        sessao = cria_sessao(client, headers, sala).json()
+        room = cria_sala(client, headers, name="Sala A")
+        outra = cria_sala(client, headers, name="Sala B")
+        session = cria_sessao(client, headers, room).json()
 
         db = TestSession()
         try:
             db.add(
                 SessionSectorPrice(
-                    session_id=U.UUID(sessao["id"]),
+                    session_id=U.UUID(session["id"]),
                     sector_id=U.UUID(outra["sectors"][0]["id"]),
-                    room_id=U.UUID(sala["id"]),
+                    room_id=U.UUID(room["id"]),
                     price_cents=3000,
                 )
             )
@@ -1075,8 +1075,8 @@ class TestPrecoPertenceASalaDaSessao:
             db.close()
 
         # a sessão continua com os preços que tinha
-        atual = client.get(f"/organizer/sessions/{sessao['id']}", headers=headers).json()
-        assert len(atual["prices"]) == len(sala["sectors"])
+        atual = client.get(f"/organizer/sessions/{session['id']}", headers=headers).json()
+        assert len(atual["prices"]) == len(room["sectors"])
 
     def test_o_banco_recusa_sala_que_nao_e_a_da_sessao(self, client):
         """A outra metade da prova: o setor até é da sala informada, mas a
@@ -1090,15 +1090,15 @@ class TestPrecoPertenceASalaDaSessao:
         from tests.conftest import TestSession
 
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers, nome="Sala C")
-        outra = cria_sala(client, headers, nome="Sala D")
-        sessao = cria_sessao(client, headers, sala).json()
+        room = cria_sala(client, headers, name="Sala C")
+        outra = cria_sala(client, headers, name="Sala D")
+        session = cria_sessao(client, headers, room).json()
 
         db = TestSession()
         try:
             db.add(
                 SessionSectorPrice(
-                    session_id=U.UUID(sessao["id"]),
+                    session_id=U.UUID(session["id"]),
                     sector_id=U.UUID(outra["sectors"][0]["id"]),
                     room_id=U.UUID(outra["id"]),
                     price_cents=3000,
@@ -1121,16 +1121,16 @@ class TestPrecoPertenceASalaDaSessao:
         from tests.conftest import TestSession
 
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers, nome="Sala E")
-        sessao = cria_sessao(client, headers, sala).json()
+        room = cria_sala(client, headers, name="Sala E")
+        session = cria_sessao(client, headers, room).json()
 
         db = TestSession()
         try:
             db.add(
                 SessionSectorPrice(
-                    session_id=U.UUID(sessao["id"]),
-                    sector_id=U.UUID(sala["sectors"][0]["id"]),
-                    room_id=U.UUID(sala["id"]),
+                    session_id=U.UUID(session["id"]),
+                    sector_id=U.UUID(room["sectors"][0]["id"]),
+                    room_id=U.UUID(room["id"]),
                     price_cents=0,
                 )
             )
@@ -1144,9 +1144,9 @@ class TestPrecoPertenceASalaDaSessao:
         """A trava do banco é rede de segurança, não substituta: quem passa
         pela API precisa de erro explicado, não de violação de constraint."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers, nome="Sala F")
-        outra = cria_sala(client, headers, nome="Sala G")
-        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
+        room = cria_sala(client, headers, name="Sala F")
+        outra = cria_sala(client, headers, name="Sala G")
+        starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(
             hour=20, minute=0, second=0, microsecond=0
         )
 
@@ -1154,8 +1154,8 @@ class TestPrecoPertenceASalaDaSessao:
             "/organizer/sessions",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
-                "starts_at": quando.isoformat(),
+                "room_id": room["id"],
+                "starts_at": starts_at.isoformat(),
                 "prices": [{"sector_id": outra["sectors"][0]["id"], "price_cents": 3000}],
             },
             headers=headers,
@@ -1166,10 +1166,10 @@ class TestPrecoPertenceASalaDaSessao:
     def test_apagar_a_sala_leva_os_precos_junto(self, client):
         """A chave composta manteve o CASCADE que as chaves simples tinham."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers, nome="Sala H")
-        cria_sessao(client, headers, sala)
+        room = cria_sala(client, headers, name="Sala H")
+        cria_sessao(client, headers, room)
 
-        assert client.delete(f"/rooms/{sala['id']}", headers=headers).status_code == 409
+        assert client.delete(f"/rooms/{room['id']}", headers=headers).status_code == 409
 
 
 class TestSalaOcupadaPorIntervalo:
@@ -1180,18 +1180,18 @@ class TestSalaOcupadaPorIntervalo:
     plateias.
     """
 
-    def _sessao(self, client, headers, sala, *, dias=3, hora=20, minuto=0, filme=0):
-        quando = (datetime.now(timezone.utc) + timedelta(days=dias)).replace(
+    def _sessao(self, client, headers, room, *, days=3, hora=20, minuto=0, movie=0):
+        starts_at = (datetime.now(timezone.utc) + timedelta(days=days)).replace(
             hour=hora, minute=minuto, second=0, microsecond=0
         )
         return client.post(
             "/organizer/sessions",
             json={
-                "catalog_id": FixtureProvider().items[filme].id,
-                "room_id": sala["id"],
-                "starts_at": quando.isoformat(),
+                "catalog_id": FixtureProvider().items[movie].id,
+                "room_id": room["id"],
+                "starts_at": starts_at.isoformat(),
                 "prices": [
-                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                    {"sector_id": s["id"], "price_cents": 3000} for s in room["sectors"]
                 ],
             },
             headers=headers,
@@ -1200,45 +1200,45 @@ class TestSalaOcupadaPorIntervalo:
     def test_um_minuto_depois_nao_cabe(self, client):
         """O caso exato que a regra antiga deixava passar."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        assert self._sessao(client, headers, sala, hora=20, minuto=0).status_code == 201
-        segunda = self._sessao(client, headers, sala, hora=20, minuto=1)
+        assert self._sessao(client, headers, room, hora=20, minuto=0).status_code == 201
+        segunda = self._sessao(client, headers, room, hora=20, minuto=1)
         assert segunda.status_code == 409
         assert "sala" in segunda.json()["detail"].lower()
 
     def test_no_meio_do_filme_nao_cabe(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        self._sessao(client, headers, sala, hora=20, minuto=0)
-        assert self._sessao(client, headers, sala, hora=21, minuto=30).status_code == 409
+        self._sessao(client, headers, room, hora=20, minuto=0)
+        assert self._sessao(client, headers, room, hora=21, minuto=30).status_code == 409
 
     def test_depois_de_a_sala_liberar_cabe(self, client):
         """O filme tem 143 min; com a folga de limpeza a sala libera 22:43."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        self._sessao(client, headers, sala, hora=20, minuto=0)
-        assert self._sessao(client, headers, sala, hora=22, minuto=45).status_code == 201
+        self._sessao(client, headers, room, hora=20, minuto=0)
+        assert self._sessao(client, headers, room, hora=22, minuto=45).status_code == 201
 
     def test_encostar_nao_e_sobrepor(self, client):
         """Começar exatamente quando a sala libera é permitido: o intervalo é
         fechado no início e aberto no fim."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        primeira = self._sessao(client, headers, sala, hora=20, minuto=0).json()
-        livre = datetime.fromisoformat(primeira["starts_at"]) + timedelta(minutes=143 + 20)
+        primeira = self._sessao(client, headers, room, hora=20, minuto=0).json()
+        free_at = datetime.fromisoformat(primeira["starts_at"]) + timedelta(minutes=143 + 20)
 
         r = client.post(
             "/organizer/sessions",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
-                "starts_at": livre.isoformat(),
+                "room_id": room["id"],
+                "starts_at": free_at.isoformat(),
                 "prices": [
-                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                    {"sector_id": s["id"], "price_cents": 3000} for s in room["sectors"]
                 ],
             },
             headers=headers,
@@ -1247,8 +1247,8 @@ class TestSalaOcupadaPorIntervalo:
 
     def test_salas_diferentes_no_mesmo_horario_convivem(self, client):
         headers = auth(client, ORGANIZADOR)
-        uma = cria_sala(client, headers, nome="Sala Um")
-        outra = cria_sala(client, headers, nome="Sala Dois")
+        uma = cria_sala(client, headers, name="Sala Um")
+        outra = cria_sala(client, headers, name="Sala Dois")
 
         assert self._sessao(client, headers, uma, hora=20).status_code == 201
         assert self._sessao(client, headers, outra, hora=20).status_code == 201
@@ -1257,13 +1257,13 @@ class TestSalaOcupadaPorIntervalo:
         """A D31 continua valendo: cancelada não vai acontecer, então libera o
         horário — agora o intervalo inteiro, e não só o instante."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        primeira = self._sessao(client, headers, sala, hora=20).json()
-        assert self._sessao(client, headers, sala, hora=21).status_code == 409
+        primeira = self._sessao(client, headers, room, hora=20).json()
+        assert self._sessao(client, headers, room, hora=21).status_code == 409
 
         client.post(f"/organizer/sessions/{primeira['id']}/cancel", headers=headers)
-        assert self._sessao(client, headers, sala, hora=21).status_code == 201
+        assert self._sessao(client, headers, room, hora=21).status_code == 201
 
     def test_o_banco_recusa_por_baixo_do_servico(self, client):
         """A trava não é só a checagem em Python: é constraint de exclusão."""
@@ -1276,8 +1276,8 @@ class TestSalaOcupadaPorIntervalo:
         from tests.conftest import TestSession
 
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        primeira = self._sessao(client, headers, sala, hora=20).json()
+        room = cria_sala(client, headers)
+        primeira = self._sessao(client, headers, room, hora=20).json()
 
         comeca = datetime.fromisoformat(primeira["starts_at"]) + timedelta(minutes=30)
         db = TestSession()
@@ -1285,7 +1285,7 @@ class TestSalaOcupadaPorIntervalo:
             db.add(
                 Session(
                     organizer_id=U.UUID(client.get("/auth/me", headers=headers).json()["id"]),
-                    room_id=U.UUID(sala["id"]),
+                    room_id=U.UUID(room["id"]),
                     catalog_id="x",
                     movie_title="Colidente",
                     movie_runtime_minutes=100,
@@ -1301,10 +1301,10 @@ class TestSalaOcupadaPorIntervalo:
 
     def test_mover_o_horario_para_cima_de_outra_e_recusado(self, client):
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
+        room = cria_sala(client, headers)
 
-        self._sessao(client, headers, sala, dias=3, hora=20)
-        movel = self._sessao(client, headers, sala, dias=5, hora=20).json()
+        self._sessao(client, headers, room, days=3, hora=20)
+        movel = self._sessao(client, headers, room, days=5, hora=20).json()
 
         colide = (datetime.now(timezone.utc) + timedelta(days=3)).replace(
             hour=21, minute=0, second=0, microsecond=0
@@ -1320,12 +1320,12 @@ class TestSalaOcupadaPorIntervalo:
         """Mover trinta minutos para frente sobrepõe o próprio intervalo antigo
         — e isso não pode ser tratado como conflito."""
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        sessao = self._sessao(client, headers, sala, dias=3, hora=20).json()
+        room = cria_sala(client, headers)
+        session = self._sessao(client, headers, room, days=3, hora=20).json()
 
-        novo = datetime.fromisoformat(sessao["starts_at"]) + timedelta(minutes=30)
+        novo = datetime.fromisoformat(session["starts_at"]) + timedelta(minutes=30)
         r = client.patch(
-            f"/organizer/sessions/{sessao['id']}",
+            f"/organizer/sessions/{session['id']}",
             json={"starts_at": novo.isoformat()},
             headers=headers,
         )
@@ -1338,8 +1338,8 @@ class TestSalaOcupadaPorIntervalo:
         from zoneinfo import ZoneInfo
 
         headers = auth(client, ORGANIZADOR)
-        sala = cria_sala(client, headers)
-        existente = self._sessao(client, headers, sala, dias=3, hora=20).json()
+        room = cria_sala(client, headers)
+        existente = self._sessao(client, headers, room, days=3, hora=20).json()
 
         local = datetime.fromisoformat(existente["starts_at"]).astimezone(
             ZoneInfo("America/Sao_Paulo")
@@ -1349,11 +1349,11 @@ class TestSalaOcupadaPorIntervalo:
             "/organizer/sessions/batch",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
+                "room_id": room["id"],
                 "dates": [local.date().isoformat(), (local + timedelta(days=1)).date().isoformat()],
                 "time_of_day": local.strftime("%H:%M"),
                 "prices": [
-                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                    {"sector_id": s["id"], "price_cents": 3000} for s in room["sectors"]
                 ],
             },
             headers=headers,

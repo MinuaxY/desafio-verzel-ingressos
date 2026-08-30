@@ -14,10 +14,10 @@ class RoomRepository:
     def list_by_organizer(
         self, organizer_id: uuid.UUID, *, apenas_ativas: bool = True
     ) -> list[Room]:
-        consulta = select(Room).where(Room.organizer_id == organizer_id)
+        query = select(Room).where(Room.organizer_id == organizer_id)
         if apenas_ativas:
-            consulta = consulta.where(Room.active.is_(True))
-        return list(self.db.scalars(consulta.order_by(Room.name)))
+            query = query.where(Room.active.is_(True))
+        return list(self.db.scalars(query.order_by(Room.name)))
 
     def get(self, room_id: uuid.UUID) -> Room | None:
         return self.db.get(Room, room_id)
@@ -38,10 +38,10 @@ class RoomRepository:
         room = Room(organizer_id=organizer_id, name=name, location=location)
         room.sectors = [
             Sector(
-                **{k: v for k, v in dados.items() if k != "special_seats"},
-                special_seats=[SeatAttribute(**a) for a in dados.get("special_seats", [])],
+                **{k: v for k, v in data.items() if k != "special_seats"},
+                special_seats=[SeatAttribute(**a) for a in data.get("special_seats", [])],
             )
-            for dados in sectors
+            for data in sectors
         ]
         self.db.add(room)
         self.db.commit()
@@ -74,8 +74,8 @@ class RoomRepository:
         self.db.flush()
         room.sectors = [
             Sector(
-                **{k: v for k, v in dados.items() if k != "special_seats"},
-                special_seats=[SeatAttribute(**a) for a in dados.get("special_seats", [])],
+                **{k: v for k, v in data.items() if k != "special_seats"},
+                special_seats=[SeatAttribute(**a) for a in data.get("special_seats", [])],
             )
-            for dados in sectors
+            for data in sectors
         ]

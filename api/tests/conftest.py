@@ -65,7 +65,7 @@ def client():
     fastapi_app.dependency_overrides.clear()
 
 
-def cria_conta(client, dados: dict) -> dict[str, str]:
+def cria_conta(client, data: dict) -> dict[str, str]:
     """Cria a conta e devolve o cabeçalho de autorização.
 
     Cliente sai do cadastro público, que é o caminho real dele. Organizador e
@@ -76,11 +76,11 @@ def cria_conta(client, dados: dict) -> dict[str, str]:
     Nos dois casos o token vem do login normal, então o teste continua passando
     pelo mesmo caminho de entrada de quem usa o sistema. Ver decisão D34.
     """
-    papel = Role(dados.get("role", Role.CUSTOMER.value))
-    senha = dados["password"]
+    role = Role(data.get("role", Role.CUSTOMER.value))
+    password = data["password"]
 
-    if papel is Role.CUSTOMER:
-        corpo = {c: v for c, v in dados.items() if c != "role"}
+    if role is Role.CUSTOMER:
+        corpo = {c: v for c, v in data.items() if c != "role"}
         resposta = client.post("/auth/register", json=corpo)
         return {"Authorization": f"Bearer {resposta.json()['access_token']}"}
 
@@ -88,15 +88,15 @@ def cria_conta(client, dados: dict) -> dict[str, str]:
     try:
         db.add(
             User(
-                name=dados["name"],
-                email=dados["email"],
-                password_hash=hash_password(senha),
-                role=papel,
+                name=data["name"],
+                email=data["email"],
+                password_hash=hash_password(password),
+                role=role,
             )
         )
         db.commit()
     finally:
         db.close()
 
-    entrou = client.post("/auth/login", json={"email": dados["email"], "password": senha})
+    entrou = client.post("/auth/login", json={"email": data["email"], "password": password})
     return {"Authorization": f"Bearer {entrou.json()['access_token']}"}

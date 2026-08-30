@@ -29,32 +29,32 @@ class Throttle:
         self.janela = janela
         self._tentativas: dict[str, deque[float]] = defaultdict(deque)
 
-    def _limpa(self, chave: str, agora: float) -> deque[float]:
-        marcas = self._tentativas[chave]
-        while marcas and agora - marcas[0] > self.janela:
+    def _limpa(self, key: str, now: float) -> deque[float]:
+        marcas = self._tentativas[key]
+        while marcas and now - marcas[0] > self.janela:
             marcas.popleft()
         return marcas
 
-    def registrar(self, chave: str) -> None:
+    def registrar(self, key: str) -> None:
         """Conta uma tentativa malsucedida."""
-        agora = time.monotonic()
-        self._limpa(chave, agora).append(agora)
+        now = time.monotonic()
+        self._limpa(key, now).append(now)
 
-    def bloqueado(self, chave: str) -> int:
+    def blocked_for(self, key: str) -> int:
         """Segundos que faltam para liberar; 0 quando pode tentar."""
-        agora = time.monotonic()
-        marcas = self._limpa(chave, agora)
+        now = time.monotonic()
+        marcas = self._limpa(key, now)
         if len(marcas) < self.maximo:
             return 0
-        return max(1, int(self.janela - (agora - marcas[0])))
+        return max(1, int(self.janela - (now - marcas[0])))
 
-    def liberar(self, chave: str) -> None:
+    def liberar(self, key: str) -> None:
         """Chamado no login bem-sucedido: quem acertou não carrega o histórico
         de erros para a próxima vez."""
-        self._tentativas.pop(chave, None)
+        self._tentativas.pop(key, None)
 
     def limpar_tudo(self) -> None:
         self._tentativas.clear()
 
 
-tentativas_de_login = Throttle()
+login_attempts = Throttle()

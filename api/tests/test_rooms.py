@@ -22,9 +22,9 @@ SALA = {
 }
 
 
-def auth(client, dados):
+def auth(client, data):
     """Papel privilegiado não sai do cadastro público. Ver conftest."""
-    return cria_conta(client, dados)
+    return cria_conta(client, data)
 
 
 class TestAutorizacao:
@@ -39,9 +39,9 @@ class TestCriacao:
     def test_cria_sala_com_setores(self, client):
         r = client.post("/rooms", json=SALA, headers=auth(client, ORGANIZADOR))
         assert r.status_code == 201
-        sala = r.json()
-        assert sala["name"] == "Sala 1"
-        assert len(sala["sectors"]) == 2
+        room = r.json()
+        assert room["name"] == "Sala 1"
+        assert len(room["sectors"]) == 2
 
     def test_capacidade_e_soma_dos_setores(self, client):
         """5x10 na plateia mais 2x6 no VIP dá 62."""
@@ -50,8 +50,8 @@ class TestCriacao:
 
     def test_capacidade_por_setor(self, client):
         r = client.post("/rooms", json=SALA, headers=auth(client, ORGANIZADOR))
-        setores = {s["name"]: s["capacity"] for s in r.json()["sectors"]}
-        assert setores == {"Plateia": 50, "VIP": 12}
+        sectors = {s["name"]: s["capacity"] for s in r.json()["sectors"]}
+        assert sectors == {"Plateia": 50, "VIP": 12}
 
     def test_nome_repetido_do_mesmo_organizador_e_recusado(self, client):
         headers = auth(client, ORGANIZADOR)
@@ -82,7 +82,7 @@ class TestCriacao:
         assert r.status_code == 422
 
     @pytest.mark.parametrize(
-        "setor",
+        "sector",
         [
             {"name": "X", "rows": 0, "seats_per_row": 5},
             {"name": "X", "rows": 99, "seats_per_row": 5},
@@ -90,9 +90,9 @@ class TestCriacao:
             {"name": "X", "rows": 5, "seats_per_row": 999},
         ],
     )
-    def test_geometria_absurda_e_recusada(self, client, setor):
+    def test_geometria_absurda_e_recusada(self, client, sector):
         r = client.post(
-            "/rooms", json={**SALA, "sectors": [setor]}, headers=auth(client, ORGANIZADOR)
+            "/rooms", json={**SALA, "sectors": [sector]}, headers=auth(client, ORGANIZADOR)
         )
         assert r.status_code == 422
 
@@ -135,17 +135,17 @@ class TestRemocao:
         from tests.conftest import TestSession
 
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
+        room = client.post("/rooms", json=SALA, headers=headers).json()
 
-        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
-        sessao = client.post(
+        starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
+        session = client.post(
             "/organizer/sessions",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
-                "starts_at": quando.isoformat(),
+                "room_id": room["id"],
+                "starts_at": starts_at.isoformat(),
                 "prices": [
-                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                    {"sector_id": s["id"], "price_cents": 3000} for s in room["sectors"]
                 ],
             },
             headers=headers,
@@ -156,18 +156,18 @@ class TestRemocao:
         try:
             import uuid as _uuid
 
-            registro = db.get(Session, _uuid.UUID(sessao["id"]))
+            registro = db.get(Session, _uuid.UUID(session["id"]))
             registro.starts_at = datetime.now(timezone.utc) - timedelta(days=1)
             db.commit()
         finally:
             db.close()
 
-        r = client.delete(f"/rooms/{sala['id']}", headers=headers)
+        r = client.delete(f"/rooms/{room['id']}", headers=headers)
         assert r.status_code == 200
         assert r.json()["active"] is False
 
         # Continua acessivel por id, e some da lista de escolha.
-        assert client.get(f"/rooms/{sala['id']}", headers=headers).status_code == 200
+        assert client.get(f"/rooms/{room['id']}", headers=headers).status_code == 200
         assert client.get("/rooms", headers=headers).json() == []
 
     def test_sala_com_sessao_futura_nao_sai(self, client):
@@ -177,23 +177,23 @@ class TestRemocao:
         from app.catalog.fixture import FixtureProvider
 
         headers = auth(client, ORGANIZADOR)
-        sala = client.post("/rooms", json=SALA, headers=headers).json()
-        quando = (datetime.now(timezone.utc) + timedelta(days=3)).replace(microsecond=0)
+        room = client.post("/rooms", json=SALA, headers=headers).json()
+        starts_at = (datetime.now(timezone.utc) + timedelta(days=3)).replace(microsecond=0)
         client.post(
             "/organizer/sessions",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
-                "starts_at": quando.isoformat(),
+                "room_id": room["id"],
+                "starts_at": starts_at.isoformat(),
                 "prices": [
-                    {"sector_id": s["id"], "price_cents": 3000} for s in sala["sectors"]
+                    {"sector_id": s["id"], "price_cents": 3000} for s in room["sectors"]
                 ],
                 "publish": True,
             },
             headers=headers,
         )
 
-        r = client.delete(f"/rooms/{sala['id']}", headers=headers)
+        r = client.delete(f"/rooms/{room['id']}", headers=headers)
         assert r.status_code == 409
         assert "futura" in r.json()["detail"]
         assert client.get("/rooms", headers=headers) .json() != []
@@ -212,8 +212,8 @@ class TestNumeracaoContinua:
     """
 
     def test_setor_seguinte_continua_o_alfabeto(self, client):
-        sala = client.post("/rooms", json=SALA, headers=auth(client, ORGANIZADOR)).json()
-        plateia, vip = sala["sectors"]
+        room = client.post("/rooms", json=SALA, headers=auth(client, ORGANIZADOR)).json()
+        plateia, vip = room["sectors"]
         assert (plateia["rows"], vip["rows"]) == (5, 2)
         # Plateia A-E, entao o VIP comeca em F.
         assert plateia["name"] == "Plateia"
@@ -277,36 +277,36 @@ class TestCorredores:
     """
 
     def test_corredores_sao_gravados(self, client):
-        sala = {
+        room = {
             "name": "Sala Corredor",
             "sectors": [
                 {"name": "Plateia", "rows": 3, "seats_per_row": 12, "aisles": [3, 9]},
             ],
         }
-        r = client.post("/rooms", json=sala, headers=auth(client, ORGANIZADOR))
+        r = client.post("/rooms", json=room, headers=auth(client, ORGANIZADOR))
         assert r.status_code == 201
         assert r.json()["sectors"][0]["aisles"] == [3, 9]
 
     def test_sem_corredor_e_um_bloco_so(self, client):
-        sala = {
+        room = {
             "name": "Sala Inteira",
             "sectors": [{"name": "Plateia", "rows": 2, "seats_per_row": 8}],
         }
-        r = client.post("/rooms", json=sala, headers=auth(client, ORGANIZADOR))
+        r = client.post("/rooms", json=room, headers=auth(client, ORGANIZADOR))
         assert r.status_code == 201
         assert r.json()["sectors"][0]["aisles"] == []
 
-    @pytest.mark.parametrize("posicao", [0, 12, 20, -1])
-    def test_corredor_fora_da_fileira_e_recusado(self, client, posicao):
+    @pytest.mark.parametrize("position", [0, 12, 20, -1])
+    def test_corredor_fora_da_fileira_e_recusado(self, client, position):
         """Corredor na posicao 0 ou na ultima poltrona nao separa nada — seria
         um espaco na borda do bloco, nao uma passagem."""
-        sala = {
-            "name": f"Sala Invalida {posicao}",
+        room = {
+            "name": f"Sala Invalida {position}",
             "sectors": [
-                {"name": "Plateia", "rows": 2, "seats_per_row": 12, "aisles": [posicao]},
+                {"name": "Plateia", "rows": 2, "seats_per_row": 12, "aisles": [position]},
             ],
         }
-        r = client.post("/rooms", json=sala, headers=auth(client, ORGANIZADOR))
+        r = client.post("/rooms", json=room, headers=auth(client, ORGANIZADOR))
         assert r.status_code == 422
 
     def test_blocos_derivados_da_geometria(self):
@@ -325,7 +325,7 @@ class TestCorredores:
         from app.catalog.fixture import FixtureProvider
 
         headers = auth(client, ORGANIZADOR)
-        sala = client.post(
+        room = client.post(
             "/rooms",
             json={
                 "name": "Sala Mapa",
@@ -334,18 +334,18 @@ class TestCorredores:
             headers=headers,
         ).json()
 
-        quando = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
-        sessao = client.post(
+        starts_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
+        session = client.post(
             "/organizer/sessions",
             json={
                 "catalog_id": FixtureProvider().items[0].id,
-                "room_id": sala["id"],
-                "starts_at": quando.isoformat(),
-                "prices": [{"sector_id": sala["sectors"][0]["id"], "price_cents": 3000}],
+                "room_id": room["id"],
+                "starts_at": starts_at.isoformat(),
+                "prices": [{"sector_id": room["sectors"][0]["id"], "price_cents": 3000}],
                 "publish": True,
             },
             headers=headers,
         ).json()
 
-        mapa = client.get(f"/sessions/{sessao['id']}/seats").json()
+        mapa = client.get(f"/sessions/{session['id']}/seats").json()
         assert mapa["sectors"][0]["aisles"] == [3, 9]

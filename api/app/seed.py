@@ -37,9 +37,9 @@ from app.models.session import (
 )
 from app.models.user import Role, User
 
-SENHA_PADRAO = "verzel123"
+DEFAULT_PASSWORD = "verzel123"
 
-USUARIOS = [
+USERS = [
     ("Organizador Demo", "organizador@verzel.dev", Role.ORGANIZER),
     ("Cliente Um", "cliente1@verzel.dev", Role.CUSTOMER),
     ("Cliente Dois", "cliente2@verzel.dev", Role.CUSTOMER),
@@ -47,7 +47,7 @@ USUARIOS = [
 ]
 
 # Fuso em que os horários da programação são interpretados. Ver decisão D27.
-FUSO_LOCAL = ZoneInfo("America/Sao_Paulo")
+LOCAL_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
 # --------------------------------------------------------------------------
 # Salas
@@ -57,7 +57,7 @@ FUSO_LOCAL = ZoneInfo("America/Sao_Paulo")
 # original, citada no roteiro do README, e nao muda.
 # --------------------------------------------------------------------------
 
-SALAS = [
+ROOMS = [
     {
         "name": "Sala 1 — Cine Verzel",
         "location": "Av. Paulista, 1000 — São Paulo",
@@ -178,15 +178,15 @@ SALAS = [
 # primeiro dado que quem avalia ve.
 # --------------------------------------------------------------------------
 
-DIAS_DE_PROGRAMACAO = 10
+SCHEDULE_DAYS = 10
 
 # Horario da primeira sessao de cada sala. As salas nao abrem juntas: numa
 # multiplex real os horarios sao escalonados para a bilheteria e a portaria nao
 # receberem tres plateias no mesmo minuto.
-PRIMEIRA_SESSAO = [time(14, 0), time(15, 30), time(16, 0)]
+FIRST_SHOWTIME = [time(14, 0), time(15, 30), time(16, 0)]
 
 # Depois da ultima sessao que comeca antes disso, a sala fecha.
-ULTIMA_ENTRADA = time(22, 30)
+LAST_SHOWTIME = time(22, 30)
 
 # As sessoes seguintes nao saem de uma grade fixa: sao empilhadas a partir da
 # duracao real de cada filme mais a folga de limpeza, e arredondadas para cima
@@ -196,7 +196,7 @@ ULTIMA_ENTRADA = time(22, 30)
 # longo do catalogo ocupa 192 -- o proprio seed produzia sobreposicao, e a
 # trava da D37 passou a recusa-la. Empilhar pela duracao real resolve na
 # origem, e e como um cinema monta a programacao de verdade.
-ARREDONDA_PARA_MINUTOS = 15
+ROUND_TO_MINUTES = 15
 
 # Combinacoes de exibicao, percorridas em rodizio. Variadas de proposito: quem
 # abrir a vitrine ve as quatro possibilidades, em vez de dez sessoes iguais.
@@ -208,7 +208,7 @@ EXIBICOES = [
 ]
 
 
-def _monta_setores(spec: list[dict]) -> list[Sector]:
+def _build_sectors(spec: list[dict]) -> list[Sector]:
     """Constroi os setores com as letras corretas.
 
     As fileiras sao continuas na sala: com a Plateia ocupando A a F, o VIP
@@ -216,11 +216,11 @@ def _monta_setores(spec: list[dict]) -> list[Sector]:
     para que mudar o tamanho de um setor nao exija reescrever os codigos do
     seguinte.
     """
-    setores: list[Sector] = []
+    sectors: list[Sector] = []
     offset = 0
 
     for s in spec:
-        setores.append(
+        sectors.append(
             Sector(
                 name=s["name"],
                 rows=s["rows"],
@@ -237,10 +237,10 @@ def _monta_setores(spec: list[dict]) -> list[Sector]:
         )
         offset += s["rows"]
 
-    return setores
+    return sectors
 
 
-def _programacao(agora: datetime) -> list[tuple[int, datetime, int]]:
+def _schedule(now: datetime) -> list[tuple[int, datetime, int]]:
     """A grade inteira: (índice da sala, quando, índice do filme).
 
     Cada sala é preenchida empilhando sessões a partir da duração real do filme
@@ -256,112 +256,112 @@ def _programacao(agora: datetime) -> list[tuple[int, datetime, int]]:
     filme reaparece em dias e salas diferentes, que é o que dá o que buscar e o
     que filtrar. Sendo determinístico, duas execuções produzem a mesma coisa.
     """
-    filmes = FixtureProvider().items
-    hoje = agora.date()
+    movies = FixtureProvider().items
+    hoje = now.date()
     grade: list[tuple[int, datetime, int]] = []
     proximo_filme = 0
 
-    for dia in range(DIAS_DE_PROGRAMACAO):
-        data = hoje + timedelta(days=dia)
+    for day in range(SCHEDULE_DAYS):
+        data = hoje + timedelta(days=day)
 
-        for sala, abertura in enumerate(PRIMEIRA_SESSAO):
-            quando = datetime.combine(data, abertura, tzinfo=FUSO_LOCAL)
-            fecha = datetime.combine(data, ULTIMA_ENTRADA, tzinfo=FUSO_LOCAL)
+        for room, abertura in enumerate(FIRST_SHOWTIME):
+            starts_at = datetime.combine(data, abertura, tzinfo=LOCAL_TIMEZONE)
+            fecha = datetime.combine(data, LAST_SHOWTIME, tzinfo=LOCAL_TIMEZONE)
 
-            while quando <= fecha:
-                indice = proximo_filme % len(filmes)
+            while starts_at <= fecha:
+                indice = proximo_filme % len(movies)
                 proximo_filme += 1
 
-                if quando > agora:
-                    grade.append((sala, quando, indice))
+                if starts_at > now:
+                    grade.append((room, starts_at, indice))
 
-                quando = _proximo_horario(quando, filmes[indice].runtime_minutes)
+                starts_at = _next_slot(starts_at, movies[indice].runtime_minutes)
 
     return grade
 
 
-def _proximo_horario(comeca: datetime, duracao: int | None) -> datetime:
+def _next_slot(comeca: datetime, duracao: int | None) -> datetime:
     """Quando a sala pode receber a próxima plateia, em hora redonda.
 
     Arredondar para cima é o que faz a programação parecer de cinema: ninguém
     anuncia sessão às 19h07. Para cima, e nunca para baixo, senão a sessão
     seguinte começaria antes de a sala estar livre.
     """
-    livre = occupation_end(comeca, duracao)
-    sobra = livre.minute % ARREDONDA_PARA_MINUTOS
+    free_at = occupation_end(comeca, duracao)
+    sobra = free_at.minute % ROUND_TO_MINUTES
     if sobra:
-        livre += timedelta(minutes=ARREDONDA_PARA_MINUTOS - sobra)
-    return livre.replace(second=0, microsecond=0)
+        free_at += timedelta(minutes=ROUND_TO_MINUTES - sobra)
+    return free_at.replace(second=0, microsecond=0)
 
 
-def _completa_campos_faltantes(sessao: Session, filme) -> list[str]:
+def _fill_missing_fields(session: Session, movie) -> list[str]:
     """Preenche o que a sessão não tinha por ter nascido antes da coluna.
 
     Aconteceu com a classificação indicativa, adicionada depois que o ambiente
     publicado já tinha dados. Nunca sobrescreve o que já está preenchido.
     """
-    remendos = []
-    if sessao.movie_age_rating is None and filme.age_rating:
-        sessao.movie_age_rating = filme.age_rating
-        remendos.append("classificação")
-    if sessao.movie_backdrop_url is None and filme.backdrop_url:
-        sessao.movie_backdrop_url = filme.backdrop_url
-        remendos.append("arte")
-    return remendos
+    patched = []
+    if session.movie_age_rating is None and movie.age_rating:
+        session.movie_age_rating = movie.age_rating
+        patched.append("classificação")
+    if session.movie_backdrop_url is None and movie.backdrop_url:
+        session.movie_backdrop_url = movie.backdrop_url
+        patched.append("arte")
+    return patched
 
 
 def run() -> None:
     db = SessionLocal()
-    criados: list[str] = []
-    existentes: list[str] = []
+    created: list[str] = []
+    already_there: list[str] = []
 
     try:
         # -- usuarios ------------------------------------------------------
-        for nome, email, papel in USUARIOS:
+        for name, email, role in USERS:
             if db.query(User).filter(User.email == email).first():
-                existentes.append(f"usuário {email}")
+                already_there.append(f"usuário {email}")
                 continue
             db.add(
                 User(
-                    name=nome,
+                    name=name,
                     email=email,
-                    password_hash=hash_password(SENHA_PADRAO),
-                    role=papel,
+                    password_hash=hash_password(DEFAULT_PASSWORD),
+                    role=role,
                 )
             )
-            criados.append(f"usuário {email}")
+            created.append(f"usuário {email}")
         db.commit()
 
-        organizador = db.query(User).filter(User.role == Role.ORGANIZER).first()
-        if organizador is None:
+        organizer = db.query(User).filter(User.role == Role.ORGANIZER).first()
+        if organizer is None:
             print("Nenhum organizador no banco; nada mais a semear.")
             return
 
         # -- salas ---------------------------------------------------------
-        salas: list[Room] = []
-        for spec in SALAS:
-            sala = db.query(Room).filter(Room.name == spec["name"]).first()
-            if sala is None:
-                sala = Room(
-                    organizer_id=organizador.id,
+        rooms: list[Room] = []
+        for spec in ROOMS:
+            room = db.query(Room).filter(Room.name == spec["name"]).first()
+            if room is None:
+                room = Room(
+                    organizer_id=organizer.id,
                     name=spec["name"],
                     location=spec["location"],
-                    sectors=_monta_setores(spec["sectors"]),
+                    sectors=_build_sectors(spec["sectors"]),
                 )
-                db.add(sala)
+                db.add(room)
                 db.commit()
-                db.refresh(sala)
-                acessiveis = sum(len(s.special_seats) for s in sala.sectors)
-                criados.append(
-                    f"sala {sala.name} ({sala.capacity} lugares, {acessiveis} acessíveis)"
+                db.refresh(room)
+                acessiveis = sum(len(s.special_seats) for s in room.sectors)
+                created.append(
+                    f"sala {room.name} ({room.capacity} lugares, {acessiveis} acessíveis)"
                 )
             else:
-                existentes.append(f"sala {sala.name}")
-            salas.append(sala)
+                already_there.append(f"sala {room.name}")
+            rooms.append(room)
 
         # -- sessoes -------------------------------------------------------
-        filmes = FixtureProvider().items
-        agora = datetime.now(FUSO_LOCAL)
+        movies = FixtureProvider().items
+        now = datetime.now(LOCAL_TIMEZONE)
 
         # As sessões que já existem, indexadas pela chave que o banco usa para
         # impedir duas na mesma sala e horário. É o que torna o seed idempotente
@@ -376,93 +376,93 @@ def run() -> None:
         # banco, sem passar pelo serviço, então precisa respeitar a trava de
         # sobreposição por conta própria — senão a primeira colisão derruba a
         # execução inteira com uma violação de constraint. Ver decisão D37.
-        ocupacao: dict[uuid.UUID, list[tuple[datetime, datetime]]] = {}
+        occupied_ranges: dict[uuid.UUID, list[tuple[datetime, datetime]]] = {}
         for s in vivas:
-            ocupacao.setdefault(s.room_id, []).append((s.starts_at, s.occupies_until))
+            occupied_ranges.setdefault(s.room_id, []).append((s.starts_at, s.occupies_until))
 
-        pulados = 0
-        novas = 0
+        skipped_count = 0
+        new_count = 0
         remendadas = 0
         por_dia: dict[date, int] = {}
 
-        for indice_sala, quando, indice_filme in _programacao(agora):
-            sala = salas[indice_sala]
-            filme = filmes[indice_filme]
+        for indice_sala, starts_at, indice_filme in _schedule(now):
+            room = rooms[indice_sala]
+            movie = movies[indice_filme]
 
-            existente = ja_existem.get((sala.id, quando))
+            existente = ja_existem.get((room.id, starts_at))
             if existente is not None:
-                if _completa_campos_faltantes(existente, filme):
+                if _fill_missing_fields(existente, movie):
                     remendadas += 1
                 continue
 
-            livre_em = occupation_end(quando, filme.runtime_minutes)
+            free_at = occupation_end(starts_at, movie.runtime_minutes)
             if any(
-                quando < fim and livre_em > inicio
-                for inicio, fim in ocupacao.get(sala.id, ())
+                starts_at < fim and free_at > inicio
+                for inicio, fim in occupied_ranges.get(room.id, ())
             ):
                 # Horário já ocupado por uma sessão de execução anterior, com
                 # outra duração. Pular é o certo: o seed completa a programação,
                 # não a reescreve.
-                pulados += 1
+                skipped_count += 1
                 continue
 
-            audio, formato = EXIBICOES[(indice_filme + quando.hour) % len(EXIBICOES)]
+            audio, formato = EXIBICOES[(indice_filme + starts_at.hour) % len(EXIBICOES)]
             db.add(
                 Session(
-                    organizer_id=organizador.id,
-                    room_id=sala.id,
-                    catalog_id=filme.id,
-                    movie_title=filme.title,
-                    movie_overview=filme.overview,
-                    movie_poster_url=filme.poster_url,
-                    movie_backdrop_url=filme.backdrop_url,
-                    movie_runtime_minutes=filme.runtime_minutes,
-                    movie_year=filme.release_year,
-                    movie_age_rating=filme.age_rating,
-                    starts_at=quando,
-                    occupies_until=occupation_end(quando, filme.runtime_minutes),
+                    organizer_id=organizer.id,
+                    room_id=room.id,
+                    catalog_id=movie.id,
+                    movie_title=movie.title,
+                    movie_overview=movie.overview,
+                    movie_poster_url=movie.poster_url,
+                    movie_backdrop_url=movie.backdrop_url,
+                    movie_runtime_minutes=movie.runtime_minutes,
+                    movie_year=movie.release_year,
+                    movie_age_rating=movie.age_rating,
+                    starts_at=starts_at,
+                    occupies_until=occupation_end(starts_at, movie.runtime_minutes),
                     audio=audio,
                     screen_format=formato,
                     status=SessionStatus.PUBLISHED,
                     prices=[
                         SessionSectorPrice(
-                            sector_id=setor.id,
-                            room_id=sala.id,
-                            price_cents=SALAS[indice_sala]["precos"][setor.name],
+                            sector_id=sector.id,
+                            room_id=room.id,
+                            price_cents=ROOMS[indice_sala]["precos"][sector.name],
                         )
-                        for setor in sala.sectors
+                        for sector in room.sectors
                     ],
                 )
             )
-            ocupacao.setdefault(sala.id, []).append((quando, livre_em))
-            novas += 1
-            por_dia[quando.date()] = por_dia.get(quando.date(), 0) + 1
+            occupied_ranges.setdefault(room.id, []).append((starts_at, free_at))
+            new_count += 1
+            por_dia[starts_at.date()] = por_dia.get(starts_at.date(), 0) + 1
 
         db.commit()
 
-        if novas:
-            dias = sorted(por_dia)
-            criados.append(
-                f"{novas} sessões em {len(dias)} dias "
-                f"({dias[0]:%d/%m} a {dias[-1]:%d/%m}), "
-                f"{len({f.id for f in filmes})} filmes, {len(salas)} salas"
+        if new_count:
+            days = sorted(por_dia)
+            created.append(
+                f"{new_count} sessões em {len(days)} dias "
+                f"({days[0]:%d/%m} a {days[-1]:%d/%m}), "
+                f"{len({f.id for f in movies})} filmes, {len(rooms)} salas"
             )
         if remendadas:
-            criados.append(f"{remendadas} sessões existentes completadas")
-        if pulados:
-            existentes.append(f"{pulados} horários já ocupados por sessões anteriores")
-        if not novas and not remendadas:
-            existentes.append("programação (nenhum horário novo a criar)")
+            created.append(f"{remendadas} sessões existentes completadas")
+        if skipped_count:
+            already_there.append(f"{skipped_count} horários já ocupados por sessões anteriores")
+        if not new_count and not remendadas:
+            already_there.append("programação (nenhum horário novo a criar)")
 
         # -- relatorio -----------------------------------------------------
-        print(f"Criados ({len(criados)}):")
-        for item in criados:
+        print(f"Criados ({len(created)}):")
+        for item in created:
             print(f"  + {item}")
-        if existentes:
-            print(f"\nJa existiam ({len(existentes)}):")
-            for item in existentes:
+        if already_there:
+            print(f"\nJa existiam ({len(already_there)}):")
+            for item in already_there:
                 print(f"  = {item}")
-        print(f"\nSenha de todos os usuarios: {SENHA_PADRAO}")
+        print(f"\nSenha de todos os usuarios: {DEFAULT_PASSWORD}")
 
     finally:
         db.close()

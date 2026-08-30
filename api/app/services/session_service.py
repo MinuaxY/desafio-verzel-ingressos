@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
 from app.catalog.factory import get_catalog_provider
-from app.models.order import OCUPAM_ASSENTO, Ticket
+from app.models.order import OCCUPY_SEAT, Ticket
 from app.models.session import (
     Session,
     SessionSectorPrice,
@@ -22,16 +22,16 @@ from app.services.room_service import RoomNotFound, RoomService
 
 # Fuso em que as datas escolhidas pelo organizador são interpretadas. "Dia 24
 # às 19h" é hora local de quem vai ao cinema. Ver decisão D27.
-FUSO_LOCAL = ZoneInfo("America/Sao_Paulo")
+LOCAL_TIMEZONE = ZoneInfo("America/Sao_Paulo")
 
 # Quanto tempo uma sessão continua aparecendo para a portaria depois de
 # começar. Uma sessão de duas horas com público chegando atrasado ainda está
 # recebendo gente; sumir da lista nesse momento é o pior instante possível.
-HORAS_DE_TOLERANCIA_NA_PORTARIA = timedelta(hours=6)
+GATE_GRACE_PERIOD = timedelta(hours=6)
 
 # Teto para a criação em lote. Uma programação de cinema não passa de algumas
 # semanas, e sem limite um engano criaria centenas de sessões.
-MAX_DATAS_POR_LOTE = 60
+MAX_BATCH_DATES = 60
 
 
 class MovieNotFound(Exception):
@@ -55,9 +55,9 @@ class SessionInThePast(Exception):
 
 
 class PricesDoNotCoverSectors(Exception):
-    def __init__(self, faltando: list[str]) -> None:
-        self.faltando = faltando
-        super().__init__(f"Sem preço para: {', '.join(faltando)}")
+    def __init__(self, missing: list[str]) -> None:
+        self.missing = missing
+        super().__init__(f"Sem preço para: {', '.join(missing)}")
 
 
 class SessionAlreadyCancelled(Exception):
@@ -72,9 +72,9 @@ class SessionHasTickets(Exception):
 class SessionSold(Exception):
     """A sessão já vendeu: cancelar exige resolver com quem comprou antes."""
 
-    def __init__(self, vendidos: int) -> None:
-        self.vendidos = vendidos
-        super().__init__(f"{vendidos} ingresso(s) vendido(s)")
+    def __init__(self, sold: int) -> None:
+        self.sold = sold
+        super().__init__(f"{sold} ingresso(s) vendido(s)")
 
 
 class SessionIsPublished(Exception):
@@ -90,37 +90,37 @@ class SessionService:
 
     # -- leitura pública ---------------------------------------------------
 
-    def listar_publicas(
+    def list_public(
         self,
         *,
-        busca: str | None = None,
-        dia: date | None = None,
-        incluir_passadas: bool = False,
+        search: str | None = None,
+        day: date | None = None,
+        include_past: bool = False,
         page: int = 1,
-        por_pagina: int = 12,
+        per_page: int = 12,
     ) -> tuple[list[Session], int]:
         # Sessão que já começou não interessa a quem quer comprar.
-        corte = None if incluir_passadas else datetime.now(timezone.utc)
+        corte = None if include_past else datetime.now(timezone.utc)
         return self.sessions.list_published(
-            busca=busca, a_partir_de=corte, dia=dia, page=page, por_pagina=por_pagina
+            search=search, from_time=corte, day=day, page=page, per_page=per_page
         )
 
-    def dias_em_cartaz(self, *, dias: int = 14, busca: str | None = None) -> dict[date, int]:
+    def days_on_billboard(self, *, days: int = 14, search: str | None = None) -> dict[date, int]:
         """Quantas sessões há em cada dia daqui para a frente.
 
         A barra de datas precisa saber quais dias têm o que mostrar: oferecer
         um dia vazio como se fosse opção é convidar o clique que não leva a
         lugar nenhum.
         """
-        agora = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
         fim = datetime.combine(
-            agora.astimezone(FUSO_LOCAL).date() + timedelta(days=dias),
+            now.astimezone(LOCAL_TIMEZONE).date() + timedelta(days=days),
             time.min,
-            tzinfo=FUSO_LOCAL,
+            tzinfo=LOCAL_TIMEZONE,
         )
-        return self.sessions.dias_com_sessao(a_partir_de=agora, ate=fim, busca=busca)
+        return self.sessions.days_with_sessions(from_time=now, until=fim, search=search)
 
-    def listar_para_portaria(self) -> list[Session]:
+    def list_for_gate(self) -> list[Session]:
         """Sessões que a portaria pode estar conferindo agora.
 
         A vitrine só mostra o que ainda vai começar, e faz sentido para quem
@@ -133,75 +133,75 @@ class SessionService:
         sessão em andamento e as próximas do turno, sem despejar a programação
         do mês num seletor. Ver decisão D33.
         """
-        agora = datetime.now(timezone.utc)
-        itens, _ = self.sessions.list_published(
-            a_partir_de=agora - HORAS_DE_TOLERANCIA_NA_PORTARIA,
+        now = datetime.now(timezone.utc)
+        items, _ = self.sessions.list_published(
+            from_time=now - GATE_GRACE_PERIOD,
             page=1,
-            por_pagina=100,
+            per_page=100,
         )
-        return [s for s in itens if s.starts_at <= agora + timedelta(days=2)]
+        return [s for s in items if s.starts_at <= now + timedelta(days=2)]
 
-    def obter_publica(self, session_id: uuid.UUID) -> Session:
-        sessao = self.sessions.get(session_id)
-        if sessao is None or not sessao.is_public:
+    def get_public(self, session_id: uuid.UUID) -> Session:
+        session = self.sessions.get(session_id)
+        if session is None or not session.is_public:
             raise SessionNotFound
-        return sessao
+        return session
 
     # -- leitura do organizador -------------------------------------------
 
-    def listar_do_organizador(self, organizer_id: uuid.UUID) -> list[Session]:
+    def list_for_organizer(self, organizer_id: uuid.UUID) -> list[Session]:
         return self.sessions.list_by_organizer(organizer_id)
 
-    def obter_do_organizador(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
-        sessao = self.sessions.get(session_id)
-        if sessao is None or sessao.organizer_id != organizer_id:
+    def get_for_organizer(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
+        session = self.sessions.get(session_id)
+        if session is None or session.organizer_id != organizer_id:
             raise SessionNotFound
-        return sessao
+        return session
 
     # -- escrita -----------------------------------------------------------
 
-    def criar(self, organizer_id: uuid.UUID, dados: SessionCreate) -> Session:
+    def create(self, organizer_id: uuid.UUID, data: SessionCreate) -> Session:
         try:
-            sala = self.room_service.obter_do_organizador(dados.room_id, organizer_id)
+            room = self.room_service.get_for_organizer(data.room_id, organizer_id)
         except RoomNotFound:
             raise
 
-        self._exige_futuro(dados.starts_at)
+        self._require_future(data.starts_at)
 
         # O filme é buscado antes da trava de sala ocupada, e não depois: a
         # trava passou a comparar intervalos, e o intervalo depende da duração
         # do filme. Ver decisão D37.
-        filme = get_catalog_provider().get(dados.catalog_id)
-        if filme is None:
+        movie = get_catalog_provider().get(data.catalog_id)
+        if movie is None:
             raise MovieNotFound
 
-        ocupa_ate = occupation_end(dados.starts_at, filme.runtime_minutes)
-        if self.sessions.overlaps(sala.id, dados.starts_at, ocupa_ate):
+        ocupa_ate = occupation_end(data.starts_at, movie.runtime_minutes)
+        if self.sessions.overlaps(room.id, data.starts_at, ocupa_ate):
             raise RoomBusy
 
-        precos = self._monta_precos(sala, {p.sector_id: p.price_cents for p in dados.prices})
+        prices = self._build_prices(room, {p.sector_id: p.price_cents for p in data.prices})
 
-        sessao = Session(
+        session = Session(
             organizer_id=organizer_id,
-            room_id=sala.id,
+            room_id=room.id,
             # Cópia dos dados do filme no momento da criação. Ver decisão D13.
-            catalog_id=filme.id,
-            movie_title=filme.title,
-            movie_overview=filme.overview,
-            movie_poster_url=filme.poster_url,
-            movie_backdrop_url=filme.backdrop_url,
-            movie_runtime_minutes=filme.runtime_minutes,
-            movie_year=filme.release_year,
-            movie_age_rating=filme.age_rating,
-            starts_at=dados.starts_at,
+            catalog_id=movie.id,
+            movie_title=movie.title,
+            movie_overview=movie.overview,
+            movie_poster_url=movie.poster_url,
+            movie_backdrop_url=movie.backdrop_url,
+            movie_runtime_minutes=movie.runtime_minutes,
+            movie_year=movie.release_year,
+            movie_age_rating=movie.age_rating,
+            starts_at=data.starts_at,
             occupies_until=ocupa_ate,
-            audio=dados.audio,
-            screen_format=dados.screen_format,
-            status=SessionStatus.PUBLISHED if dados.publish else SessionStatus.DRAFT,
+            audio=data.audio,
+            screen_format=data.screen_format,
+            status=SessionStatus.PUBLISHED if data.publish else SessionStatus.DRAFT,
         )
-        return self.sessions.create(sessao, precos)
+        return self.sessions.create(session, prices)
 
-    def criar_em_lote(self, organizer_id: uuid.UUID, dados: SessionRepeat) -> dict:
+    def create_batch(self, organizer_id: uuid.UUID, data: SessionRepeat) -> dict:
         """Cria a mesma sessão em vários dias, no mesmo horário.
 
         Dia em que a sala já está ocupada é **pulado**, e não aborta o lote:
@@ -210,92 +210,92 @@ class SessionService:
         na resposta, com o motivo, para o organizador resolver esses casos.
         Ver decisão D27.
         """
-        criadas: list[Session] = []
-        puladas: list[dict] = []
+        created_sessions: list[Session] = []
+        skipped: list[dict] = []
 
-        for dia in sorted(set(dados.dates))[:MAX_DATAS_POR_LOTE]:
-            quando = datetime.combine(dia, dados.time_of_day, tzinfo=FUSO_LOCAL)
+        for day in sorted(set(data.dates))[:MAX_BATCH_DATES]:
+            starts_at = datetime.combine(day, data.time_of_day, tzinfo=LOCAL_TIMEZONE)
 
             try:
-                criadas.append(
-                    self.criar(
+                created_sessions.append(
+                    self.create(
                         organizer_id,
                         SessionCreate(
-                            catalog_id=dados.catalog_id,
-                            room_id=dados.room_id,
-                            starts_at=quando,
-                            audio=dados.audio,
-                            screen_format=dados.screen_format,
-                            prices=dados.prices,
-                            publish=dados.publish,
+                            catalog_id=data.catalog_id,
+                            room_id=data.room_id,
+                            starts_at=starts_at,
+                            audio=data.audio,
+                            screen_format=data.screen_format,
+                            prices=data.prices,
+                            publish=data.publish,
                         ),
                     )
                 )
             except RoomBusy:
-                puladas.append(
-                    {"date": dia, "reason": "A sala já estava ocupada nesse intervalo"}
+                skipped.append(
+                    {"date": day, "reason": "A sala já estava ocupada nesse intervalo"}
                 )
             except SessionInThePast:
-                puladas.append({"date": dia, "reason": "Data e horário já passaram"})
+                skipped.append({"date": day, "reason": "Data e horário já passaram"})
 
-        return {"created": criadas, "skipped": puladas}
+        return {"created": created_sessions, "skipped": skipped}
 
-    def tem_ingressos(self, session_id: uuid.UUID) -> bool:
+    def has_any_ticket(self, session_id: uuid.UUID) -> bool:
         return (
             self.db.scalar(select(Ticket.id).where(Ticket.session_id == session_id).limit(1))
             is not None
         )
 
-    def excluir(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> None:
+    def delete(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> None:
         """Apaga a sessão de vez — só rascunho, e só sem ingresso.
 
         Sessão publicada sai do cartaz com despublicar; sessão que já vendeu
         não some, porque quem comprou precisa continuar enxergando o que
         comprou. Para essas o caminho é cancelar. Ver decisão D28.
         """
-        sessao = self.obter_do_organizador(session_id, organizer_id)
+        session = self.get_for_organizer(session_id, organizer_id)
 
-        if self.tem_ingressos(session_id):
+        if self.has_any_ticket(session_id):
             raise SessionHasTickets
-        if sessao.status is SessionStatus.PUBLISHED:
+        if session.status is SessionStatus.PUBLISHED:
             raise SessionIsPublished
 
-        self.db.delete(sessao)
+        self.db.delete(session)
         self.db.commit()
 
-    def atualizar(
-        self, session_id: uuid.UUID, organizer_id: uuid.UUID, dados: SessionUpdate
+    def update(
+        self, session_id: uuid.UUID, organizer_id: uuid.UUID, data: SessionUpdate
     ) -> Session:
-        sessao = self.obter_do_organizador(session_id, organizer_id)
-        self._exige_nao_cancelada(sessao)
+        session = self.get_for_organizer(session_id, organizer_id)
+        self._require_not_cancelled(session)
 
-        if dados.starts_at is not None and dados.starts_at != sessao.starts_at:
+        if data.starts_at is not None and data.starts_at != session.starts_at:
             # Mudar a hora por baixo de quem já tem ingresso é pior que recusar
             # a edição: o sistema não tem como avisar essas pessoas.
-            if self.tem_ingressos(session_id):
+            if self.has_any_ticket(session_id):
                 raise SessionHasTickets
-            self._exige_futuro(dados.starts_at)
+            self._require_future(data.starts_at)
 
             # A duração vem da cópia guardada na própria sessão, não de uma
             # nova consulta ao catálogo: o filme é o mesmo, e o que o ingresso
             # promete é o que foi gravado na venda. Ver decisões D13 e D37.
-            ocupa_ate = occupation_end(dados.starts_at, sessao.movie_runtime_minutes)
+            ocupa_ate = occupation_end(data.starts_at, session.movie_runtime_minutes)
             if self.sessions.overlaps(
-                sessao.room_id, dados.starts_at, ocupa_ate, ignoring=sessao.id
+                session.room_id, data.starts_at, ocupa_ate, ignoring=session.id
             ):
                 raise RoomBusy
 
-            sessao.starts_at = dados.starts_at
-            sessao.occupies_until = ocupa_ate
+            session.starts_at = data.starts_at
+            session.occupies_until = ocupa_ate
 
-        if dados.audio is not None:
-            sessao.audio = dados.audio
-        if dados.screen_format is not None:
-            sessao.screen_format = dados.screen_format
+        if data.audio is not None:
+            session.audio = data.audio
+        if data.screen_format is not None:
+            session.screen_format = data.screen_format
 
-        if dados.prices is not None:
-            novos = self._monta_precos(
-                sessao.room, {p.sector_id: p.price_cents for p in dados.prices}
+        if data.prices is not None:
+            novos = self._build_prices(
+                session.room, {p.sector_id: p.price_cents for p in data.prices}
             )
             # Monta os novos antes de mexer nos atuais: se a validação falhar,
             # a sessão fica intacta em vez de perder os preços que tinha.
@@ -303,26 +303,26 @@ class SessionService:
             # O flush no meio é necessário porque o SQLAlchemy inseriria os
             # novos antes de apagar os antigos, e o índice único de
             # (sessão, setor) recusaria a operação.
-            sessao.prices.clear()
+            session.prices.clear()
             self.db.flush()
-            sessao.prices = novos
+            session.prices = novos
 
-        return self.sessions.save(sessao)
+        return self.sessions.save(session)
 
-    def publicar(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
-        sessao = self.obter_do_organizador(session_id, organizer_id)
-        self._exige_nao_cancelada(sessao)
-        self._exige_futuro(sessao.starts_at)
-        sessao.status = SessionStatus.PUBLISHED
-        return self.sessions.save(sessao)
+    def publish(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
+        session = self.get_for_organizer(session_id, organizer_id)
+        self._require_not_cancelled(session)
+        self._require_future(session.starts_at)
+        session.status = SessionStatus.PUBLISHED
+        return self.sessions.save(session)
 
-    def despublicar(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
-        sessao = self.obter_do_organizador(session_id, organizer_id)
-        self._exige_nao_cancelada(sessao)
-        sessao.status = SessionStatus.DRAFT
-        return self.sessions.save(sessao)
+    def unpublish(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
+        session = self.get_for_organizer(session_id, organizer_id)
+        self._require_not_cancelled(session)
+        session.status = SessionStatus.DRAFT
+        return self.sessions.save(session)
 
-    def ingressos_vendidos(self, session_id: uuid.UUID) -> int:
+    def occupied_seat_count(self, session_id: uuid.UUID) -> int:
         """Quantos ingressos desta sessão ocupam poltrona.
 
         Ingresso cancelado pelo próprio cliente não conta: a poltrona voltou
@@ -335,13 +335,13 @@ class SessionService:
                 .select_from(Ticket)
                 .where(
                     Ticket.session_id == session_id,
-                    Ticket.status.in_(OCUPAM_ASSENTO),
+                    Ticket.status.in_(OCCUPY_SEAT),
                 )
             )
             or 0
         )
 
-    def contagens_de_ingressos(
+    def ticket_counts(
         self, session_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, tuple[int, int]]:
         """Por sessão: (quantos ocupam poltrona, quantos existem ao todo).
@@ -361,7 +361,7 @@ class SessionService:
         linhas = self.db.execute(
             select(
                 Ticket.session_id,
-                func.count().filter(Ticket.status.in_(OCUPAM_ASSENTO)),
+                func.count().filter(Ticket.status.in_(OCCUPY_SEAT)),
                 func.count(),
             )
             .where(Ticket.session_id.in_(session_ids))
@@ -369,7 +369,7 @@ class SessionService:
         ).all()
         return {sid: (ocupam, total) for sid, ocupam, total in linhas}
 
-    def cancelar(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
+    def cancel(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> Session:
         """Cancela a sessão — só enquanto ela estiver vazia.
 
         Cancelar diz que a sessão **não vai acontecer**. Se alguém já comprou,
@@ -383,17 +383,17 @@ class SessionService:
         despublicar: para de vender e quem já tem ingresso entra normalmente.
         Ver decisão D30.
         """
-        sessao = self.obter_do_organizador(session_id, organizer_id)
-        self._exige_nao_cancelada(sessao)
+        session = self.get_for_organizer(session_id, organizer_id)
+        self._require_not_cancelled(session)
 
-        vendidos = self.ingressos_vendidos(session_id)
-        if vendidos:
-            raise SessionSold(vendidos)
+        sold = self.occupied_seat_count(session_id)
+        if sold:
+            raise SessionSold(sold)
 
-        sessao.status = SessionStatus.CANCELLED
-        return self.sessions.save(sessao)
+        session.status = SessionStatus.CANCELLED
+        return self.sessions.save(session)
 
-    def cancelar_pedidos(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> int:
+    def cancel_orders(self, session_id: uuid.UUID, organizer_id: uuid.UUID) -> int:
         """Cancela de uma vez todos os pedidos da sessão. Devolve quantos.
 
         É o passo que falta para conseguir cancelar uma sessão que já vendeu.
@@ -409,44 +409,44 @@ class SessionService:
         um pedido que já estava em voo, e para esse a contagem devolvida
         denuncia a diferença.
         """
-        sessao = self.obter_do_organizador(session_id, organizer_id)
-        self._exige_nao_cancelada(sessao)
+        session = self.get_for_organizer(session_id, organizer_id)
+        self._require_not_cancelled(session)
 
-        if sessao.status is SessionStatus.PUBLISHED:
-            sessao.status = SessionStatus.DRAFT
-            self.sessions.save(sessao)
+        if session.status is SessionStatus.PUBLISHED:
+            session.status = SessionStatus.DRAFT
+            self.sessions.save(session)
 
-        return OrderService(self.db).cancelar_da_sessao(session_id)
+        return OrderService(self.db).cancel_for_session(session_id)
 
     # -- apoio -------------------------------------------------------------
 
     @staticmethod
-    def _exige_futuro(quando: datetime) -> None:
-        if quando <= datetime.now(timezone.utc):
+    def _require_future(starts_at: datetime) -> None:
+        if starts_at <= datetime.now(timezone.utc):
             raise SessionInThePast
 
     @staticmethod
-    def _exige_nao_cancelada(sessao: Session) -> None:
-        if sessao.status is SessionStatus.CANCELLED:
+    def _require_not_cancelled(session: Session) -> None:
+        if session.status is SessionStatus.CANCELLED:
             raise SessionAlreadyCancelled
 
     @staticmethod
-    def _monta_precos(sala, por_setor: dict[uuid.UUID, int]) -> list[SessionSectorPrice]:
+    def _build_prices(room, por_setor: dict[uuid.UUID, int]) -> list[SessionSectorPrice]:
         """Todo setor da sala precisa ter preço.
 
         Sem essa trava, uma sessão poderia ir ao ar com um setor sem valor, e o
         erro só apareceria na hora em que alguém tentasse comprar aquela
         poltrona.
         """
-        faltando = [s.name for s in sala.sectors if s.id not in por_setor]
-        if faltando:
-            raise PricesDoNotCoverSectors(faltando)
+        missing = [s.name for s in room.sectors if s.id not in por_setor]
+        if missing:
+            raise PricesDoNotCoverSectors(missing)
 
-        validos = {s.id for s in sala.sectors}
+        valid_ids = {s.id for s in room.sectors}
         return [
             # `room_id` explícito: é ele que a chave composta usa para provar
             # que o setor é desta sala. Ver decisão D35.
-            SessionSectorPrice(sector_id=sid, room_id=sala.id, price_cents=valor)
-            for sid, valor in por_setor.items()
-            if sid in validos
+            SessionSectorPrice(sector_id=sid, room_id=room.id, price_cents=amount)
+            for sid, amount in por_setor.items()
+            if sid in valid_ids
         ]

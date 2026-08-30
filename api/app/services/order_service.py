@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DbSession
 
 from app.core import ticket_code
-from app.models.order import OCUPAM_ASSENTO, Order, OrderStatus, Ticket, TicketStatus
+from app.models.order import OCCUPY_SEAT, Order, OrderStatus, Ticket, TicketStatus
 from app.models.session import Session, SessionStatus
 from app.schemas.order import OrderCreate, SeatSelection
 from app.services import payment
@@ -49,7 +49,7 @@ class OrderService:
 
     # -- disponibilidade ---------------------------------------------------
 
-    def liberar_reservas_vencidas(self) -> int:
+    def release_expired_holds(self) -> int:
         """Devolve ao estoque os assentos de pedidos que ninguém pagou.
 
         Roda antes de qualquer leitura ou escrita de disponibilidade, em vez de
@@ -57,12 +57,12 @@ class OrderService:
         limpeza precisa acontecer no caminho de quem usa. O custo é um UPDATE
         que quase sempre não encontra nada.
         """
-        agora = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc)
 
         vencidos = list(
             self.db.scalars(
                 select(Order.id).where(
-                    Order.status == OrderStatus.PENDING, Order.expires_at <= agora
+                    Order.status == OrderStatus.PENDING, Order.expires_at <= now
                 )
             )
         )
@@ -80,72 +80,72 @@ class OrderService:
         self.db.commit()
         return len(vencidos)
 
-    def assentos_ocupados(self, session_id: uuid.UUID) -> set[tuple[uuid.UUID, str]]:
-        self.liberar_reservas_vencidas()
+    def taken_seats(self, session_id: uuid.UUID) -> set[tuple[uuid.UUID, str]]:
+        self.release_expired_holds()
         linhas = self.db.execute(
             select(Ticket.sector_id, Ticket.seat_code).where(
-                Ticket.session_id == session_id, Ticket.status.in_(OCUPAM_ASSENTO)
+                Ticket.session_id == session_id, Ticket.status.in_(OCCUPY_SEAT)
             )
         ).all()
         return {(sid, code) for sid, code in linhas}
 
-    def sessao_a_venda(self, session_id: uuid.UUID) -> Session:
-        sessao = self.db.get(Session, session_id)
+    def session_on_sale(self, session_id: uuid.UUID) -> Session:
+        session = self.db.get(Session, session_id)
         if (
-            sessao is None
-            or sessao.status is not SessionStatus.PUBLISHED
-            or sessao.starts_at <= datetime.now(timezone.utc)
+            session is None
+            or session.status is not SessionStatus.PUBLISHED
+            or session.starts_at <= datetime.now(timezone.utc)
         ):
             raise SessionNotAvailable
-        return sessao
+        return session
 
     # -- compra ------------------------------------------------------------
 
-    def criar(self, customer_id: uuid.UUID, dados: OrderCreate) -> Order:
-        sessao = self.sessao_a_venda(dados.session_id)
+    def create(self, customer_id: uuid.UUID, data: OrderCreate) -> Order:
+        session = self.session_on_sale(data.session_id)
 
-        escolhidos = [
+        chosen = [
             SeatSelection(sector_id=s.sector_id, seat_code=s.seat_code.strip().upper())
-            for s in dados.seats
+            for s in data.seats
         ]
 
-        chaves = [(s.sector_id, s.seat_code) for s in escolhidos]
+        chaves = [(s.sector_id, s.seat_code) for s in chosen]
         if len(chaves) != len(set(chaves)):
             raise DuplicateSeat
 
-        precos = {p.sector_id: p.price_cents for p in sessao.prices}
-        setores = {s.id: s for s in sessao.room.sectors}
+        prices = {p.sector_id: p.price_cents for p in session.prices}
+        sectors = {s.id: s for s in session.room.sectors}
 
         # A poltrona precisa existir na geometria e o setor precisa ser da sala
         # desta sessão. Sem isso, dava para comprar "Z99" e o pedido nasceria
         # válido para um lugar que não existe.
-        inexistentes = [
+        unknown = [
             s.seat_code
-            for s in escolhidos
-            if s.sector_id not in setores or not setores[s.sector_id].has_seat(s.seat_code)
+            for s in chosen
+            if s.sector_id not in sectors or not sectors[s.sector_id].has_seat(s.seat_code)
         ]
-        if inexistentes:
-            raise SeatDoesNotExist(inexistentes)
+        if unknown:
+            raise SeatDoesNotExist(unknown)
 
-        ocupados = self.assentos_ocupados(sessao.id)
-        tomados = [s.seat_code for s in escolhidos if (s.sector_id, s.seat_code) in ocupados]
-        if tomados:
-            raise SeatTaken(tomados)
+        occupied = self.taken_seats(session.id)
+        taken = [s.seat_code for s in chosen if (s.sector_id, s.seat_code) in occupied]
+        if taken:
+            raise SeatTaken(taken)
 
-        total = sum(precos[s.sector_id] for s in escolhidos)
+        total = sum(prices[s.sector_id] for s in chosen)
 
-        pedido = Order(customer_id=customer_id, session_id=sessao.id, total_cents=total)
-        pedido.tickets = [
+        order = Order(customer_id=customer_id, session_id=session.id, total_cents=total)
+        order.tickets = [
             Ticket(
-                session_id=sessao.id,
+                session_id=session.id,
                 sector_id=s.sector_id,
                 seat_code=s.seat_code,
-                price_cents=precos[s.sector_id],
+                price_cents=prices[s.sector_id],
             )
-            for s in escolhidos
+            for s in chosen
         ]
 
-        self.db.add(pedido)
+        self.db.add(order)
         try:
             self.db.commit()
         except IntegrityError:
@@ -153,54 +153,54 @@ class OrderService:
             # acima passou nas duas, e o índice único parcial derrubou a
             # segunda. É o caminho normal sob concorrência, não um imprevisto.
             self.db.rollback()
-            raise SeatTaken([s.seat_code for s in escolhidos])
+            raise SeatTaken([s.seat_code for s in chosen])
 
-        self.db.refresh(pedido)
-        return pedido
+        self.db.refresh(order)
+        return order
 
     # -- pagamento ---------------------------------------------------------
 
-    def pagar(self, order_id: uuid.UUID, customer_id: uuid.UUID, card: dict) -> Order:
-        pedido = self.obter(order_id, customer_id)
+    def pay(self, order_id: uuid.UUID, customer_id: uuid.UUID, card: dict) -> Order:
+        order = self.get_for_customer(order_id, customer_id)
 
-        if pedido.is_expired:
-            self.liberar_reservas_vencidas()
-            self.db.refresh(pedido)
+        if order.is_expired:
+            self.release_expired_holds()
+            self.db.refresh(order)
 
-        if pedido.status is not OrderStatus.PENDING:
-            raise OrderNotPayable(pedido.status)
+        if order.status is not OrderStatus.PENDING:
+            raise OrderNotPayable(order.status)
 
-        resultado = payment.processar(card["card_number"], pedido.total_cents)
+        resultado = payment.process(card["card_number"], order.total_cents)
 
-        if resultado.aprovado:
-            pedido.status = OrderStatus.PAID
-            pedido.paid_at = datetime.now(timezone.utc)
-            for ingresso in pedido.tickets:
-                ingresso.status = TicketStatus.VALID
+        if resultado.approved:
+            order.status = OrderStatus.PAID
+            order.paid_at = datetime.now(timezone.utc)
+            for ticket in order.tickets:
+                ticket.status = TicketStatus.VALID
         else:
             # Recusa devolve os assentos. Marcar CANCELLED basta: o índice
             # único parcial ignora esse estado, então a poltrona volta a ficar
             # livre sem nenhuma limpeza extra.
-            pedido.status = OrderStatus.DECLINED
-            pedido.decline_reason = resultado.motivo
-            for ingresso in pedido.tickets:
-                ingresso.status = TicketStatus.CANCELLED
+            order.status = OrderStatus.DECLINED
+            order.decline_reason = resultado.reason
+            for ticket in order.tickets:
+                ticket.status = TicketStatus.CANCELLED
 
         self.db.commit()
-        self.db.refresh(pedido)
-        return pedido
+        self.db.refresh(order)
+        return order
 
-    def cancelar(self, order_id: uuid.UUID, customer_id: uuid.UUID) -> Order:
-        pedido = self.obter(order_id, customer_id)
-        if pedido.status not in (OrderStatus.PENDING, OrderStatus.PAID):
-            raise OrderNotPayable(pedido.status)
+    def cancel(self, order_id: uuid.UUID, customer_id: uuid.UUID) -> Order:
+        order = self.get_for_customer(order_id, customer_id)
+        if order.status not in (OrderStatus.PENDING, OrderStatus.PAID):
+            raise OrderNotPayable(order.status)
 
-        self._marca_cancelado(pedido)
+        self._mark_cancelled(order)
         self.db.commit()
-        self.db.refresh(pedido)
-        return pedido
+        self.db.refresh(order)
+        return order
 
-    def cancelar_da_sessao(self, session_id: uuid.UUID) -> int:
+    def cancel_for_session(self, session_id: uuid.UUID) -> int:
         """Cancela todos os pedidos vivos de uma sessão. Devolve quantos.
 
         Quem chama é o organizador, pela sessão — o cliente não está por perto
@@ -219,36 +219,36 @@ class OrderService:
                 )
             )
         )
-        for pedido in pedidos:
-            self._marca_cancelado(pedido, pelo_organizador=True)
+        for order in pedidos:
+            self._mark_cancelled(order, pelo_organizador=True)
 
         self.db.commit()
         return len(pedidos)
 
     @staticmethod
-    def _marca_cancelado(pedido: Order, *, pelo_organizador: bool = False) -> None:
+    def _mark_cancelled(order: Order, *, pelo_organizador: bool = False) -> None:
         """A regra de o que acontece com o pedido e os ingressos ao cancelar.
 
         Fica num lugar só porque os dois caminhos — o cliente desistindo e o
         organizador cancelando a sessão — precisam concordar sobre o que
         sobrevive. Não commita: quem chama decide o escopo da transação.
         """
-        pedido.status = OrderStatus.CANCELLED
-        pedido.cancelled_by_organizer = pelo_organizador
-        for ingresso in pedido.tickets:
-            if ingresso.status is not TicketStatus.USED:
-                ingresso.status = TicketStatus.CANCELLED
+        order.status = OrderStatus.CANCELLED
+        order.cancelled_by_organizer = pelo_organizador
+        for ticket in order.tickets:
+            if ticket.status is not TicketStatus.USED:
+                ticket.status = TicketStatus.CANCELLED
 
     # -- leitura -----------------------------------------------------------
 
-    def obter(self, order_id: uuid.UUID, customer_id: uuid.UUID) -> Order:
-        pedido = self.db.get(Order, order_id)
-        if pedido is None or pedido.customer_id != customer_id:
+    def get_for_customer(self, order_id: uuid.UUID, customer_id: uuid.UUID) -> Order:
+        order = self.db.get(Order, order_id)
+        if order is None or order.customer_id != customer_id:
             raise OrderNotFound
-        return pedido
+        return order
 
-    def listar_do_cliente(self, customer_id: uuid.UUID) -> list[Order]:
-        self.liberar_reservas_vencidas()
+    def list_for_customer(self, customer_id: uuid.UUID) -> list[Order]:
+        self.release_expired_holds()
         return list(
             self.db.scalars(
                 select(Order)
@@ -257,10 +257,10 @@ class OrderService:
             )
         )
 
-    def ingressos_do_cliente(self, customer_id: uuid.UUID) -> list[Ticket]:
+    def tickets_for_customer(self, customer_id: uuid.UUID) -> list[Ticket]:
         """Só ingressos que valem alguma coisa. Reserva não paga e ingresso
         cancelado não são documento, e poluiriam a carteira."""
-        self.liberar_reservas_vencidas()
+        self.release_expired_holds()
         return list(
             self.db.scalars(
                 select(Ticket)
@@ -274,7 +274,7 @@ class OrderService:
         )
 
     @staticmethod
-    def codigo_do(ingresso: Ticket) -> str | None:
-        if ingresso.status in (TicketStatus.VALID, TicketStatus.USED):
-            return ticket_code.gerar(ingresso.id)
+    def code_for(ticket: Ticket) -> str | None:
+        if ticket.status in (TicketStatus.VALID, TicketStatus.USED):
+            return ticket_code.issue(ticket.id)
         return None

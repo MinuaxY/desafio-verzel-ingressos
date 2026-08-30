@@ -3,7 +3,7 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.room import MAX_FILEIRAS, MAX_POLTRONAS_POR_FILEIRA, SeatKind
+from app.models.room import MAX_ROWS, MAX_SEATS_PER_ROW, SeatKind
 
 
 class SpecialSeatIn(BaseModel):
@@ -12,7 +12,7 @@ class SpecialSeatIn(BaseModel):
 
     @field_validator("seat_code")
     @classmethod
-    def normaliza(cls, v: str) -> str:
+    def normalize(cls, v: str) -> str:
         return v.strip().upper()
 
 
@@ -25,8 +25,8 @@ class SpecialSeatOut(BaseModel):
 
 class SectorIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)
-    rows: int = Field(ge=1, le=MAX_FILEIRAS, description="Quantidade de fileiras (A, B, C…)")
-    seats_per_row: int = Field(ge=1, le=MAX_POLTRONAS_POR_FILEIRA)
+    rows: int = Field(ge=1, le=MAX_ROWS, description="Quantidade de fileiras (A, B, C…)")
+    seats_per_row: int = Field(ge=1, le=MAX_SEATS_PER_ROW)
     display_order: int = Field(0, ge=0, description="Ordem no mapa, da tela para o fundo")
     special_seats: list[SpecialSeatIn] = Field(
         default_factory=list,

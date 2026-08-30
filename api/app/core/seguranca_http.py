@@ -31,8 +31,8 @@ HSTS = "max-age=31536000; includeSubDomains"
 class CabecalhosDeSeguranca(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         resposta = await call_next(request)
-        for nome, valor in CABECALHOS.items():
-            resposta.headers.setdefault(nome, valor)
+        for name, amount in CABECALHOS.items():
+            resposta.headers.setdefault(name, amount)
 
         # O proxy da plataforma informa o esquema original em X-Forwarded-Proto.
         if request.headers.get("x-forwarded-proto") == "https":
@@ -41,11 +41,11 @@ class CabecalhosDeSeguranca(BaseHTTPMiddleware):
         return resposta
 
 
-def instalar(app: FastAPI) -> None:
+def install(app: FastAPI) -> None:
     app.add_middleware(CabecalhosDeSeguranca)
 
     @app.exception_handler(RequestValidationError)
-    async def erro_de_validacao(_request: Request, exc: RequestValidationError):
+    async def validation_error(_request: Request, exc: RequestValidationError):
         """Devolve só o que o cliente precisa saber.
 
         A resposta padrão do FastAPI inclui `ctx` e `input`, que descrevem o
@@ -53,8 +53,8 @@ def instalar(app: FastAPI) -> None:
         ajuda quem está usando a API, e ajuda quem está sondando.
         """
         limpos = [
-            {"loc": erro.get("loc", []), "msg": erro.get("msg", "Valor inválido")}
-            for erro in exc.errors()
+            {"loc": error.get("loc", []), "msg": error.get("msg", "Valor inválido")}
+            for error in exc.errors()
         ]
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

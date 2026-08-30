@@ -12,7 +12,7 @@ TAMANHO_BACKDROP = "w1280"
 # O TMDb separa os lançamentos por tipo, e cada um pode ter classificação
 # diferente: Duna é 14 no cinema e 12 no digital. Para sessão de cinema vale a
 # de exibição em sala, então esses tipos vêm primeiro na ordem de preferência.
-TIPO_CINEMA = (3, 2, 1)  # geral, limitado, pré-estreia
+CINEMA_GENRE = (3, 2, 1)  # geral, limitado, pré-estreia
 
 
 def _classificacao_brasileira(release_dates: dict | None) -> str | None:
@@ -31,7 +31,7 @@ def _classificacao_brasileira(release_dates: dict | None) -> str | None:
         return None
 
     lancamentos.sort(
-        key=lambda r: TIPO_CINEMA.index(r["type"]) if r["type"] in TIPO_CINEMA else 99
+        key=lambda r: CINEMA_GENRE.index(r["type"]) if r["type"] in CINEMA_GENRE else 99
     )
     return lancamentos[0]["certification"].strip() or None
 
@@ -44,8 +44,8 @@ class TmdbProvider:
     # -- infraestrutura ----------------------------------------------------
 
     def _get(self, path: str, params: dict[str, str | int] | None = None) -> dict:
-        chave = f"{path}?{sorted((params or {}).items())}"
-        if (cacheado := self.cache.get(chave)) is not None:
+        key = f"{path}?{sorted((params or {}).items())}"
+        if (cacheado := self.cache.get(key)) is not None:
             return cacheado
 
         try:
@@ -66,9 +66,9 @@ class TmdbProvider:
         except httpx.HTTPError as e:
             raise CatalogUnavailable("Não foi possível falar com o catálogo") from e
 
-        dados = resposta.json()
-        self.cache.set(chave, dados)
-        return dados
+        data = resposta.json()
+        self.cache.set(key, data)
+        return data
 
     def _imagem(self, path: str | None, tamanho: str) -> str | None:
         if not path:
@@ -95,12 +95,12 @@ class TmdbProvider:
     # -- contrato ----------------------------------------------------------
 
     def search(self, query: str, page: int = 1) -> CatalogPage:
-        dados = self._get("/search/movie", {"query": query, "page": page})
+        data = self._get("/search/movie", {"query": query, "page": page})
         return CatalogPage(
-            items=[self._para_item(r) for r in dados.get("results", [])],
-            page=dados.get("page", 1),
-            total_pages=dados.get("total_pages", 1),
-            total_results=dados.get("total_results", 0),
+            items=[self._para_item(r) for r in data.get("results", [])],
+            page=data.get("page", 1),
+            total_pages=data.get("total_pages", 1),
+            total_results=data.get("total_results", 0),
         )
 
     def get(self, item_id: str) -> CatalogItem | None:

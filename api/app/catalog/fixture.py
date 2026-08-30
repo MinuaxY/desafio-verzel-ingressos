@@ -24,19 +24,19 @@ def _sem_acento(texto: str) -> str:
 
 
 @lru_cache
-def _carrega() -> list[CatalogItem]:
-    dados = json.loads(ARQUIVO.read_text(encoding="utf-8"))
-    return [CatalogItem(**i) for i in dados["items"]]
+def _load() -> list[CatalogItem]:
+    data = json.loads(ARQUIVO.read_text(encoding="utf-8"))
+    return [CatalogItem(**i) for i in data["items"]]
 
 
 class FixtureProvider:
     def __init__(self, *_args, **_kwargs) -> None:
-        self.items = _carrega()
+        self.items = _load()
 
     def search(self, query: str, page: int = 1) -> CatalogPage:
-        termo = _sem_acento(query.strip())
+        term = _sem_acento(query.strip())
         encontrados = (
-            [i for i in self.items if termo in _sem_acento(i.title)] if termo else list(self.items)
+            [i for i in self.items if term in _sem_acento(i.title)] if term else list(self.items)
         )
         inicio = (page - 1) * POR_PAGINA
         return CatalogPage(

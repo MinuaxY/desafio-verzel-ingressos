@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user
-from app.core.throttle import tentativas_de_login
+from app.core.throttle import login_attempts
 from app.db import get_db
 from app.models.user import User
 from app.schemas.user import TokenOut, UserLogin, UserOut, UserRegister
@@ -25,24 +25,24 @@ def login(data: UserLogin, request: Request, db: Session = Depends(get_db)) -> T
     # A chave junta IP e e-mail: só por IP puniria uma rede compartilhada
     # inteira, e só por e-mail deixaria alguém bloquear a conta de outra
     # pessoa de propósito. Ver decisão D26.
-    origem = request.client.host if request.client else "desconhecido"
-    chave = f"{origem}|{data.email.lower()}"
+    origin = request.client.host if request.client else "desconhecido"
+    key = f"{origin}|{data.email.lower()}"
 
-    if (espera := tentativas_de_login.bloqueado(chave)):
+    if (wait_seconds := login_attempts.blocked_for(key)):
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,
-            f"Muitas tentativas. Tente de novo em {espera} segundos.",
-            headers={"Retry-After": str(espera)},
+            f"Muitas tentativas. Tente de novo em {wait_seconds} segundos.",
+            headers={"Retry-After": str(wait_seconds)},
         )
 
     try:
         resposta = AuthService(db).login(data)
     except InvalidCredentials:
-        tentativas_de_login.registrar(chave)
+        login_attempts.registrar(key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "E-mail ou senha inválidos")
 
     # Quem acertou não carrega o histórico de erros para a próxima vez.
-    tentativas_de_login.liberar(chave)
+    login_attempts.liberar(key)
     return resposta
 
 

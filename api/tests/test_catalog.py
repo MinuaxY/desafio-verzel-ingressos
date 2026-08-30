@@ -36,9 +36,9 @@ def usa_fixture_provider(monkeypatch):
     get_catalog_provider.cache_clear()
 
 
-def auth(client, dados):
+def auth(client, data):
     """Papel privilegiado não sai do cadastro público. Ver conftest."""
-    return cria_conta(client, dados)
+    return cria_conta(client, data)
 
 
 class TestAutorizacao:

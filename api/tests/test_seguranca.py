@@ -1,7 +1,7 @@
 """Proteções de borda: limite de tentativas, cabeçalhos e vazamento de erro."""
 import pytest
 
-from app.core.throttle import MAX_TENTATIVAS, Throttle, tentativas_de_login
+from app.core.throttle import MAX_TENTATIVAS, Throttle, login_attempts
 
 CLIENTE = {
     "name": "Cli", "email": "cli@seg.dev", "password": "senhaforte123",
@@ -10,9 +10,9 @@ CLIENTE = {
 
 @pytest.fixture(autouse=True)
 def limpa_throttle():
-    tentativas_de_login.limpar_tudo()
+    login_attempts.limpar_tudo()
     yield
-    tentativas_de_login.limpar_tudo()
+    login_attempts.limpar_tudo()
 
 
 class TestLimiteDeTentativas:
@@ -28,11 +28,11 @@ class TestLimiteDeTentativas:
             )
             assert r.status_code == 401
 
-        bloqueado = client.post(
+        blocked_for = client.post(
             "/auth/login", json={"email": CLIENTE["email"], "password": "erradaerrada"}
         )
-        assert bloqueado.status_code == 429
-        assert "Retry-After" in bloqueado.headers
+        assert blocked_for.status_code == 429
+        assert "Retry-After" in blocked_for.headers
 
     def test_bloqueio_vale_ate_para_a_senha_certa(self, client):
         """Depois de bloqueado, nem acertar libera — senão bastaria acertar na
@@ -99,24 +99,24 @@ class TestThrottleIsolado:
         t = Throttle(maximo=2, janela=0)
         t.registrar("x")
         t.registrar("x")
-        assert t.bloqueado("x") == 0
+        assert t.blocked_for("x") == 0
 
     def test_conta_por_chave(self):
         t = Throttle(maximo=1, janela=60)
         t.registrar("a")
-        assert t.bloqueado("a") > 0
-        assert t.bloqueado("b") == 0
+        assert t.blocked_for("a") > 0
+        assert t.blocked_for("b") == 0
 
     def test_liberar_zera(self):
         t = Throttle(maximo=1, janela=60)
         t.registrar("a")
         t.liberar("a")
-        assert t.bloqueado("a") == 0
+        assert t.blocked_for("a") == 0
 
     def test_devolve_segundos_restantes(self):
         t = Throttle(maximo=1, janela=60)
         t.registrar("a")
-        assert 1 <= t.bloqueado("a") <= 60
+        assert 1 <= t.blocked_for("a") <= 60
 
 
 class TestCabecalhos:
@@ -147,10 +147,10 @@ class TestErroNaoVazaEstrutura:
         r = client.get("/sessions/nao-e-uuid")
         assert r.status_code == 422
 
-        for erro in r.json()["detail"]:
-            assert set(erro.keys()) == {"loc", "msg"}
-            assert "ctx" not in erro
-            assert "input" not in erro
+        for error in r.json()["detail"]:
+            assert set(error.keys()) == {"loc", "msg"}
+            assert "ctx" not in error
+            assert "input" not in error
 
     def test_corpo_invalido_nao_devolve_o_que_foi_enviado(self, client):
         r = client.post(
