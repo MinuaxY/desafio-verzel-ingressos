@@ -50,6 +50,8 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [ ] 3.1 Rodada de produto no front-end  ← PROXIMA
 - [ ] 3.2 Testes E2E de checkout, portaria e gestao
 - [ ] Portaria pertencer a um organizador (surgiu da D34)
+- [ ] test_melhorias.py dividido por assunto — 78 testes, virou saco de gatos
+- [ ] Expor occupies_until na API, para a tela mostrar quando a sessao termina
 
 
 ## Falta o Paulo fazer

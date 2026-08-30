@@ -381,3 +381,46 @@ disso se lê no código. Cortar a partir daí seria apagar informação para mel
 
 ### Decisões tomadas
 D36 (ampliada) e D38.
+
+---
+
+## Onde paramos — 30/08, fim do dia
+
+**Blocos 1 e 2 do ciclo pós-devolutiva estão fechados.** Tudo o que a Verzel apontou como
+prioridade — escalada de privilégio, invariantes no banco, padronização de vocabulário e
+excesso de comentário — foi endereçado, em D34 a D38.
+
+### A próxima etapa é o bloco 3, o front-end
+
+É o maior, e a devolutiva disse ser o de maior ganho de percepção: *"o maior ganho viria de
+aproximar o frontend do nível de cuidado do backend"*.
+
+**3.1 — rodada de produto.** Revisar responsividade, espaçamentos, estados de carregamento e
+erro, feedback após ação, consistência dos formulários e comportamento das páginas completas.
+
+**3.2 — testes E2E** de checkout, portaria e painel do organizador. Playwright seria o caminho;
+hoje essas três páginas só foram verificadas manualmente no navegador, o que está declarado nas
+limitações do README.
+
+### O que já está levantado para o bloco 3
+
+- **`occupies_until` não é exposto na API.** A coluna existe desde a D37 e a tela poderia usá-la
+  para mostrar "termina às 22:23" na sessão — é informação que o cliente quer e que hoje o front
+  não tem como calcular sozinho.
+- **A portaria tem uma lista de sessões do turno** (`GET /gate/sessions`, D33) que a tela usa,
+  mas o seletor não mostra qual está em andamento agora. Detalhe de produto barato.
+- **O idioma do front fica em português**, decidido e medido na D36 — não é pendência.
+
+### Fora do backlog original, ainda em aberto
+
+- **A portaria valida ingresso de qualquer organizador.** Um usuário GATE não pertence a cinema
+  nenhum. Apareceu durante a D34 e é modelagem nova.
+- **`test_melhorias.py` tem 78 testes e virou saco de gatos:** começou nas melhorias de gestão
+  (D26–D29) e recebeu cancelamento, defeitos da revisão, invariante de preço e sobreposição de
+  agenda. Dividir por assunto é baixo risco e melhora a leitura do repositório.
+
+### Para retomar o ambiente
+
+O Docker Desktop precisa estar rodando antes de qualquer coisa — a suíte usa Postgres de
+verdade, e sem ele os 264 testes falham todos com erro de conexão, o que já me confundiu uma
+vez. `docker compose up -d db`, esperar o `healthy`, e então `pytest`.
