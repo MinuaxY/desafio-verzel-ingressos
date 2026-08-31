@@ -48,7 +48,17 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] 2.1 Identificadores do back-end em ingles (D36) — front medido e mantido
 - [x] 2.2 Comentario enxuto: o porque fica, o quee a duplicacao saem (D38)
 - [ ] 3.1 Rodada de produto no front-end  ← PROXIMA
+      Achados medidos no ambiente publicado, em 375px:
+      - [ ] Cabecalho transborda 18px: "Criar conta" cortado e a pagina rola de lado em TODAS as telas
+      - [ ] Mapa da sala IMAX cortado dos dois lados no celular: aparecem as poltronas 4 a 11 de 14,
+            com barra de rolagem fininha como unica pista e sem as letras das fileiras
+      - [ ] Poltrona tem 32x32px; a WCAG pede 44x44 para alvo de toque
+      - [ ] Inicio.tsx nao tem estado de carregamento nem de erro: o .catch engole a falha e a
+            secao inteira de previa some, justo onde o Render hibernando custa ate um minuto
+      - [ ] Sem estado de carregamento em NovaSessao, Portaria, Entrar e CriarConta
+      - [ ] So 4 media queries em 1.322 linhas de CSS
 - [ ] 3.2 Testes E2E de checkout, portaria e gestao
+      - [ ] So 2 das 13 paginas tem teste (EmCartaz e Pedido)
 - [ ] Portaria pertencer a um organizador (surgiu da D34)
 - [ ] test_melhorias.py dividido por assunto — 78 testes, virou saco de gatos
 - [ ] Expor occupies_until na API, para a tela mostrar quando a sessao termina
