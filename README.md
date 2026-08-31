@@ -462,7 +462,7 @@ cd web
 npm test
 ```
 
-**122 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
+**126 testes** com Vitest e Testing Library. Cobrem a lógica e os componentes com regra —
 `lib` em 95%, `components` em 83%, `auth` em 77%.
 
 | Arquivo | Testes | Cobre |
@@ -476,6 +476,7 @@ npm test
 | `ProtectedRoute.test.tsx` | 7 | Acesso por papel, token inválido, espera pela sessão |
 | `EscolhaDeDias.test.tsx` | 15 | Repetição em vários dias, atalhos, dia principal travado, contagem na edição |
 | `BarraDeDias.test.tsx` | 10 | Filtro por dia, dia sem sessão, data sem escorregar para UTC |
+| `Inicio.test.tsx` | 4 | Prévia do cartaz: carregando, erro, vazio e com sessões |
 | `Pedido.test.tsx` | 4 | Quem cancelou o pedido: a desistência do cliente e o cancelamento pelo cinema |
 
 ---
@@ -486,7 +487,7 @@ npm test
 desafio-verzel-ingressos/
 ├── docker-compose.yml
 ├── docs/
-│   ├── decisoes.md          as 38 decisões técnicas, e o que foi descartado em cada uma
+│   ├── decisoes.md          as 39 decisões técnicas, e o que foi descartado em cada uma
 │   ├── backlog.md           requisitos, o que foi entregue e o que ficou fora do escopo
 │   ├── diario.md            o que aconteceu em ordem, incluindo o que deu errado
 │   ├── quadro.md            o kanban ao fim do projeto
@@ -563,7 +564,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 
 | | |
 |---|---|
-| [`decisoes.md`](docs/decisoes.md) | As **38 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
+| [`decisoes.md`](docs/decisoes.md) | As **39 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |

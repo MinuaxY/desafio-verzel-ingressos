@@ -35,11 +35,19 @@ const COMO_FUNCIONA = [
 export function Inicio() {
   const { user } = useAuth();
   const [pagina, setPagina] = useState<SessionPage | null>(null);
+  // A prévia tem três desfechos, e a landing precisa saber em qual está: o
+  // `.catch` silencioso fazia a seção inteira sumir sem explicar nada — logo
+  // aqui, onde a primeira visita pega o servidor acordando e leva até um
+  // minuto. Ver decisão D39.
+  const [estado, setEstado] = useState<"carregando" | "pronto" | "erro">("carregando");
 
   useEffect(() => {
     request<SessionPage>(`/sessions?per_page=${NA_PREVIA}`, { auth: false })
-      .then(setPagina)
-      .catch(() => setPagina(null));
+      .then((r) => {
+        setPagina(r);
+        setEstado("pronto");
+      })
+      .catch(() => setEstado("erro"));
   }, []);
 
   const sessoes = pagina?.items ?? [];
@@ -93,6 +101,33 @@ export function Inicio() {
       </section>
 
       {/* ---------- Prévia do cartaz ---------- */}
+      {estado === "carregando" && (
+        <section className="secao">
+          <h2 className="secao__titulo">Próximas sessões</h2>
+          <p className="muted" role="status">
+            Carregando o cartaz. A primeira visita pode demorar até um minuto — o servidor
+            hiberna quando fica sem uso.
+          </p>
+        </section>
+      )}
+
+      {estado === "erro" && (
+        <section className="secao">
+          <h2 className="secao__titulo">Próximas sessões</h2>
+          <p className="alert alert--error" role="alert">
+            Não foi possível carregar o cartaz agora.{" "}
+            <Link to="/em-cartaz">Tentar de novo</Link>.
+          </p>
+        </section>
+      )}
+
+      {estado === "pronto" && sessoes.length === 0 && (
+        <section className="secao">
+          <h2 className="secao__titulo">Próximas sessões</h2>
+          <p className="muted">Nenhuma sessão em cartaz no momento.</p>
+        </section>
+      )}
+
       {sessoes.length > 0 && (
         <section className="secao">
           <header className="secao__cabecalho">

@@ -49,11 +49,11 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] 2.2 Comentario enxuto: o porque fica, o quee a duplicacao saem (D38)
 - [ ] 3.1 Rodada de produto no front-end  ← PROXIMA
       Achados medidos no ambiente publicado, em 375px:
-      - [ ] Cabecalho transborda 18px: "Criar conta" cortado e a pagina rola de lado em TODAS as telas
-      - [ ] Mapa da sala IMAX cortado dos dois lados no celular: aparecem as poltronas 4 a 11 de 14,
+      - [x] Cabecalho transborda 18px: "Criar conta" cortado e a pagina rola de lado em TODAS as telas
+      - [x] Mapa da sala IMAX cortado dos dois lados no celular: aparecem as poltronas 4 a 11 de 14,
             com barra de rolagem fininha como unica pista e sem as letras das fileiras
-      - [ ] Poltrona tem 32x32px; a WCAG pede 44x44 para alvo de toque
-      - [ ] Inicio.tsx nao tem estado de carregamento nem de erro: o .catch engole a falha e a
+      - [x] Poltrona 40px no dedo (32 ja cumpria o minimo AA; 44 e AAA)
+      - [x] Inicio.tsx nao tem estado de carregamento nem de erro: o .catch engole a falha e a
             secao inteira de previa some, justo onde o Render hibernando custa ate um minuto
       - [ ] Sem estado de carregamento em NovaSessao, Portaria, Entrar e CriarConta
       - [ ] So 4 media queries em 1.322 linhas de CSS

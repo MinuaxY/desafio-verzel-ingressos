@@ -845,6 +845,66 @@ sala ocupada. A trava agora depende da duração, e a duração vem do catálogo
 
 ---
 
+## D39 — O front começa pelo celular, e o que estava quebrado lá
+
+**A devolutiva pediu "revisar responsividade, espaçamentos e estados de erro".** Fui medir no
+ambiente publicado a 375px em vez de tratar isso como acabamento, e o que apareceu não era
+acabamento: era o produto não funcionando no aparelho em que mais se compra ingresso.
+
+### O mapa da sala aparecia cortado dos dois lados
+
+Na Sala 3 (IMAX, 14 poltronas por fileira) viam-se as poltronas **4 a 11**. As 1–3 e 12–14
+ficavam fora, e as letras das fileiras nem apareciam. A única pista era uma barra de rolagem
+fininha.
+
+A causa é uma armadilha de flexbox: `.setor__grade` tinha `align-items: center` **junto com**
+`overflow-x: auto`. Conteúdo mais largo que o contêiner transborda para os dois lados, e o lado
+esquerdo fica **inalcançável** — `scrollLeft` não fica negativo.
+
+**Escolhido: separar os papéis em dois elementos.** O de fora rola; um trilho interno com
+`width: fit-content` e `margin-inline: auto` centraliza quando cabe e encosta na esquerda quando
+não cabe.
+
+**Descartado: encolher a poltrona para caber.** Já estavam em 32px; diminuir para caber 14 numa
+tela de 375px levaria a ~20px, e trocaria um problema visível por um erro de toque.
+
+**Descartado: pedir para girar o aparelho.** Empurra para o usuário um problema de layout.
+
+**A rolagem ganhou sombra**, em CSS puro, que aparece só quando há o que rolar e some ao chegar
+na ponta. Uma barra fininha não é convite; a sombra é.
+
+### O cabeçalho transbordava 18px em todas as telas
+
+"Criar conta" ficava cortado e a **página inteira rolava de lado** — em toda tela do sistema,
+não só na landing. Passa a quebrar linha abaixo de 40rem.
+
+### A poltrona no dedo
+
+Sobe para 40px em `@media (pointer: coarse)`, e fica em 32px no mouse. **Correção de um exagero
+meu:** eu tinha citado os 44×44 da WCAG como se fossem obrigatórios. São do nível **AAA**
+(critério 2.5.5); o mínimo AA é **24×24** (2.5.8), que os 32px já cumpriam. É conforto no dedo,
+não conformidade — o que muda a prioridade, não a validade.
+
+### A landing engolia a falha da API
+
+`Inicio.tsx` fazia `.catch(() => setPagina(null))`, e a seção de prévia inteira sumia: sem
+carregamento, sem erro, sem explicação. No pior lugar possível — é onde a primeira visita pega o
+Render acordando, o que o próprio README avisa que leva até um minuto.
+
+Passou a ter os **três desfechos**: carregando (dizendo que o servidor pode estar acordando),
+erro (com caminho para tentar de novo) e vazio. Quatro testes trancam os três.
+
+### O que isso revelou sobre a suíte
+
+**Os 22 testes do mapa passaram sem uma linha de alteração.** O defeito era invisível para eles
+porque jsdom não tem layout: `getBoundingClientRect` devolve zeros, e não há transbordo para
+medir. Nenhum teste de unidade pegaria isso.
+
+É o argumento mais concreto para a etapa 3.2: essa classe de defeito — transbordo, corte,
+alvo pequeno demais — só existe com layout de verdade, e só um navegador de verdade mede.
+
+---
+
 ## Decisões que estavam pendentes
 
 Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma
