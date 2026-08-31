@@ -68,10 +68,16 @@ export function MapaDeAssentos({
             <span className="setor__preco">{reais(setor.price_cents)}</span>
           </div>
 
+          {/* Dois elementos, e não um: o de fora rola, o de dentro tem a largura
+              do conteúdo e se centraliza com `margin: auto`. Com um só, a
+              centralização transbordava para os dois lados numa sala larga em
+              tela estreita, e o lado esquerdo ficava inalcançável — `scrollLeft`
+              não fica negativo. Ver decisão D39. */}
           <div className="setor__grade" role="group" aria-label={`Poltronas do setor ${setor.name}`}>
-            {agrupaPorFileira(setor)
-              .reverse()
-              .map(([fileira, assentos]) => (
+            <div className="setor__trilho">
+              {agrupaPorFileira(setor)
+                .reverse()
+                .map(([fileira, assentos]) => (
                 <div key={fileira} className="fileira">
                   {/* A letra aparece nas duas pontas, como em sala de verdade.
                       Além de ser o costume, mantém as poltronas centradas — com
@@ -129,8 +135,9 @@ export function MapaDeAssentos({
                   <span className="fileira__letra" aria-hidden="true">
                     {fileira}
                   </span>
-                </div>
-              ))}
+                  </div>
+                ))}
+            </div>
           </div>
         </div>
       ))}

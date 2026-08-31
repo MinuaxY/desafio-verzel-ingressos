@@ -306,6 +306,9 @@ a.btn:hover { text-decoration: none; }
 }
 
 @media (max-width: 40rem) {
+  /* Sem a quebra, o grupo de conta transbordava a tela e a página inteira
+     passava a rolar de lado — em todas as telas, não só nesta. Ver decisão D39. */
+  .topo__interno { flex-wrap: wrap; row-gap: var(--space-3); }
   .topo__conta { gap: var(--space-3); }
   .topo__conta .muted { display: none; }
   .conteudo { padding: var(--space-6) var(--space-4); }

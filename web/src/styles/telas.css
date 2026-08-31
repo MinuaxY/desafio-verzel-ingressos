@@ -128,12 +128,35 @@
 }
 .setor__nome { font-size: var(--text-base); }
 .setor__preco { color: var(--accent); font-weight: 700; font-size: var(--text-sm); }
+/* Quem rola é este; quem centraliza é o trilho de dentro.
+   `align-items: center` com `overflow-x` transborda para os dois lados, e o
+   lado esquerdo fica inalcançável porque `scrollLeft` não fica negativo — era
+   o que cortava as primeiras poltronas numa sala larga em tela estreita.
+   Ver decisão D39. */
 .setor__grade {
+  overflow-x: auto;
+  /* Sombra que só aparece quando há o que rolar, e some ao chegar na ponta:
+     as duas primeiras camadas são o fundo (rolam junto), as duas de trás são
+     a sombra (ficam paradas) e vão sendo cobertas. */
+  background:
+    linear-gradient(to right, var(--surface), transparent) left / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--surface), transparent) right / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 0.45), transparent)
+      left / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.45), transparent)
+      right / 14px 100% no-repeat scroll;
+}
+
+.setor__trilho {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  overflow-x: auto;
+  /* A dupla `fit-content` + `margin: auto` centraliza quando cabe e encosta na
+     esquerda quando não cabe, mantendo a rolagem inteira alcançável. */
+  width: fit-content;
+  min-width: 100%;
+  margin-inline: auto;
 }
 
 /* O corredor e o espaco entre blocos: maior que o vao entre poltronas
@@ -170,6 +193,14 @@
   border-radius: var(--radius-sm) var(--radius-sm) var(--radius) var(--radius);
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+/* No dedo, 32px é apertado: a poltrona vizinha fica a poucos pixels. O ponteiro
+   fino do mouse não tem esse problema, então o aumento é só onde ele importa.
+   32px já cumpre o mínimo da WCAG AA (24×24); isto é conforto. */
+@media (pointer: coarse) {
+  .poltrona { width: 2.5rem; height: 2.5rem; font-size: var(--text-xs); }
+  .fileira__letra { width: 1.5rem; }
 }
 
 .poltrona:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
