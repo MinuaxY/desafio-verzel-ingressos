@@ -286,6 +286,28 @@ commit que a criou.
 
 ---
 
+## 17. Uma suíte verde pode ser cega para uma classe inteira de defeito.
+
+**O que aconteceu:** o mapa de assentos aparecia cortado dos dois lados no celular — das 14
+poltronas da fileira, só apareciam a 4 até a 11. Os **22 testes do mapa passaram sem uma linha
+de alteração**, antes e depois da correção. Não estavam errados: jsdom não tem layout.
+`getBoundingClientRect` devolve zeros, larguras não existem, e portanto não há transbordo para
+medir. O teste conferia que a poltrona certa está na tela e clicável, e isso continuava verdade
+enquanto ninguém conseguia enxergá-la.
+
+Os três defeitos encontrados naquele dia — o cabeçalho transbordando, o mapa cortado e a landing
+sumindo em silêncio — só um seria pego pela suíte de 126 testes.
+
+**A lição:** a pergunta não é "os testes passaram?", é "**o que estes testes seriam capazes de
+reprovar?**". Toda ferramenta de teste tem um recorte, e o recorte do jsdom exclui geometria:
+posição, tamanho, transbordo, rolagem, sobreposição. Cobertura alta dentro desse recorte não diz
+nada sobre o que está fora dele.
+
+O útil disso não é desconfiar de todo teste — é saber **nomear o que a ferramenta não vê**, para
+escolher a próxima ferramenta pelo buraco que ela tapa, e não pelo número que ela aumenta.
+
+---
+
 ## O que faria diferente no próximo
 
 1. **Perguntar sobre o não-escrito no dia 1**, não no dia 3.
@@ -302,3 +324,5 @@ commit que a criou.
    código. Foi o que achou a última leva de erros, e nenhum deles era de programação.
 8. **Ancorar toda busca de teste feita por texto com número dentro**, e desconfiar de teste que
    monta o dado a partir de `hoje`.
+9. **Perguntar de cada teste o que ele seria capaz de reprovar**, e não só se ele passa.
+   Uma suíte inteira pode ser cega para geometria sem que nada fique vermelho.

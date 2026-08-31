@@ -36,7 +36,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] Revisao de codigo: tres defeitos corrigidos (D33)
 - [x] Volume na vitrine: tres salas, dez dias, ~90 sessoes
 - [x] Artefatos de processo versionados no repositorio
-- [x] 364 testes (242 back, 122 front)  → agora 371 (249 back, 122 front)
+- [x] 364 testes (242 back, 122 front)  → agora 390 (264 back, 126 front)
 
 
 ## Ciclo pos-devolutiva
@@ -47,7 +47,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] 1.4 CheckConstraint do preco alinhado com o minimo da API (veio junto da D35)
 - [x] 2.1 Identificadores do back-end em ingles (D36) — front medido e mantido
 - [x] 2.2 Comentario enxuto: o porque fica, o quee a duplicacao saem (D38)
-- [ ] 3.1 Rodada de produto no front-end  ← PROXIMA
+- [ ] 3.1 Rodada de produto no front-end  ← EM ANDAMENTO: defeitos sairam, falta a parte estetica
       Achados medidos no ambiente publicado, em 375px:
       - [x] Cabecalho transborda 18px: "Criar conta" cortado e a pagina rola de lado em TODAS as telas
       - [x] Mapa da sala IMAX cortado dos dois lados no celular: aparecem as poltronas 4 a 11 de 14,
@@ -56,10 +56,15 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
       - [x] Inicio.tsx nao tem estado de carregamento nem de erro: o .catch engole a falha e a
             secao inteira de previa some, justo onde o Render hibernando custa ate um minuto
       - [ ] Sem estado de carregamento em NovaSessao, Portaria, Entrar e CriarConta
-      - [ ] So 4 media queries em 1.322 linhas de CSS
-- [ ] 3.2 Testes E2E de checkout, portaria e gestao
-      - [ ] So 2 das 13 paginas tem teste (EmCartaz e Pedido)
+      - [ ] Responsividade alem do medido: 5 media queries em 1.356 linhas de CSS,
+            e so o cabecalho e o mapa foram exercitados em 375px
+      - [ ] Espacamento, consistencia dos formularios e feedback depois da acao
+- [ ] 3.2 Testes E2E de checkout, portaria e gestao  ← PRIORIDADE SUBIU
+      - [ ] So 3 das 13 paginas tem teste (EmCartaz, Pedido e Inicio)
+      - [ ] Os 22 testes do mapa passaram com o mapa quebrado: jsdom nao tem layout,
+            entao essa classe de defeito so aparece com navegador de verdade
 - [ ] Portaria pertencer a um organizador (surgiu da D34)
+- [ ] Seletor da portaria indicar qual sessao esta em andamento agora
 - [ ] test_melhorias.py dividido por assunto — 78 testes, virou saco de gatos
 - [ ] Expor occupies_until na API, para a tela mostrar quando a sessao termina
 

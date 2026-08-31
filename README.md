@@ -527,6 +527,11 @@ O que **não** está pronto, ou está pronto pela metade:
   assentos, o ingresso, a rota protegida, a vitrine e os avisos de pedido cancelado têm teste;
   o checkout, a portaria e o painel do organizador foram verificados manualmente no navegador,
   de ponta a ponta. Com mais tempo, o próximo alvo seria o fluxo de pagamento.
+- **E eles não veem geometria.** O jsdom não calcula layout, então largura, transbordo e
+  rolagem não existem para a suíte. Um defeito real de recorte do mapa no celular passou pelos
+  22 testes do componente sem que nenhum ficasse vermelho — foi encontrado medindo no
+  navegador, e corrigido na decisão D39. Teste de ponta a ponta com navegador de verdade,
+  em Playwright, é o que tapa esse buraco.
 - **Cancelar a sessão não avisa nem estorna ninguém.** Quando o organizador desfaz os pedidos
   de uma sessão, o cliente descobre ao abrir a compra — que passa a dizer que o cinema
   cancelou e que a devolução é com o organizador. Falta o e-mail e falta o estorno, e é por

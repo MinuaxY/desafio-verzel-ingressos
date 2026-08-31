@@ -384,7 +384,7 @@ D36 (ampliada) e D38.
 
 ---
 
-## Onde paramos — 30/08, fim do dia
+## Onde paramos — 30/08, madrugada
 
 **Blocos 1 e 2 do ciclo pós-devolutiva estão fechados.** Tudo o que a Verzel apontou como
 prioridade — escalada de privilégio, invariantes no banco, padronização de vocabulário e
@@ -424,3 +424,108 @@ limitações do README.
 O Docker Desktop precisa estar rodando antes de qualquer coisa — a suíte usa Postgres de
 verdade, e sem ele os 264 testes falham todos com erro de conexão, o que já me confundiu uma
 vez. `docker compose up -d db`, esperar o `healthy`, e então `pytest`.
+
+---
+
+## Pós-devolutiva — 3.1, o front no celular
+
+Comecei a rodada de produto pelo que dava para **medir**, não pelo que dava para opinar: abri o
+ambiente publicado num viewport de 375px e anotei o que estava quebrado, com número.
+
+### Três defeitos, todos invisíveis no desktop
+
+**O cabeçalho transbordava 18px.** "Criar conta" ficava cortado — e, porque o transbordo é do
+documento, a página inteira rolava de lado em **todas** as telas, não só no celular. Uma linha
+de `flex-wrap: wrap` com `row-gap` abaixo de 40rem resolveu.
+
+**O mapa da sala IMAX aparecia cortado dos dois lados.** Das 14 poltronas da fileira, apareciam
+a 4 até a 11: faltavam três de cada lado, sem as letras das fileiras, com uma barra de rolagem
+fininha como única pista de que havia mais coisa ali. A causa é uma armadilha de flexbox:
+`align-items: center` **junto com** `overflow-x: auto`. Conteúdo mais largo que o contêiner
+transborda para os dois lados, e o lado esquerdo fica inalcançável porque `scrollLeft` não
+assume valor negativo — não existe rolagem para trás do zero.
+
+A correção foi separar as duas responsabilidades em dois elementos: o de fora (`.setor__grade`)
+rola, o trilho de dentro (`.setor__trilho`) centraliza com `width: fit-content` e
+`margin-inline: auto`. Aproveitei para colocar sombras de rolagem só com CSS, usando
+`background-attachment: local` e `scroll` — a sombra aparece no lado onde ainda há conteúdo
+escondido, sem uma linha de JavaScript.
+
+**A landing engolia a falha da API.** `Inicio.tsx` tinha um `.catch` que zerava o estado: se a
+requisição falhasse, a seção de prévia sumia inteira — sem carregamento, sem erro, sem
+explicação. É justamente o cenário mais provável em produção, porque o plano gratuito do Render
+hiberna e a primeira visita paga até um minuto de espera. Passou a ter três desfechos
+declarados, com quatro testes novos que trancam cada um.
+
+### O achado mais desconfortável do dia
+
+**Os 22 testes do mapa passaram sem uma linha de alteração.** Não porque o mapa estava certo,
+mas porque jsdom não tem layout: `getBoundingClientRect` devolve zeros e não existe transbordo
+para medir. A suíte de 126 testes de front não pegaria **nenhum** dos três defeitos de hoje.
+
+Isso deixou de ser argumento teórico a favor da 3.2 e virou evidência. Subi a prioridade dela.
+
+### Onde eu tinha exagerado
+
+Citei os 44×44 da WCAG como requisito para a poltrona. São do nível **AAA** (critério 2.5.5). O
+mínimo **AA** é o 2.5.8, de 24×24, que os 32px já cumpriam. Mantive os 40px, mas só sob
+`pointer: coarse`, e pelo motivo certo: conforto no dedo, não conformidade. O item continua
+válido; o que muda é a prioridade dele.
+
+### As medidas, antes e depois
+
+| | antes | depois |
+|---|---|---|
+| transbordo da página | 18px | 0 |
+| rolagem inicial do mapa | travada à direita | `scrollLeft` 0, começa na poltrona 1 |
+| poltronas visíveis | 4 a 11, de 14 | a fileira inteira, com as letras |
+| poltrona no dedo | 32px | 40px |
+| desktop em 750px | — | centralizado, sem rolagem, poltrona 32px |
+
+### Decisões tomadas
+D39.
+
+---
+
+## Onde paramos — 30/08, noite
+
+**A 3.1 está pela metade, e a metade que saiu é a dos defeitos.** O que sobrou é a parte
+estética, que faz sentido vir depois mesmo.
+
+### O que falta na 3.1
+
+- **Estado de carregamento em `NovaSessao`, `Portaria`, `Entrar` e `CriarConta`.** O caminho
+  está aberto: `Inicio.tsx` estabeleceu o padrão de três estados
+  (`"carregando" | "pronto" | "erro"`) e `Inicio.test.tsx` estabeleceu como testá-lo, com uma
+  promessa controlada que só resolve quando o teste manda — é o que dá tempo de observar o
+  carregamento antes do desfecho.
+- **Responsividade além do que já foi medido.** São 5 media queries em 1.356 linhas de CSS. Só
+  o cabeçalho e o mapa foram exercitados em 375px; o resto do sistema nunca foi.
+- **Espaçamento, consistência dos formulários e feedback depois da ação.**
+
+### A 3.2 subiu de prioridade
+
+Só **3 das 13 páginas** têm teste — `EmCartaz`, `Pedido` e agora `Inicio`. Checkout, portaria e
+painel do organizador nunca foram exercitados por automação, só à mão no navegador. E o dia de
+hoje mostrou que existe uma classe inteira de defeito que **só aparece com layout de verdade**.
+Playwright continua sendo o caminho.
+
+### Continua em aberto, fora do backlog original
+
+- A portaria valida ingresso de qualquer organizador — um usuário GATE não pertence a cinema
+  nenhum. Apareceu na D34 e é modelagem nova.
+- `occupies_until` existe no banco desde a D37 e não é exposto na API; a tela poderia mostrar
+  quando a sessão termina.
+- `test_melhorias.py` tem 78 testes de cinco assuntos diferentes.
+- O seletor da portaria não indica qual sessão está em andamento agora.
+
+### Contagem atual
+
+**390 testes: 264 no back, 126 no front.** Os números que estavam anotados aqui (371, 249 e 122)
+eram de antes dos blocos 1.2 e 1.3 e ficaram para trás.
+
+### Para retomar o ambiente
+
+Docker Desktop primeiro, sempre — sem ele os 264 testes de back falham todos com erro de
+conexão, e isso já me confundiu uma vez. `docker compose up -d db`, esperar o `healthy`, e então
+`pytest`. Para mexer no front com dados reais: `uvicorn` na 8000 e `npm run dev` na 5173.
