@@ -525,10 +525,10 @@ conhece HTTP.
 
 O que **não** está pronto, ou está pronto pela metade:
 
-- **Os testes de front-end cobrem lógica e componentes, não as páginas inteiras.** O mapa de
-  assentos, o ingresso, a rota protegida, a vitrine e os avisos de pedido cancelado têm teste;
-  o checkout, a portaria e o painel do organizador foram verificados manualmente no navegador,
-  de ponta a ponta. Com mais tempo, o próximo alvo seria o fluxo de pagamento.
+- **Cinco das treze páginas têm teste.** A vitrine, o pedido, a landing, a portaria e a
+  criação de sessão; o checkout, o painel do organizador e as demais foram verificados
+  manualmente no navegador, de ponta a ponta. Com mais tempo, o próximo alvo seria o fluxo de
+  pagamento.
 - **E eles não veem geometria.** O jsdom não calcula layout, então largura, transbordo e
   rolagem não existem para a suíte. Um defeito real de recorte do mapa no celular passou pelos
   22 testes do componente sem que nenhum ficasse vermelho — foi encontrado medindo no
@@ -575,7 +575,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |
-| [`aprendizados.md`](docs/aprendizados.md) | As **16 lições** que ficaram, cada uma amarrada ao episódio concreto que a originou |
+| [`aprendizados.md`](docs/aprendizados.md) | As **19 lições** que ficaram, cada uma amarrada ao episódio concreto que a originou |
 | [`ia.md`](docs/ia.md) | Onde a IA entrou, onde não entrou, e onde ela errou |
 
 Os quatro primeiros são espelhos de um vault do Obsidian usado durante o projeto — por isso o

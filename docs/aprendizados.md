@@ -308,6 +308,44 @@ escolher a próxima ferramenta pelo buraco que ela tapa, e não pelo número que
 
 ---
 
+## 18. Duas variáveis para três realidades: a terceira se disfarça da mais inocente.
+
+**O que aconteceu, duas vezes no mesmo dia:** `NovaSessao` decidia por `salas.length === 0`, que
+é ao mesmo tempo "ainda não carregou", "falhou" e "não tem nenhuma". A tela escolhia a terceira e
+dizia *"Você ainda não tem salas"* para quem tinha três. `Portaria` guardava a lista em
+`SessionListItem[] | null`, e o `null` significava tanto "carregando" quanto "deu erro" — com um
+`.catch(() => {})` garantindo que ninguém soubesse qual.
+
+O detalhe que mais me incomodou: em nenhum dos dois a tela parecia quebrada. **O estado
+desconhecido não some — ele se disfarça, e escolhe justamente o desfecho que parece normal:**
+lista vazia, nenhuma sala, "qualquer sessão". Na portaria isso significava uma conferência de
+segurança se desarmando sozinha, em silêncio, no aparelho onde ninguém vai investigar.
+
+**A lição:** contar os estados reais antes de escrever a condição. Toda busca de dado tem três
+desfechos, não dois, e quando o código só distingue dois, o terceiro não fica visível — ele
+assume a fantasia do vizinho mais plausível. `null` que significa duas coisas é o sintoma; quem
+lê o código depois escolhe o significado errado, e não tem como perceber.
+
+---
+
+## 19. A pendência que você anotou é uma hipótese, não um fato.
+
+**O que aconteceu:** o quadro dizia "sem estado de carregamento em NovaSessao, Portaria, Entrar e
+CriarConta". Fui conferir as quatro antes de mexer, e as quatro **já tinham** — `Entrando…`,
+`Criando…`, `Salvando…`, `Verificando…`, todas com o botão desabilitado. A anotação estava errada
+desde o dia em que foi escrita, feita de relance e não de leitura.
+
+Se eu tivesse executado a tarefa como estava escrita, teria mexido no que já funcionava e passado
+ao largo do defeito real, que era o carregamento **inicial** — e, na portaria, uma proteção que se
+desligava sozinha.
+
+**A lição:** o eu de duas semanas atrás é uma fonte como outra qualquer, e escreveu com menos
+contexto do que eu tenho agora. Vale reabrir a pendência e conferir a premissa antes de executar,
+sobretudo quando ela é uma categoria ("faltam estados de carregamento") e não uma medida. Categoria
+descreve uma impressão; medida descreve o sistema.
+
+---
+
 ## O que faria diferente no próximo
 
 1. **Perguntar sobre o não-escrito no dia 1**, não no dia 3.
@@ -326,3 +364,7 @@ escolher a próxima ferramenta pelo buraco que ela tapa, e não pelo número que
    monta o dado a partir de `hoje`.
 9. **Perguntar de cada teste o que ele seria capaz de reprovar**, e não só se ele passa.
    Uma suíte inteira pode ser cega para geometria sem que nada fique vermelho.
+10. **Contar os estados reais antes de escrever a condição** — e desconfiar de todo `null`
+    que precisa significar duas coisas.
+11. **Reabrir a própria pendência antes de executá-la.** Uma anotação de categoria vale
+    menos que trinta segundos de medição.

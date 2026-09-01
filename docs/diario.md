@@ -529,3 +529,110 @@ eram de antes dos blocos 1.2 e 1.3 e ficaram para trás.
 Docker Desktop primeiro, sempre — sem ele os 264 testes de back falham todos com erro de
 conexão, e isso já me confundiu uma vez. `docker compose up -d db`, esperar o `healthy`, e então
 `pytest`. Para mexer no front com dados reais: `uvicorn` na 8000 e `npm run dev` na 5173.
+
+---
+
+## Pós-devolutiva — 3.1, o que a tela afirma sem saber
+
+**O item do quadro estava errado, e conferir foi o que mostrou.** Estava escrito "sem estado de
+carregamento em NovaSessao, Portaria, Entrar e CriarConta". Fui olhar as quatro antes de mexer:
+as quatro **já tinham** feedback de envio — `Entrando…`, `Criando…`, `Salvando…`, `Verificando…`,
+todas com o botão desabilitado enquanto a requisição corre. Se eu tivesse executado a tarefa como
+estava escrita, teria "corrigido" o que já funcionava e passado ao largo do defeito.
+
+O que faltava era o **carregamento inicial**. E ali o problema não era ausência de aviso: era a
+tela **afirmar com confiança uma coisa que ainda não sabia**.
+
+### A sala que o organizador não tinha
+
+`NovaSessao` decidia o que mostrar por `salas.length === 0` — que também é o valor inicial, antes
+de `/rooms` responder. Enquanto a lista não chegava, e **para sempre** se ela falhasse, a tela
+dizia *"Você ainda não tem salas"* com um botão convidando a cadastrar a primeira.
+
+Para um organizador que tem três salas, isso não é uma tela sem polimento: é uma afirmação falsa
+que empurra para o erro seguinte, criar uma sala duplicada.
+
+### A porta que ficava permissiva em silêncio
+
+`Portaria` tinha `.catch(() => {})`. Com `/gate/sessions` fora, o seletor continuava lá, com cara
+de funcionando, oferecendo só *"Qualquer sessão"* — que é o modo permissivo. A conferência de
+"ingresso de outra sessão" da D33 **se desarmava sozinha**, e a pessoa na porta não tinha como
+saber.
+
+Esse é o pior dos dois, e não por pouco. Não é uma tela feia: é uma proteção que se desliga sem
+avisar, no aparelho e no momento em que ninguém vai investigar.
+
+### O que foi feito
+
+Três estados explícitos nas duas telas — `carregando | pronto | erro` —, o mesmo desenho que a
+D39 tinha estabelecido na landing. Enquanto carrega, o seletor da portaria fica desabilitado,
+porque não dá para escolher de uma lista que não chegou. No erro, a mensagem diz **o que se
+perdeu**, e não só que algo falhou: *"um ingresso de outra sala vai ser aceito"*. Com botão de
+tentar de novo, e sem travar a validação — a portaria existe para deixar gente entrar.
+
+### Como conferi, depois do que aprendi ontem
+
+Escrevi dez testes e **rodei os dois arquivos contra a versão antiga antes de aceitar que
+funcionam**: 4 de 5 falham na portaria, 3 de 5 na nova sessão. Os que passam nas duas versões são
+os caminhos felizes, que nunca estiveram quebrados — e é bom que passem nos dois.
+
+Depois fui ao navegador em 375px e derrubei **um endpoint de cada vez, com o resto no ar**. Essa é
+a falha parcial real: o servidor inteiro fora é o caso fácil, e não é o que estava escondido. O
+erro apareceu, o "tentar de novo" recuperou — 26 opções de volta, seletor reativado — e o
+transbordo de página ficou em 0.
+
+### Um detalhe do lint que valeu obedecer
+
+Meus dois avisos novos eram `set-state-in-effect`, e eram justos: eu chamava `setEstado("carregando")`
+dentro do efeito, onde o estado inicial já era esse. A própria regra dizia o que fazer — atualizar
+a partir do evento que causa a mudança. Movi a transição para o clique do "tentar de novo", que é
+onde ela pertence. Voltou aos 4 avisos pré-existentes.
+
+### Achado que ficou parado de propósito
+
+`/gate/sessions` devolve **26 sessões de três dias diferentes**. O endpoint se chama "sessões do
+turno" e não filtra por turno. No celular da porta, rolar 26 opções para achar a certa é pior do
+que não ter seletor. É escopo de back-end e não entrou nesta etapa; foi para o quadro.
+
+### Decisões tomadas
+D40.
+
+---
+
+## Onde paramos — 31/08, fim do dia
+
+**A 3.1 tem agora todos os defeitos funcionais corrigidos.** O que resta é a parte estética, que
+é subjetiva e cabe decidir com calma.
+
+### O que falta na 3.1
+
+- **Responsividade além do que já foi medido.** São 5 media queries em 1.356 linhas de CSS, e só
+  o cabeçalho e o mapa de assentos foram exercitados em 375px. As outras onze telas nunca foram.
+- **Espaçamento, consistência dos formulários e feedback depois da ação.**
+
+### A 3.2 continua sendo o maior ganho
+
+Passamos de 3 para **5 das 13 páginas com teste** — entraram `Portaria` e `NovaSessao`. Ainda
+faltam checkout, painel do organizador, salas, sessão, meus ingressos e as demais. E continua
+valendo o que ontem mostrou: existe uma classe de defeito que **só aparece com layout de
+verdade**, e nenhum teste em jsdom vai encontrá-la. Playwright.
+
+### Em aberto, fora do backlog original
+
+- A portaria valida ingresso de qualquer organizador — um usuário GATE não pertence a cinema
+  nenhum. Apareceu na D34, é modelagem nova.
+- `/gate/sessions` devolvendo três dias de sessões.
+- O seletor da portaria não indica qual sessão está em andamento agora.
+- `occupies_until` existe no banco desde a D37 e não é exposto na API.
+- `test_melhorias.py` tem 78 testes de cinco assuntos.
+
+### Contagem atual
+
+**400 testes: 264 no back, 136 no front.** 40 decisões, 19 aprendizados.
+
+### Para retomar o ambiente
+
+Docker Desktop primeiro, sempre. `docker compose up -d db`, esperar o `healthy`, e então
+`pytest`. Para o front com dados reais: `uvicorn app.main:app --port 8000` na pasta `api`, e
+`npm run dev` na `web`. O `.claude/launch.json` que uso para o preview está no `.gitignore` — é
+config de ferramenta, não faz parte do projeto que o avaliador clona.
