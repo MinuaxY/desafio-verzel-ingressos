@@ -21,3 +21,6 @@ dist/
 .idea/
 Thumbs.db
 desktop.ini
+
+# Config local do preview do Claude Code, nao faz parte do projeto
+.claude/

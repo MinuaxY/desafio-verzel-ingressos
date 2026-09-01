@@ -905,6 +905,65 @@ alvo pequeno demais — só existe com layout de verdade, e só um navegador de 
 
 ---
 
+## D40 — Estado indeterminado não pode ser desenhado como estado determinado
+
+**O item do quadro estava errado, e medir foi o que mostrou isso.** Estava escrito "sem estado
+de carregamento em NovaSessao, Portaria, Entrar e CriarConta". Fui conferir os quatro: os quatro
+**já tinham** feedback de envio — `Entrando…`, `Criando…`, `Salvando…`, `Verificando…`, todos com
+o botão desabilitado. O que faltava não era isso. Era o **carregamento inicial**, e o problema
+não era ausência de aviso: era a tela **afirmar com confiança uma coisa que ainda não sabia**.
+
+### A sala que o organizador não tinha
+
+`NovaSessao` decidia pelo `salas.length === 0` — que também é o valor inicial, antes de
+`/rooms` responder. Enquanto a lista não chegava, e para sempre se ela falhasse, a tela dizia
+**"Você ainda não tem salas"** com um botão para cadastrar a primeira.
+
+Para um organizador com três salas, isso é uma afirmação falsa que empurra para o erro certo:
+criar uma sala duplicada. E o `.catch` mandava a mensagem para o alerta geral da página, longe
+do passo 2, onde a frase errada continuava.
+
+### A porta que ficava permissiva em silêncio
+
+`Portaria` tinha `.catch(() => {})`. Se `/gate/sessions` falhasse, o seletor continuava lá, com
+cara de funcionando, oferecendo só **"Qualquer sessão"** — que é o modo permissivo. A conferência
+de "ingresso de outra sessão" da D33 ficava desarmada, e a pessoa na porta não tinha como saber.
+
+Esse é o pior dos dois. Não é uma tela feia: é uma **proteção que se desliga sozinha sem avisar**,
+justamente no aparelho e no momento em que ninguém vai investigar.
+
+**Escolhido: três estados explícitos** — `carregando | pronto | erro` —, o mesmo desenho da D39.
+Enquanto carrega, o seletor fica desabilitado, porque não dá para escolher de uma lista que não
+chegou. No erro, a mensagem diz **o que se perdeu**, e não só que algo falhou: "um ingresso de
+outra sala vai ser aceito". Com botão de tentar de novo, e sem interromper a leitura — que
+continua funcionando.
+
+**Descartado: só trocar o `.catch` vazio por um alerta genérico.** "Erro ao carregar" não conta
+que a porta ficou permissiva, que é a única parte que muda o que o operador faz.
+
+**Descartado: bloquear a validação quando a lista falha.** A portaria existe para deixar gente
+entrar; travar a fila por causa de uma conferência secundária troca um risco pequeno por uma
+parada de operação.
+
+**Descartado: distinguir carregando de erro por um `null` a mais no tipo.** Era o que já havia
+(`SessionListItem[] | null`), e é exatamente a origem do defeito: um `null` tem que significar
+duas coisas ao mesmo tempo, e quem lê escolhe a errada.
+
+### O que ficou de regra
+
+Toda tela que busca dado tem **três desfechos, não dois**. Quando o código só distingue dois, o
+terceiro não some — ele se disfarça de um dos outros, e escolhe justamente o que parece normal:
+lista vazia, nenhuma sala, qualquer sessão.
+
+### Provado antes e depois
+
+Dez testes novos, e os dois arquivos foram rodados **contra a versão antiga** para ver a falha:
+4 de 5 falham na portaria, 3 de 5 em nova sessão. Os que passam nas duas versões são os caminhos
+felizes, que nunca estiveram quebrados. Depois, conferido no navegador em 375px, derrubando um
+endpoint de cada vez com o resto no ar — que é a falha parcial real, e não o servidor inteiro fora.
+
+---
+
 ## Decisões que estavam pendentes
 
 Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError, request } from "../lib/api";
@@ -15,6 +15,7 @@ import type {
 import { AUDIO, FORMATO } from "../lib/tipos";
 import { Classificacao } from "../components/Selos";
 import { Campo } from "../components/Campo";
+import { Carregando } from "../components/Carregando";
 import { EscolhaDeDias } from "../components/EscolhaDeDias";
 
 /** Converte "32,00" ou "32.00" em centavos, sem passar por float. */
@@ -40,6 +41,9 @@ export function NovaSessao() {
   const [filme, setFilme] = useState<CatalogItem | null>(null);
 
   const [salas, setSalas] = useState<Room[]>([]);
+  // Sem este estado, "carregando" e "falhou" ficavam indistinguíveis de "não tem
+  // sala nenhuma" — e a tela afirmava a terceira. Ver decisão D40.
+  const [estadoSalas, setEstadoSalas] = useState<"carregando" | "pronto" | "erro">("carregando");
   const [salaId, setSalaId] = useState("");
   const [quando, setQuando] = useState("");
   const [audio, setAudio] = useState<AudioType>("SUBTITLED");
@@ -52,14 +56,26 @@ export function NovaSessao() {
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
+  const carregarSalas = useCallback(() => {
     request<Room[]>("/rooms")
       .then((r) => {
         setSalas(r);
         if (r.length === 1) setSalaId(r[0].id);
+        setEstadoSalas("pronto");
       })
-      .catch((e) => setErro(e.message));
+      .catch(() => setEstadoSalas("erro"));
   }, []);
+
+  // A volta para "carregando" mora no clique, e não aqui: no primeiro carregamento
+  // o estado já é esse, e mudá-lo dentro do efeito só provocaria outro render.
+  useEffect(() => {
+    carregarSalas();
+  }, [carregarSalas]);
+
+  function tentarSalasDeNovo() {
+    setEstadoSalas("carregando");
+    carregarSalas();
+  }
 
   const sala = salas.find((s) => s.id === salaId) ?? null;
 
@@ -242,7 +258,26 @@ export function NovaSessao() {
           <span className="etapa__numero">2</span> Sala
         </h2>
 
-        {salas.length === 0 ? (
+        {estadoSalas === "carregando" ? (
+          <Carregando texto="Carregando suas salas" inline />
+        ) : estadoSalas === "erro" ? (
+          <div className="alert alert--error" role="alert">
+            <div className="stack" style={{ gap: "var(--space-2)" }}>
+              <strong>Não foi possível carregar suas salas</strong>
+              <span style={{ fontSize: "var(--text-sm)" }}>
+                Não quer dizer que você não tenha nenhuma — quer dizer que a lista não chegou.
+              </span>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                style={{ alignSelf: "flex-start" }}
+                onClick={tentarSalasDeNovo}
+              >
+                Tentar de novo
+              </button>
+            </div>
+          </div>
+        ) : salas.length === 0 ? (
           <div className="vazio" style={{ padding: "var(--space-5)" }}>
             <p style={{ fontWeight: 600 }}>Você ainda não tem salas</p>
             <p className="muted" style={{ fontSize: "var(--text-sm)" }}>

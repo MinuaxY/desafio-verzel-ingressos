@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 
 import { ApiError, request } from "../lib/api";
 import { dataHora } from "../lib/formato";
+import { Carregando } from "../components/Carregando";
 import type { GateCheck, GateResult, SessionListItem } from "../lib/tipos";
 
 const LEITOR_ID = "leitor-qr";
@@ -20,7 +21,10 @@ const VEREDITO: Record<GateResult, { rotulo: string; simbolo: string; classe: st
 };
 
 export function Portaria() {
-  const [sessoes, setSessoes] = useState<SessionListItem[] | null>(null);
+  const [sessoes, setSessoes] = useState<SessionListItem[]>([]);
+  const [estadoSessoes, setEstadoSessoes] = useState<"carregando" | "pronto" | "erro">(
+    "carregando",
+  );
   const [sessaoId, setSessaoId] = useState("");
   const [codigo, setCodigo] = useState("");
   const [resultado, setResultado] = useState<GateCheck | null>(null);
@@ -36,11 +40,29 @@ export function Portaria() {
   // começou, e a sessão sumia da lista bem no meio da entrada — perdendo a
   // checagem de "ingresso de outra sessão" na hora em que ela mais serve.
   // Ver decisão D33.
-  useEffect(() => {
+  //
+  // A falha aqui não é cosmética: sem a lista, a porta fica em "qualquer sessão",
+  // que é o modo permissivo. O operador precisa saber que a checagem está
+  // desarmada, em vez de descobrir depois. Ver decisão D40.
+  const carregarSessoes = useCallback(() => {
     request<SessionListItem[]>("/gate/sessions")
-      .then(setSessoes)
-      .catch(() => {});
+      .then((s) => {
+        setSessoes(s);
+        setEstadoSessoes("pronto");
+      })
+      .catch(() => setEstadoSessoes("erro"));
   }, []);
+
+  // A volta para "carregando" mora no clique, e não aqui: no primeiro carregamento
+  // o estado já é esse, e mudá-lo dentro do efeito só provocaria outro render.
+  useEffect(() => {
+    carregarSessoes();
+  }, [carregarSessoes]);
+
+  function tentarSessoesDeNovo() {
+    setEstadoSessoes("carregando");
+    carregarSessoes();
+  }
 
   // Desliga a câmera ao sair da tela: sem isso a luz do aparelho fica acesa
   // e a permissão continua em uso depois que o operador navegou para outro lugar.
@@ -135,18 +157,47 @@ export function Portaria() {
           id="sessao"
           className="field__input"
           value={sessaoId}
+          disabled={estadoSessoes !== "pronto"}
           onChange={(e) => setSessaoId(e.target.value)}
         >
           <option value="">Qualquer sessão</option>
-          {sessoes?.map((s) => (
+          {sessoes.map((s) => (
             <option key={s.id} value={s.id}>
               {s.title} — {dataHora(s.starts_at)}
             </option>
           ))}
         </select>
-        <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
-          Escolhendo a sessão, o ingresso de outra sala é recusado com aviso claro.
-        </span>
+
+        {estadoSessoes === "carregando" && <Carregando texto="Carregando as sessões do turno" inline />}
+
+        {estadoSessoes === "erro" && (
+          <div className="alert alert--error" role="alert">
+            <div className="stack" style={{ gap: "var(--space-2)" }}>
+              <strong>A porta está em “qualquer sessão”</strong>
+              <span style={{ fontSize: "var(--text-sm)" }}>
+                As sessões do turno não carregaram, então não dá para prender esta porta a uma
+                delas: um ingresso de outra sala vai ser aceito. A leitura continua funcionando —
+                o que falta é essa conferência.
+              </span>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                style={{ alignSelf: "flex-start" }}
+                onClick={tentarSessoesDeNovo}
+              >
+                Tentar de novo
+              </button>
+            </div>
+          </div>
+        )}
+
+        {estadoSessoes === "pronto" && (
+          <span className="faint" style={{ fontSize: "var(--text-xs)" }}>
+            {sessoes.length === 0
+              ? "Nenhuma sessão neste turno. A porta aceita ingresso de qualquer sessão."
+              : "Escolhendo a sessão, o ingresso de outra sala é recusado com aviso claro."}
+          </span>
+        )}
       </div>
 
       {veredito && resultado && (

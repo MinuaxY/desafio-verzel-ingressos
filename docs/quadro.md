@@ -36,7 +36,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] Revisao de codigo: tres defeitos corrigidos (D33)
 - [x] Volume na vitrine: tres salas, dez dias, ~90 sessoes
 - [x] Artefatos de processo versionados no repositorio
-- [x] 364 testes (242 back, 122 front)  → agora 390 (264 back, 126 front)
+- [x] 364 testes (242 back, 122 front)  → agora 400 (264 back, 136 front)
 
 
 ## Ciclo pos-devolutiva
@@ -55,16 +55,19 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
       - [x] Poltrona 40px no dedo (32 ja cumpria o minimo AA; 44 e AAA)
       - [x] Inicio.tsx nao tem estado de carregamento nem de erro: o .catch engole a falha e a
             secao inteira de previa some, justo onde o Render hibernando custa ate um minuto
-      - [ ] Sem estado de carregamento em NovaSessao, Portaria, Entrar e CriarConta
+      - [x] Carregamento inicial com tres estados em NovaSessao e Portaria (D40)
+            Entrar e CriarConta ja tinham: o item do quadro estava errado, medir mostrou
       - [ ] Responsividade alem do medido: 5 media queries em 1.356 linhas de CSS,
             e so o cabecalho e o mapa foram exercitados em 375px
       - [ ] Espacamento, consistencia dos formularios e feedback depois da acao
 - [ ] 3.2 Testes E2E de checkout, portaria e gestao  ← PRIORIDADE SUBIU
-      - [ ] So 3 das 13 paginas tem teste (EmCartaz, Pedido e Inicio)
+      - [ ] So 5 das 13 paginas tem teste (EmCartaz, Pedido, Inicio, Portaria e NovaSessao)
       - [ ] Os 22 testes do mapa passaram com o mapa quebrado: jsdom nao tem layout,
             entao essa classe de defeito so aparece com navegador de verdade
 - [ ] Portaria pertencer a um organizador (surgiu da D34)
 - [ ] Seletor da portaria indicar qual sessao esta em andamento agora
+- [ ] /gate/sessions devolve 26 sessoes de tres dias: no celular da porta, rolar isso
+      para achar a sessao certa e pior do que nao ter o seletor
 - [ ] test_melhorias.py dividido por assunto — 78 testes, virou saco de gatos
 - [ ] Expor occupies_until na API, para a tela mostrar quando a sessao termina
 
