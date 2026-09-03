@@ -76,12 +76,13 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 
 - [ ] Ler e validar o docs/ia.md — escrito na sua voz
 - [ ] Regenerar a chave do TMDb no painel e atualizar no Render
-- [ ] Enviar o link em elitedev.verzel.com.br
+- [x] Enviar o link em elitedev.verzel.com.br — enviado, avaliado, nao passou.
+      O ciclo pos-devolutiva acima e o que veio depois disso
 
 
 ## Se houvesse mais tempo
 
-- [ ] Testes de front para checkout, portaria e painel do organizador
+- [ ] Testes de front para checkout e painel do organizador (a portaria ja tem, D40)
 - [ ] Cache do catalogo e limite de tentativas em Redis, e nao em memoria por instancia
 - [ ] Mapa de assentos em tempo real
 - [ ] Aviso por e-mail e estorno quando o cinema cancela uma sessao
