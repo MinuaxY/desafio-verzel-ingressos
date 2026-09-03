@@ -12,6 +12,8 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 
+import { abrePrimeiraSessao } from "./fluxos";
+
 /** Quanto o documento passa da largura da janela. Zero é o único valor aceitável:
  *  qualquer coisa acima faz a página inteira rolar de lado. */
 function transbordoDaPagina(page: Page) {
@@ -36,8 +38,7 @@ for (const caminho of PUBLICAS) {
 }
 
 test("a sala não rola de lado, e o mapa começa na primeira poltrona", async ({ page }) => {
-  await page.goto("/em-cartaz");
-  await page.locator('a[href^="/sessao/"]').first().click();
+  await abrePrimeiraSessao(page);
 
   const grade = page.locator(".setor__grade").first();
   await expect(grade).toBeVisible();
@@ -82,8 +83,7 @@ test("a sala não rola de lado, e o mapa começa na primeira poltrona", async ({
 test("no dedo, a poltrona tem alvo confortável", async ({ page }, info) => {
   test.skip(info.project.name !== "celular", "Só vale onde o ponteiro é grosso.");
 
-  await page.goto("/em-cartaz");
-  await page.locator('a[href^="/sessao/"]').first().click();
+  await abrePrimeiraSessao(page);
 
   const poltrona = page.getByRole("button", { name: /^Poltrona / }).first();
   await expect(poltrona).toBeVisible();

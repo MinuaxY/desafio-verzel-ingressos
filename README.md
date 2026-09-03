@@ -488,7 +488,7 @@ npm test
 npm run e2e          # precisa do banco e da API de pé
 ```
 
-**15 testes** em Playwright, rodando em dois projetos: `desktop` e `celular` — este fixado em
+**23 testes** em Playwright, rodando em dois projetos: `desktop` e `celular` — este fixado em
 **375px de propósito**, porque foi onde os defeitos de layout apareceram e porque num aparelho
 mais largo eles não reaparecem.
 
@@ -496,10 +496,13 @@ mais largo eles não reaparecem.
 |---|---|---|
 | `compra.spec.ts` | 2 | Do cartaz ao QR: entrar, escolher poltrona, pagar. E a poltrona vendida voltando ocupada |
 | `geometria.spec.ts` | 6 | Nenhuma tela rola de lado, o mapa começa na primeira poltrona, alvo de 40px no dedo |
+| `portaria.spec.ts` | 4 | Os quatro vereditos, com ingresso comprado pela tela: sessão errada, entrada liberada, reuso e código inventado |
 
-Existem porque a suíte de unidade é cega para layout. Revertendo a correção da D39, quatro dos
-seis testes de geometria ficam vermelhos — é assim que se sabe que eles reprovam o defeito que
-os motivou. Ver decisão D41.
+Existem porque a suíte de unidade é cega para layout e não atravessa telas. E cada arquivo foi
+conferido ao contrário, quebrando de propósito o que ele deveria proteger: revertendo a correção
+da D39, quatro dos seis testes de geometria ficam vermelhos; fazendo a portaria parar de enviar a
+sessão da porta, o ingresso de outra sala passa a receber "Pode entrar" e o primeiro veredito
+falha. Ver decisão D41.
 
 
 ---

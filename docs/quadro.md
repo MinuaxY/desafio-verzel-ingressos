@@ -36,7 +36,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] Revisao de codigo: tres defeitos corrigidos (D33)
 - [x] Volume na vitrine: tres salas, dez dias, ~90 sessoes
 - [x] Artefatos de processo versionados no repositorio
-- [x] 364 testes (242 back, 122 front)  → agora 415 (264 back, 136 front, 15 E2E)
+- [x] 364 testes (242 back, 122 front)  → agora 423 (264 back, 136 front, 23 E2E)
 
 
 ## Ciclo pos-devolutiva
@@ -65,7 +65,9 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
       - [x] compra.spec.ts: do cartaz ao QR, e a poltrona vendida volta ocupada
       - [x] geometria.spec.ts: as medicoes da D39 viradas teste — reverti a correcao
             e 4 dos 6 ficaram vermelhos, entao pegam mesmo o defeito que os motivou
-      - [ ] Portaria de ponta a ponta: ler codigo e ver os quatro vereditos
+      - [x] Portaria de ponta a ponta: os quatro vereditos, com ingresso comprado
+            pela tela. Conferido ao contrario: desligando o envio da sessao da porta,
+            o ingresso de outra sala recebe "Pode entrar" e o teste fica vermelho
       - [ ] Gestao: criar sessao, repetir em varios dias, editar e cancelar
       - [ ] So 5 das 13 paginas tem teste de unidade (EmCartaz, Pedido, Inicio,
             Portaria e NovaSessao)

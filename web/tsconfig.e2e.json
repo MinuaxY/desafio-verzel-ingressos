@@ -10,7 +10,12 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    "module": "nodenext",
+    /* `bundler`, e não `nodenext`: quem carrega estes arquivos é o Playwright,
+       que transpila com esbuild e resolve import relativo sem extensão. Descrever
+       como Node puro exigiria escrever "./fluxos.js" num arquivo .ts que nunca
+       vira .js — mentira de configuração para agradar o compilador. */
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "moduleDetection": "force",
     "verbatimModuleSyntax": true,
     "noEmit": true,

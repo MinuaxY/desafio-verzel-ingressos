@@ -1025,6 +1025,21 @@ precisa dos tipos do DOM — o corpo de `page.evaluate` roda dentro do navegador
 configuração de Node não carrega. Sem ele, a pasta nova não seria checada por configuração
 nenhuma.
 
+### A portaria entrou depois, e trouxe uma escolha
+
+Os quatro vereditos ficam num `describe` em série, com uma aba só, e não em testes
+independentes. Eles contam uma história em ordem: o ingresso entra, e **por ter entrado** não
+entra de novo. Separá-los exigiria uma compra por veredito para provar menos — o reuso deixaria
+de ser consequência do uso anterior e viraria estado montado à mão.
+
+O ingresso também não é forjado nem inserido no banco: é **comprado pela tela**, e o código sai
+de onde o cliente o leria. Assim o teste cobre a costura inteira — a compra emite, o ingresso
+mostra, a portaria reconhece. Um código injetado no banco provaria só a portaria.
+
+A câmera fica de fora, por falta de permissão e hardware. Sobra a digitação manual, que existe no
+produto justamente para quando a câmera falha — então o caminho testado é o caminho de
+contingência real, e não um atalho de teste.
+
 ---
 
 ## Decisões que estavam pendentes
