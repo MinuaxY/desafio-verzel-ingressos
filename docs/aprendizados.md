@@ -346,6 +346,31 @@ descreve uma impressão; medida descreve o sistema.
 
 ---
 
+## 20. Para um teste separar duas regras, ele precisa do caso em que elas discordam.
+
+**O que aconteceu:** escrevi um teste para a trava que impede publicar sessão sem preço em todos
+os setores. Ele deixava **todos** os preços em branco e conferia que o botão continuava
+desabilitado. Passou. Então, para conferir se ele servia para alguma coisa, troquei a regra de
+`every` por `some` — de "todo setor tem preço" para "algum setor tem preço".
+
+**O teste continuou verde.** Com zero preços preenchidos, as duas regras recusam igual. O teste
+exercitava um estado em que a regra certa e a regra errada se comportam do mesmo jeito, então não
+tinha como distinguir uma da outra.
+
+O conserto foi preencher **um** preço e deixar o resto em branco. É o único estado em que `every`
+e `some` divergem — e ali o teste ficou vermelho na hora.
+
+**A lição:** um teste não prova uma regra; ele prova que o sistema se comporta de um jeito num
+ponto. Se esse ponto é um em que a regra correta e a regra frouxa dão a mesma resposta, o teste
+está confirmando o comportamento e não a regra. Antes de aceitar um teste de restrição, vale
+perguntar **qual seria a versão errada mais provável** dessa restrição, e se o caso escolhido
+distingue as duas.
+
+Foi o mesmo método do dia inteiro — quebrar de propósito o que o teste deveria proteger —, e foi a
+única vez em que ele reprovou o meu próprio teste em vez do código.
+
+---
+
 ## O que faria diferente no próximo
 
 1. **Perguntar sobre o não-escrito no dia 1**, não no dia 3.
@@ -368,3 +393,5 @@ descreve uma impressão; medida descreve o sistema.
     que precisa significar duas coisas.
 11. **Reabrir a própria pendência antes de executá-la.** Uma anotação de categoria vale
     menos que trinta segundos de medição.
+12. **Perguntar qual seria a versão errada mais provável da regra**, e escolher o caso de
+    teste que separa as duas — não um em que ambas concordam.

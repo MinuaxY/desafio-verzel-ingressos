@@ -488,7 +488,7 @@ npm test
 npm run e2e          # precisa do banco e da API de pé
 ```
 
-**23 testes** em Playwright, rodando em dois projetos: `desktop` e `celular` — este fixado em
+**29 testes** em Playwright, rodando em dois projetos: `desktop` e `celular` — este fixado em
 **375px de propósito**, porque foi onde os defeitos de layout apareceram e porque num aparelho
 mais largo eles não reaparecem.
 
@@ -497,12 +497,13 @@ mais largo eles não reaparecem.
 | `compra.spec.ts` | 2 | Do cartaz ao QR: entrar, escolher poltrona, pagar. E a poltrona vendida voltando ocupada |
 | `geometria.spec.ts` | 6 | Nenhuma tela rola de lado, o mapa começa na primeira poltrona, alvo de 40px no dedo |
 | `portaria.spec.ts` | 4 | Os quatro vereditos, com ingresso comprado pela tela: sessão errada, entrada liberada, reuso e código inventado |
+| `gestao.spec.ts` | 3 | O ciclo do organizador: publicar, aparecer no cartaz, despublicar e excluir. Repetir em vários dias. E a trava do preço por setor |
 
 Existem porque a suíte de unidade é cega para layout e não atravessa telas. E cada arquivo foi
 conferido ao contrário, quebrando de propósito o que ele deveria proteger: revertendo a correção
 da D39, quatro dos seis testes de geometria ficam vermelhos; fazendo a portaria parar de enviar a
-sessão da porta, o ingresso de outra sala passa a receber "Pode entrar" e o primeiro veredito
-falha. Ver decisão D41.
+sessão da porta, o ingresso de outra sala passa a receber "Pode entrar"; trocando o `every` por
+`some` na trava de preço, a sessão passa a poder ir ao ar com um setor sem valor. Ver decisão D41.
 
 
 ---
@@ -599,7 +600,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |
-| [`aprendizados.md`](docs/aprendizados.md) | As **19 lições** que ficaram, cada uma amarrada ao episódio concreto que a originou |
+| [`aprendizados.md`](docs/aprendizados.md) | As **20 lições** que ficaram, cada uma amarrada ao episódio concreto que a originou |
 | [`ia.md`](docs/ia.md) | Onde a IA entrou, onde não entrou, e onde ela errou |
 
 Os quatro primeiros são espelhos de um vault do Obsidian usado durante o projeto — por isso o

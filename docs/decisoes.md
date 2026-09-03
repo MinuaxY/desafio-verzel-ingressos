@@ -1040,6 +1040,23 @@ A câmera fica de fora, por falta de permissão e hardware. Sobra a digitação 
 produto justamente para quando a câmera falha — então o caminho testado é o caminho de
 contingência real, e não um atalho de teste.
 
+### A gestão fechou a etapa, e trouxe a lição mais útil
+
+O teste da trava de preço **passou com a trava quebrada**, na primeira versão. Ele deixava todos
+os preços em branco e conferia que o botão continuava desabilitado — e com zero preenchidos,
+"todo setor tem preço" e "algum setor tem preço" recusam igual. Trocar o `every` por `some` não
+mudava nada que o teste olhasse.
+
+O conserto foi preencher **um** preço e deixar o resto em branco: é o único estado em que as duas
+regras discordam. Vale como método — para um teste distinguir duas regras, ele precisa exercitar
+o caso em que elas divergem, e não um caso em que ambas concordam.
+
+Os testes desta etapa também **limpam o que criam**, e não por higiene: a sala é reservada pelo
+intervalo que a sessão ocupa (D37), então resíduo de uma execução daria conflito legítimo na
+seguinte, e o vermelho seria de dado e não de defeito. O horário 09:15 não existe na programação
+semeada e serve de assinatura do que o teste criou — o título não serviria, porque "Toy Story 5"
+está no catálogo e no seed.
+
 ---
 
 ## Decisões que estavam pendentes

@@ -36,7 +36,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] Revisao de codigo: tres defeitos corrigidos (D33)
 - [x] Volume na vitrine: tres salas, dez dias, ~90 sessoes
 - [x] Artefatos de processo versionados no repositorio
-- [x] 364 testes (242 back, 122 front)  → agora 423 (264 back, 136 front, 23 E2E)
+- [x] 364 testes (242 back, 122 front)  → agora 429 (264 back, 136 front, 29 E2E)
 
 
 ## Ciclo pos-devolutiva
@@ -60,7 +60,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
       - [ ] Responsividade alem do medido: 5 media queries em 1.356 linhas de CSS,
             e so o cabecalho e o mapa foram exercitados em 375px
       - [ ] Espacamento, consistencia dos formularios e feedback depois da acao
-- [ ] 3.2 Testes E2E de checkout, portaria e gestao  ← EM ANDAMENTO
+- [x] 3.2 Testes E2E de checkout, portaria e gestao (D41)
       - [x] Playwright instalado, dois projetos: desktop e celular fixado em 375px (D41)
       - [x] compra.spec.ts: do cartaz ao QR, e a poltrona vendida volta ocupada
       - [x] geometria.spec.ts: as medicoes da D39 viradas teste — reverti a correcao
@@ -68,9 +68,12 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
       - [x] Portaria de ponta a ponta: os quatro vereditos, com ingresso comprado
             pela tela. Conferido ao contrario: desligando o envio da sessao da porta,
             o ingresso de outra sala recebe "Pode entrar" e o teste fica vermelho
-      - [ ] Gestao: criar sessao, repetir em varios dias, editar e cancelar
-      - [ ] So 5 das 13 paginas tem teste de unidade (EmCartaz, Pedido, Inicio,
-            Portaria e NovaSessao)
+      - [x] Gestao: o ciclo inteiro (publicar, ver no cartaz, despublicar, excluir),
+            repetir em varios dias e a trava do preco por setor. Os testes limpam o
+            que criam, senao o residuo daria conflito de sala na execucao seguinte
+- [ ] So 5 das 13 paginas tem teste de unidade (EmCartaz, Pedido, Inicio, Portaria
+      e NovaSessao) — os fluxos agora estao cobertos de ponta a ponta, entao isto
+      virou preferencia, nao lacuna
 - [ ] Portaria pertencer a um organizador (surgiu da D34)
 - [ ] Seletor da portaria indicar qual sessao esta em andamento agora
 - [ ] /gate/sessions devolve 26 sessoes de tres dias: no celular da porta, rolar isso
