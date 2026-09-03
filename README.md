@@ -481,6 +481,27 @@ npm test
 | `Portaria.test.tsx` | 5 | Sessões do turno: carregando, falha que deixa a porta permissiva, retentativa |
 | `NovaSessao.test.tsx` | 5 | O passo da sala não afirma que não há salas antes de saber |
 
+
+### Ponta a ponta, em navegador de verdade
+
+```bash
+npm run e2e          # precisa do banco e da API de pé
+```
+
+**15 testes** em Playwright, rodando em dois projetos: `desktop` e `celular` — este fixado em
+**375px de propósito**, porque foi onde os defeitos de layout apareceram e porque num aparelho
+mais largo eles não reaparecem.
+
+| Arquivo | Testes | Cobre |
+|---|---|---|
+| `compra.spec.ts` | 2 | Do cartaz ao QR: entrar, escolher poltrona, pagar. E a poltrona vendida voltando ocupada |
+| `geometria.spec.ts` | 6 | Nenhuma tela rola de lado, o mapa começa na primeira poltrona, alvo de 40px no dedo |
+
+Existem porque a suíte de unidade é cega para layout. Revertendo a correção da D39, quatro dos
+seis testes de geometria ficam vermelhos — é assim que se sabe que eles reprovam o defeito que
+os motivou. Ver decisão D41.
+
+
 ---
 
 ## Estrutura
@@ -489,7 +510,7 @@ npm test
 desafio-verzel-ingressos/
 ├── docker-compose.yml
 ├── docs/
-│   ├── decisoes.md          as 40 decisões técnicas, e o que foi descartado em cada uma
+│   ├── decisoes.md          as 41 decisões técnicas, e o que foi descartado em cada uma
 │   ├── backlog.md           requisitos, o que foi entregue e o que ficou fora do escopo
 │   ├── diario.md            o que aconteceu em ordem, incluindo o que deu errado
 │   ├── quadro.md            o kanban ao fim do projeto
@@ -508,6 +529,7 @@ desafio-verzel-ingressos/
 │   │   └── seed.py
 │   └── tests/
 └── web/
+    ├── e2e/                 testes de ponta a ponta em navegador de verdade
     └── src/
         ├── auth/            contexto e rotas protegidas
         ├── components/      mapa de assentos, ingresso, QR
@@ -525,15 +547,14 @@ conhece HTTP.
 
 O que **não** está pronto, ou está pronto pela metade:
 
-- **Cinco das treze páginas têm teste.** A vitrine, o pedido, a landing, a portaria e a
-  criação de sessão; o checkout, o painel do organizador e as demais foram verificados
-  manualmente no navegador, de ponta a ponta. Com mais tempo, o próximo alvo seria o fluxo de
-  pagamento.
-- **E eles não veem geometria.** O jsdom não calcula layout, então largura, transbordo e
-  rolagem não existem para a suíte. Um defeito real de recorte do mapa no celular passou pelos
-  22 testes do componente sem que nenhum ficasse vermelho — foi encontrado medindo no
-  navegador, e corrigido na decisão D39. Teste de ponta a ponta com navegador de verdade,
-  em Playwright, é o que tapa esse buraco.
+- **Cinco das treze páginas têm teste de unidade.** A vitrine, o pedido, a landing, a portaria
+  e a criação de sessão. O painel do organizador e a gestão da programação ainda só foram
+  verificados manualmente no navegador.
+- **Os testes de unidade não veem geometria** — e isso agora está coberto por outra suíte. O
+  jsdom não calcula layout, então largura, transbordo e rolagem não existem para ele: um defeito
+  real de recorte do mapa no celular passou pelos 22 testes do componente sem que nenhum ficasse
+  vermelho (D39). Os testes de ponta a ponta em Playwright cobrem essa classe (D41); o que falta
+  ali é a portaria e a gestão.
 - **Cancelar a sessão não avisa nem estorna ninguém.** Quando o organizador desfaz os pedidos
   de uma sessão, o cliente descobre ao abrir a compra — que passa a dizer que o cinema
   cancelou e que a devolução é com o organizador. Falta o e-mail e falta o estorno, e é por
@@ -571,7 +592,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 
 | | |
 |---|---|
-| [`decisoes.md`](docs/decisoes.md) | As **40 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
+| [`decisoes.md`](docs/decisoes.md) | As **41 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |

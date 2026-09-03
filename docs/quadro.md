@@ -36,7 +36,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] Revisao de codigo: tres defeitos corrigidos (D33)
 - [x] Volume na vitrine: tres salas, dez dias, ~90 sessoes
 - [x] Artefatos de processo versionados no repositorio
-- [x] 364 testes (242 back, 122 front)  → agora 400 (264 back, 136 front)
+- [x] 364 testes (242 back, 122 front)  → agora 415 (264 back, 136 front, 15 E2E)
 
 
 ## Ciclo pos-devolutiva
@@ -60,10 +60,15 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
       - [ ] Responsividade alem do medido: 5 media queries em 1.356 linhas de CSS,
             e so o cabecalho e o mapa foram exercitados em 375px
       - [ ] Espacamento, consistencia dos formularios e feedback depois da acao
-- [ ] 3.2 Testes E2E de checkout, portaria e gestao  ← PRIORIDADE SUBIU
-      - [ ] So 5 das 13 paginas tem teste (EmCartaz, Pedido, Inicio, Portaria e NovaSessao)
-      - [ ] Os 22 testes do mapa passaram com o mapa quebrado: jsdom nao tem layout,
-            entao essa classe de defeito so aparece com navegador de verdade
+- [ ] 3.2 Testes E2E de checkout, portaria e gestao  ← EM ANDAMENTO
+      - [x] Playwright instalado, dois projetos: desktop e celular fixado em 375px (D41)
+      - [x] compra.spec.ts: do cartaz ao QR, e a poltrona vendida volta ocupada
+      - [x] geometria.spec.ts: as medicoes da D39 viradas teste — reverti a correcao
+            e 4 dos 6 ficaram vermelhos, entao pegam mesmo o defeito que os motivou
+      - [ ] Portaria de ponta a ponta: ler codigo e ver os quatro vereditos
+      - [ ] Gestao: criar sessao, repetir em varios dias, editar e cancelar
+      - [ ] So 5 das 13 paginas tem teste de unidade (EmCartaz, Pedido, Inicio,
+            Portaria e NovaSessao)
 - [ ] Portaria pertencer a um organizador (surgiu da D34)
 - [ ] Seletor da portaria indicar qual sessao esta em andamento agora
 - [ ] /gate/sessions devolve 26 sessoes de tres dias: no celular da porta, rolar isso

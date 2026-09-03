@@ -1,0 +1,24 @@
+{
+  /* Os testes de ponta a ponta rodam no Node, mas o corpo de `page.evaluate`
+     executa dentro do navegador — e por isso precisa dos tipos do DOM, que a
+     configuração de Node não carrega. Sem este arquivo, `e2e/` não era checada
+     por configuração nenhuma: `tsc -b` passava sem nunca ter olhado para ela. */
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    "module": "nodenext",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["e2e", "playwright.config.ts"]
+}

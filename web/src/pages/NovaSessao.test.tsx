@@ -11,6 +11,7 @@ function sala(over: Partial<Room> = {}): Room {
     id: "r1",
     name: "Sala 1",
     location: "Centro",
+    active: true,
     capacity: 120,
     sectors: [],
     ...over,

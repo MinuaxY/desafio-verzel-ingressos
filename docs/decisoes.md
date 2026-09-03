@@ -964,6 +964,69 @@ endpoint de cada vez com o resto no ar — que é a falha parcial real, e não o
 
 ---
 
+## D41 — Teste de ponta a ponta em navegador de verdade, e não mais um teste de unidade
+
+**O gatilho foi uma constatação incômoda, não uma vontade de aumentar número.** Os 22 testes do
+mapa de assentos passaram, sem uma linha de alteração, com o mapa visivelmente cortado no
+celular. jsdom não calcula layout: `getBoundingClientRect` devolve zeros, e largura, transbordo
+e rolagem não existem. Dos três defeitos da D39, a suíte de 126 testes pegaria **zero**.
+
+**Escolhido: Playwright, como dependência de desenvolvimento do próprio repositório.**
+
+O ponto da escolha não é a biblioteca — é o **dono**. O navegador que eu, assistente, controlo
+existe só enquanto a sessão existe; um teste em `web/e2e/` fica versionado, roda com
+`npm run e2e`, entra em CI e qualquer avaliador que clonar o projeto executa. Para um repositório
+que é avaliado por processo, medição que ninguém consegue repetir vale pouco.
+
+### Dois projetos, e o de celular é o que importa
+
+`desktop` e `celular`, e o celular fixado em **375px de propósito**. A primeira versão usava o
+Pixel 7, de 412px — e com ele o cabeçalho quebrado da D39 **passava no teste**: sobra folga
+demais para o defeito aparecer. Testar no aparelho largo é testar onde não dói. O 375 é onde os
+defeitos foram encontrados e é o estreito comum que ainda circula.
+
+### O que ficou coberto
+
+- **`compra.spec.ts`** — o fluxo central, que era o único item das limitações do README declarado
+  como "verificado manualmente": entrar, escolher poltrona no mapa, pagar e chegar ao QR. Um
+  segundo teste compra e volta à sala para conferir que aquela poltrona ficou ocupada e
+  desabilitada — a face visível, na tela, da garantia que o índice único parcial dá no banco.
+- **`geometria.spec.ts`** — as medições da D39 viradas teste: nenhuma tela rola de lado, o mapa
+  começa na primeira poltrona com `scrollLeft` zero, o trilho encosta na esquerda quando não cabe
+  e fica centralizado quando cabe, e a poltrona tem 40px no dedo.
+
+**Provado ao contrário, e não só no verde:** reverti a correção inteira da D39 — componente e CSS
+— e rodei. Quatro dos seis testes de geometria ficaram vermelhos, inclusive o transbordo do
+cabeçalho. É a garantia de que estes testes reprovam o defeito que motivou existirem.
+
+**Descartado: Cypress.** Roda dentro do navegador, o que complica emulação de dispositivo — e
+emular celular é justamente o que aqui não é acessório.
+
+**Descartado: teste de imagem (screenshot comparison).** Quebra por diferença de fonte entre
+máquinas e vira ruído que se aprende a ignorar. As asserções aqui são numéricas e explicam o que
+está errado quando falham: "a primeira poltrona ficou fora da área visível do mapa".
+
+**Descartado: subir a API pelo próprio Playwright.** Ele levanta o Vite, mas o banco depende do
+Docker, que ele não controla. Em vez disso, um `globalSetup` confere `/health` e o cartaz, e
+falha com o comando exato a rodar. É a lição do dia em que o Docker parado deixou 264 testes
+vermelhos, virada código.
+
+### Um achado colateral, e desconfortável
+
+Ao configurar a checagem de tipos da pasta nova, descobri que **`npx tsc --noEmit` não checava
+nada** neste repositório: o `tsconfig.json` da raiz tem `files: []` e só referências, então o
+comando termina com sucesso sem olhar para arquivo nenhum. Era o comando que eu vinha usando
+para dizer "tipos limpos" — e, por causa dele, um erro de tipo entrou no repositório na D40 e
+deixou o `npm run build` quebrado por algumas horas.
+
+O check verdadeiro é `tsc -b`, que é o que o `build` já fazia. Virou o script `npm run typecheck`,
+para o comando certo ser o óbvio. E a pasta `e2e/` ganhou `tsconfig.e2e.json` próprio, porque
+precisa dos tipos do DOM — o corpo de `page.evaluate` roda dentro do navegador — que a
+configuração de Node não carrega. Sem ele, a pasta nova não seria checada por configuração
+nenhuma.
+
+---
+
 ## Decisões que estavam pendentes
 
 Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma
