@@ -371,6 +371,29 @@ Foi o mesmo método do dia inteiro — quebrar de propósito o que o teste dever
 
 ---
 
+## 21. Cada ferramenta de teste é cega para alguma coisa. Descubra para o quê antes de confiar.
+
+**O que aconteceu, duas vezes no mesmo dia:** de manhã, provei que a suíte de unidade não vê
+geometria — jsdom não calcula layout, e um mapa de assentos visivelmente cortado passou por 22
+testes. Escrevi testes de ponta a ponta em navegador de verdade para tapar esse buraco, e
+funcionou: revertendo a correção, eles ficaram vermelhos.
+
+À noite, os **mesmos testes novos** passaram com um diálogo de confirmação posicionado no canto
+superior esquerdo da tela, em vez de centralizado. `toBeVisible()` era verdade, o botão era
+clicável, o fluxo inteiro funcionava. Só apareceu porque olhei uma captura de tela.
+
+**A lição:** não existe "agora está coberto". Cada camada enxerga um recorte e é cega para o
+resto — jsdom não vê geometria, o navegador automatizado vê geometria mas **não julga aparência**,
+e nenhum dos dois percebe que um texto ficou confuso. Trocar de ferramenta não elimina o ponto
+cego; muda onde ele fica.
+
+O útil disso não é desconfiar de tudo, é **saber nomear o que cada camada não vê** — e reservar,
+para o fim, os dois minutos de abrir a tela e olhar. Foi o que achou este defeito, e foi também
+como o Paulo achou o botão de cancelar que não fazia nada, passeando pelo sistema enquanto 29
+testes verdes não acusavam nada.
+
+---
+
 ## O que faria diferente no próximo
 
 1. **Perguntar sobre o não-escrito no dia 1**, não no dia 3.
@@ -395,3 +418,5 @@ Foi o mesmo método do dia inteiro — quebrar de propósito o que o teste dever
     menos que trinta segundos de medição.
 12. **Perguntar qual seria a versão errada mais provável da regra**, e escolher o caso de
     teste que separa as duas — não um em que ambas concordam.
+13. **Olhar a tela uma vez, sempre**, mesmo com tudo verde — e perguntar de cada camada de
+    teste para o que ela é cega, em vez de somar ferramentas achando que somam cobertura.

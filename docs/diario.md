@@ -636,3 +636,131 @@ Docker Desktop primeiro, sempre. `docker compose up -d db`, esperar o `healthy`,
 `pytest`. Para o front com dados reais: `uvicorn app.main:app --port 8000` na pasta `api`, e
 `npm run dev` na `web`. O `.claude/launch.json` que uso para o preview está no `.gitignore` — é
 config de ferramenta, não faz parte do projeto que o avaliador clona.
+
+---
+
+## Pós-devolutiva — 3.2, o dia em que a rede de proteção passou a existir
+
+**Começou com uma pergunta do Paulo:** existe algum conector ou plugin que ajude no front? Fui
+conferir em vez de opinar — registro de conectores vazio, nenhuma skill a sugerir. A resposta
+honesta era que a ferramenta que mais importava eu já tinha, o navegador do painel, e que o que
+faltava **não era conector nenhum: era uma dependência de desenvolvimento.**
+
+A distinção decidiu a etapa. O navegador que eu controlo existe enquanto a sessão existe; um
+teste em `web/e2e/` fica versionado, roda com `npm run e2e`, entra em CI e qualquer avaliador que
+clonar o repositório executa. Para um projeto julgado por processo, medição que ninguém consegue
+repetir vale pouco.
+
+### Três arquivos, e cada um conferido ao contrário
+
+**`compra.spec.ts`** — o fluxo central, que era o único item das limitações do README declarado
+como "verificado manualmente": entrar, escolher poltrona no mapa, pagar, chegar ao QR. Um segundo
+teste compra e volta à sala para ver aquela poltrona ocupada e desabilitada — a face visível, na
+tela, da garantia que o índice único parcial dá no banco.
+
+**`geometria.spec.ts`** — as medições da D39 viradas teste. Revertendo componente e CSS daquela
+correção, **quatro dos seis ficam vermelhos**. É assim que se sabe que reprovam o defeito que os
+motivou.
+
+**`portaria.spec.ts`** — os quatro vereditos, com o ingresso **comprado pela tela** e o código
+lido de onde o cliente o leria. Um código injetado no banco provaria só a portaria; assim o teste
+cobre a costura inteira. Ficam em série numa aba só, porque contam uma história em ordem: o
+ingresso entra, e por ter entrado não entra de novo. Conferido desligando o envio da sessão da
+porta — o ingresso de outra sala passou a receber "Pode entrar".
+
+**`gestao.spec.ts`** — o ciclo do organizador, ponta a ponta, mais repetir em vários dias e a
+trava do preço por setor.
+
+### O aparelho largo demais
+
+A primeira configuração usava o Pixel 7, de 412px. **Com ele, o cabeçalho quebrado da D39 passava
+no teste** — sobra folga demais para o defeito aparecer. Fixei o projeto de celular em 375px, que
+é onde os defeitos foram encontrados. Testar no aparelho largo é testar onde não dói.
+
+### O comando que não checava nada
+
+Ao fazer a checagem de tipos alcançar a pasta nova, descobri que **`npx tsc --noEmit` não
+verificava coisa alguma** neste repositório: o `tsconfig.json` da raiz tem `files: []` e só
+referências, então o comando termina com sucesso sem abrir arquivo nenhum.
+
+Era o comando que eu vinha usando para dizer "tipos limpos". Por causa dele, um erro de tipo entrou
+no repositório na D40 e **deixou o `npm run build` quebrado por algumas horas**. Corrigido, e o
+comando certo — `tsc -b` — virou o script `npm run typecheck`, para o certo ser o óbvio.
+
+### O teste que passou com a trava quebrada
+
+O da trava de preço deixava **todos** os preços em branco. Troquei o `every` por `some` na regra —
+de "todo setor tem preço" para "algum setor tem preço" — e ele continuou verde: com zero
+preenchidos, as duas regras recusam igual. Preencher **um** preço e deixar o resto em branco é o
+único estado em que discordam, e ali ficou vermelho na hora. Virou o aprendizado 20.
+
+### Decisões tomadas
+D41.
+
+---
+
+## O defeito que o Paulo achou passeando pelo sistema
+
+**Abri o app para ele ver, e ele voltou dizendo que "Cancelar pedido" não fazia nada.**
+
+Reproduzi e medi: o botão chamava `window.confirm`, e ali ele devolvia `false` em **zero
+milissegundo**, sem nunca aparecer. Isolei antes de concluir — com o `confirm` respondido, o
+cancelamento funcionava. A lógica estava certa; o diálogo é que falhava.
+
+Podia ter parado em "é do painel de pré-visualização". Não parei, porque o `window.confirm` é
+suprimido em silêncio em situações comuns demais para uma ação destrutiva depender dele: iframe de
+outra origem, webview de aplicativo, e depois que o navegador oferece *"impedir esta página de
+criar mais diálogos"* — e o painel do organizador dispara vários seguidos, que é exatamente o
+padrão que provoca a oferta. Eram **cinco** pontos assim, todos destrutivos.
+
+Houve um sinal que eu não li na hora: os testes E2E precisaram de `page.on("dialog", …)`. **Ter de
+ensinar o robô a lidar com um diálogo que a aplicação não controla era o aviso** de que a
+confirmação estava fora do alcance dela.
+
+### O que isso custou de orgulho
+
+Os testes de ponta a ponta que eu tinha acabado de escrever **passaram com o diálogo novo
+posicionado no canto superior esquerdo da tela**. `toBeVisible()` era verdade, o botão era
+clicável, o fluxo funcionava — e a aparência estava quebrada. Só apareceu porque olhei a captura.
+
+A causa era o reset global `* { margin: 0 }` do próprio projeto, que anula o `margin: auto` com
+que o navegador centraliza um `<dialog>` modal.
+
+**Duas vezes no mesmo dia a mesma lição:** o dia começou provando que a suíte de unidade é cega
+para geometria, e terminou descobrindo que a suíte nova é cega para aparência. Virou o
+aprendizado 21.
+
+### Decisões tomadas
+D42.
+
+---
+
+## Onde paramos — 03/09, fim do dia
+
+**O bloco 3 está com a 3.2 fechada e só a parte estética da 3.1 em aberto.**
+
+### Contagem atual
+
+**433 testes: 264 no back, 136 no front e 33 de ponta a ponta**, estes últimos em dois projetos —
+desktop e celular a 375px. 42 decisões, 21 aprendizados.
+
+### O que falta
+
+- **A passada estética da 3.1:** responsividade das outras telas, espaçamento, consistência dos
+  formulários e feedback depois da ação. Agora fica mais seguro de fazer — mexer no CSS com 33
+  testes de layout e fluxo por trás é outra coisa.
+- **A portaria pertencer a um organizador.** Um usuário GATE não pertence a cinema nenhum.
+  Apareceu na D34 e continua sendo a única pendência que é regra de negócio faltando, e não
+  melhoria.
+- `/gate/sessions` devolvendo 26 sessões de três dias; o seletor não indicar a sessão em
+  andamento; `occupies_until` não exposto na API; `test_melhorias.py` com 78 testes de cinco
+  assuntos.
+
+### Para retomar o ambiente
+
+Docker Desktop primeiro. `docker compose up -d db`, esperar o `healthy`. Depois `uvicorn
+app.main:app --port 8000` na pasta `api` e `npm run dev` na `web`. Para os testes de ponta a
+ponta, `npm run e2e` — o `globalSetup` confere a API e o cartaz antes de começar, e falha com o
+comando exato a rodar se faltar alguma coisa.
+
+**E o comando de tipos é `npm run typecheck`, não `npx tsc --noEmit`.** O segundo passa sempre.
