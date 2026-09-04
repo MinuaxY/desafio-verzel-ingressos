@@ -8,7 +8,13 @@
  */
 import { expect, test } from "@playwright/test";
 
-import { CONTAS, comprarUmaPoltrona, entrar } from "./fluxos";
+import {
+  CONTAS,
+  comprarUmaPoltrona,
+  confirmarNoDialogo,
+  entrar,
+  reservarUmaPoltrona,
+} from "./fluxos";
 
 test("cliente compra um ingresso, do cartaz ao QR", async ({ page }) => {
   await entrar(page, CONTAS.cliente);
@@ -33,4 +39,37 @@ test("a poltrona comprada volta ocupada para o próximo cliente", async ({ page 
   await expect(vendida).toBeVisible();
   await expect(vendida).toHaveAccessibleName(/ocupada/);
   await expect(vendida).toBeDisabled();
+});
+
+test("dá para desistir do pedido na tela de pagamento", async ({ page }) => {
+  // O defeito que este teste tranca: a confirmação passava por `window.confirm`,
+  // que é suprimido em silêncio em vários contextos. O botão ficava morto, sem
+  // aviso nenhum, e a poltrona seguia presa até o prazo vencer. Ver decisão D42.
+  await entrar(page, CONTAS.cliente);
+  const reserva = await reservarUmaPoltrona(page);
+
+  await page.getByRole("button", { name: "Cancelar pedido" }).click();
+  await confirmarNoDialogo(page, "Cancelar pedido");
+
+  await expect(page.getByText(/pedido foi cancelado/i)).toBeVisible();
+
+  // A poltrona precisa voltar ao estoque de verdade, e não só a tela dizer que
+  // voltou: desistir sem devolver o lugar seria pior do que não desistir.
+  await page.goto(reserva.urlDaSessao);
+  const devolvida = page.getByRole("button", { name: new RegExp(`^Poltrona ${reserva.poltrona},`) });
+  await expect(devolvida).toBeEnabled();
+  await expect(devolvida).toHaveAccessibleName(/R\$/);
+});
+
+test("voltar atrás na confirmação não cancela nada", async ({ page }) => {
+  await entrar(page, CONTAS.cliente);
+  await reservarUmaPoltrona(page);
+
+  await page.getByRole("button", { name: "Cancelar pedido" }).click();
+  await confirmarNoDialogo(page, "Voltar");
+
+  // Continua sendo possível pagar: a desistência do passo de confirmação não
+  // pode deixar o pedido num estado intermediário.
+  await expect(page.getByRole("button", { name: /^Pagar/ })).toBeEnabled();
+  await expect(page.getByText(/pedido foi cancelado/i)).toHaveCount(0);
 });

@@ -29,6 +29,16 @@ function diaLivre(maisDias = 0) {
   return d.toISOString().slice(0, 10);
 }
 
+/** Confirma o passo destrutivo no diálogo da própria tela.
+ *  Escopado ao `<dialog>` de propósito: o botão da linha e o do diálogo têm o
+ *  mesmo rótulo, e sem isso o seletor ficaria ambíguo. Ver decisão D42. */
+async function confirmarNoDialogo(page: Page, acao: string) {
+  const dialogo = page.locator("dialog.confirmacao");
+  await expect(dialogo).toBeVisible();
+  await dialogo.getByRole("button", { name: acao, exact: true }).click();
+  await expect(dialogo).toBeHidden();
+}
+
 /** As linhas que este teste criou, reconhecidas pelo horário-assinatura. */
 function minhasSessoes(page: Page) {
   return page.locator(".linha-sessao").filter({ hasText: HORA });
@@ -55,6 +65,7 @@ async function limpar(page: Page) {
     }
 
     await linha.getByRole("button", { name: "Excluir" }).click();
+    await confirmarNoDialogo(page, "Excluir");
     await expect(minhasSessoes(page)).toHaveCount(restantes - 1, { timeout: 10_000 });
   }
   await expect(minhasSessoes(page)).toHaveCount(0);
@@ -80,9 +91,6 @@ async function preencheNovaSessao(page: Page, dia: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  // Confirmações de excluir e cancelar passam por `confirm()`, que o Playwright
-  // dispensa por padrão — sem isto, nenhuma delas aconteceria.
-  page.on("dialog", (d) => d.accept());
   await entrar(page, CONTAS.organizador);
   await limpar(page);
 });
@@ -115,6 +123,7 @@ test("o ciclo inteiro: publicar, aparecer no cartaz, despublicar e excluir", asy
   // Excluir só existe em rascunho — publicada sai do cartaz com despublicar, e
   // sessão com ingresso vendido não some. Ver decisão D28.
   await minhasSessoes(page).first().getByRole("button", { name: "Excluir" }).click();
+  await confirmarNoDialogo(page, "Excluir");
   await expect(minhasSessoes(page)).toHaveCount(0);
 });
 

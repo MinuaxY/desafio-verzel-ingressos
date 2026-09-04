@@ -5,6 +5,7 @@ import { ApiError, request } from "../lib/api";
 import { dataHora, faixaDePreco } from "../lib/formato";
 import type { SessionDetail } from "../lib/tipos";
 import { Carregando } from "../components/Carregando";
+import { useConfirmacao, type PedidoDeConfirmacao } from "../components/Confirmacao";
 import { Classificacao, SelosDaSessao } from "../components/Selos";
 
 const SITUACAO = {
@@ -17,6 +18,7 @@ export function Organizador() {
   const [sessoes, setSessoes] = useState<SessionDetail[] | null>(null);
   const [erro, setErro] = useState("");
   const [agindo, setAgindo] = useState("");
+  const { confirmar, dialogo } = useConfirmacao();
 
   function carregar() {
     request<SessionDetail[]>("/organizer/sessions")
@@ -28,8 +30,13 @@ export function Organizador() {
 
   async function excluir(s: SessionDetail) {
     const oque = s.status === "CANCELLED" ? "a sessão cancelada" : "o rascunho";
-    if (!window.confirm(`Excluir a sessão de ${s.movie.title}? Isso apaga ${oque} de vez.`))
-      return;
+    const confirmado = await confirmar({
+      titulo: `Excluir a sessão de ${s.movie.title}?`,
+      descricao: `Isso apaga ${oque} de vez.`,
+      acao: "Excluir",
+      perigo: true,
+    });
+    if (!confirmado) return;
 
     setAgindo(s.id);
     setErro("");
@@ -47,18 +54,18 @@ export function Organizador() {
    *  que mexe na vida de gente que comprou, e precisa ser pedido de propósito.
    *  Ver decisão D30. */
   async function cancelarPedidos(s: SessionDetail, vendidos: number) {
-    if (
-      !window.confirm(
-        `Cancelar ${vendidos} ingresso(s) já vendido(s) da sessão de ${s.movie.title}?
+    const confirmado = await confirmar({
+      titulo: `Cancelar ${vendidos} ingresso(s) já vendido(s)?`,
+      descricao:
+        `A sessão de ${s.movie.title} sai do cartaz e essas pessoas perdem o ingresso. ` +
+        `O sistema não avisa ninguém nem devolve o dinheiro — isso fica com você.
 
 ` +
-          `A sessão sai do cartaz e essas pessoas perdem o ingresso. O sistema não avisa ` +
-          `ninguém nem devolve o dinheiro — isso fica com você.
-
-Isso não pode ser desfeito.`,
-      )
-    )
-      return;
+        `Isso não pode ser desfeito.`,
+      acao: "Cancelar os pedidos",
+      perigo: true,
+    });
+    if (!confirmado) return;
 
     setAgindo(s.id);
     setErro("");
@@ -75,8 +82,8 @@ Isso não pode ser desfeito.`,
     }
   }
 
-  async function acao(id: string, caminho: string, confirmacao?: string) {
-    if (confirmacao && !window.confirm(confirmacao)) return;
+  async function acao(id: string, caminho: string, confirmacao?: PedidoDeConfirmacao) {
+    if (confirmacao && !(await confirmar(confirmacao))) return;
 
     setAgindo(id);
     setErro("");
@@ -96,6 +103,7 @@ Isso não pode ser desfeito.`,
 
   return (
     <section className="stack" style={{ gap: "var(--space-6)" }}>
+      {dialogo}
       <header className="cabecalho-acao">
         <div className="stack" style={{ gap: "var(--space-2)" }}>
           <h1>Minhas sessões</h1>
@@ -237,11 +245,12 @@ Isso não pode ser desfeito.`,
                           : undefined
                       }
                       onClick={() =>
-                        acao(
-                          s.id,
-                          "cancel",
-                          `Cancelar a sessão de ${s.movie.title}? Isso não pode ser desfeito.`,
-                        )
+                        acao(s.id, "cancel", {
+                          titulo: `Cancelar a sessão de ${s.movie.title}?`,
+                          descricao: "Isso não pode ser desfeito.",
+                          acao: "Cancelar sessão",
+                          perigo: true,
+                        })
                       }
                     >
                       Cancelar

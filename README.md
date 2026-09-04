@@ -488,13 +488,13 @@ npm test
 npm run e2e          # precisa do banco e da API de pé
 ```
 
-**29 testes** em Playwright, rodando em dois projetos: `desktop` e `celular` — este fixado em
+**33 testes** em Playwright, rodando em dois projetos: `desktop` e `celular` — este fixado em
 **375px de propósito**, porque foi onde os defeitos de layout apareceram e porque num aparelho
 mais largo eles não reaparecem.
 
 | Arquivo | Testes | Cobre |
 |---|---|---|
-| `compra.spec.ts` | 2 | Do cartaz ao QR: entrar, escolher poltrona, pagar. E a poltrona vendida voltando ocupada |
+| `compra.spec.ts` | 4 | Do cartaz ao QR: entrar, escolher poltrona, pagar. A poltrona vendida voltando ocupada. E desistir do pedido, com a poltrona voltando ao estoque |
 | `geometria.spec.ts` | 6 | Nenhuma tela rola de lado, o mapa começa na primeira poltrona, alvo de 40px no dedo |
 | `portaria.spec.ts` | 4 | Os quatro vereditos, com ingresso comprado pela tela: sessão errada, entrada liberada, reuso e código inventado |
 | `gestao.spec.ts` | 3 | O ciclo do organizador: publicar, aparecer no cartaz, despublicar e excluir. Repetir em vários dias. E a trava do preço por setor |
@@ -514,7 +514,7 @@ sessão da porta, o ingresso de outra sala passa a receber "Pode entrar"; trocan
 desafio-verzel-ingressos/
 ├── docker-compose.yml
 ├── docs/
-│   ├── decisoes.md          as 41 decisões técnicas, e o que foi descartado em cada uma
+│   ├── decisoes.md          as 42 decisões técnicas, e o que foi descartado em cada uma
 │   ├── backlog.md           requisitos, o que foi entregue e o que ficou fora do escopo
 │   ├── diario.md            o que aconteceu em ordem, incluindo o que deu errado
 │   ├── quadro.md            o kanban ao fim do projeto
@@ -596,7 +596,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 
 | | |
 |---|---|
-| [`decisoes.md`](docs/decisoes.md) | As **41 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
+| [`decisoes.md`](docs/decisoes.md) | As **42 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |

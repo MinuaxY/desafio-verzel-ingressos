@@ -6,6 +6,7 @@ import { ASSENTO } from "../lib/tipos";
 import type { Room, SeatKind } from "../lib/tipos";
 import { Campo } from "../components/Campo";
 import { Carregando } from "../components/Carregando";
+import { useConfirmacao } from "../components/Confirmacao";
 
 interface SetorForm {
   name: string;
@@ -50,6 +51,7 @@ export function Salas() {
   const [editando, setEditando] = useState<Room | null>(null);
   const [rascunho, setRascunho] = useState({ name: "", location: "" });
   const [agindo, setAgindo] = useState("");
+  const { confirmar, dialogo } = useConfirmacao();
 
   function carregar() {
     request<Room[]>("/rooms")
@@ -139,13 +141,15 @@ export function Salas() {
   }
 
   async function remover(s: Room) {
-    if (
-      !window.confirm(
-        `Remover a sala ${s.name}? Se ela já tiver sido usada em alguma sessão, fica ` +
-          "guardada como inativa para o histórico não se perder.",
-      )
-    )
-      return;
+    const confirmado = await confirmar({
+      titulo: `Remover a sala ${s.name}?`,
+      descricao:
+        "Se ela já tiver sido usada em alguma sessão, fica guardada como inativa para o " +
+        "histórico não se perder.",
+      acao: "Remover sala",
+      perigo: true,
+    });
+    if (!confirmado) return;
 
     setAgindo(s.id);
     setErro("");
@@ -163,6 +167,7 @@ export function Salas() {
 
   return (
     <section className="stack" style={{ gap: "var(--space-6)", maxWidth: "48rem" }}>
+      {dialogo}
       <header className="cabecalho-acao">
         <div className="stack" style={{ gap: "var(--space-2)" }}>
           <h1>Salas</h1>

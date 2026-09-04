@@ -6,6 +6,7 @@ import { dataHora, reais, tempoRestante } from "../lib/formato";
 import type { Order } from "../lib/tipos";
 import { Campo } from "../components/Campo";
 import { Carregando } from "../components/Carregando";
+import { useConfirmacao } from "../components/Confirmacao";
 
 /** Cartões com desfecho fixo. Ficam à vista porque o pagamento é simulado e
  *  quem estiver avaliando precisa conseguir provocar a recusa de propósito.
@@ -29,6 +30,7 @@ export function Pedido() {
   // e o valor é descartado em todos menos o primeiro.
   const [agora, setAgora] = useState(() => Date.now());
   const [cancelando, setCancelando] = useState(false);
+  const { confirmar, dialogo } = useConfirmacao();
 
   useEffect(() => {
     request<Order>(`/orders/${id}`)
@@ -67,10 +69,15 @@ export function Pedido() {
 
   async function cancelar() {
     const pago = pedido?.status === "PAID";
-    const aviso = pago
-      ? "Cancelar esta compra? As poltronas voltam para o estoque e os ingressos deixam de valer."
-      : "Cancelar este pedido? As poltronas voltam para o estoque.";
-    if (!window.confirm(aviso)) return;
+    const confirmado = await confirmar({
+      titulo: pago ? "Cancelar esta compra?" : "Cancelar este pedido?",
+      descricao: pago
+        ? "As poltronas voltam para o estoque e os ingressos deixam de valer."
+        : "As poltronas voltam para o estoque.",
+      acao: pago ? "Cancelar compra" : "Cancelar pedido",
+      perigo: true,
+    });
+    if (!confirmado) return;
 
     setErro("");
     setCancelando(true);
@@ -102,6 +109,7 @@ export function Pedido() {
 
   return (
     <section className="stack" style={{ gap: "var(--space-6)", maxWidth: "44rem" }}>
+      {dialogo}
       <header className="stack" style={{ gap: "var(--space-2)" }}>
         <h1>Pagamento</h1>
         <p className="muted">

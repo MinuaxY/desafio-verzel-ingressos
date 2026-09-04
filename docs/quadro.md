@@ -36,7 +36,7 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] Revisao de codigo: tres defeitos corrigidos (D33)
 - [x] Volume na vitrine: tres salas, dez dias, ~90 sessoes
 - [x] Artefatos de processo versionados no repositorio
-- [x] 364 testes (242 back, 122 front)  → agora 429 (264 back, 136 front, 29 E2E)
+- [x] 364 testes (242 back, 122 front)  → agora 433 (264 back, 136 front, 33 E2E)
 
 
 ## Ciclo pos-devolutiva
@@ -80,6 +80,13 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
       para achar a sessao certa e pior do que nao ter o seletor
 - [ ] test_melhorias.py dividido por assunto — 78 testes, virou saco de gatos
 - [ ] Expor occupies_until na API, para a tela mostrar quando a sessao termina
+
+
+## Achado pelo Paulo, usando o sistema
+
+- [x] "Cancelar pedido" nao fazia nada: window.confirm suprimido devolvia false na hora,
+      e o botao morria calado. Trocado por confirmacao na propria tela nos 5 pontos
+      destrutivos (D42). O passeio dele achou o que 29 testes verdes nao acharam
 
 
 ## Falta o Paulo fazer

@@ -50,6 +50,16 @@ export async function abrePrimeiraSessao(page: Page) {
   return page.url();
 }
 
+/** Confirma um passo destrutivo no diálogo da própria tela.
+ *  Escopado ao `<dialog>`: o botão que abre e o que confirma costumam ter o
+ *  mesmo rótulo, e sem isso o seletor ficaria ambíguo. Ver decisão D42. */
+export async function confirmarNoDialogo(page: Page, acao: string) {
+  const dialogo = page.locator("dialog.confirmacao");
+  await expect(dialogo).toBeVisible();
+  await dialogo.getByRole("button", { name: acao, exact: true }).click();
+  await expect(dialogo).toBeHidden();
+}
+
 export interface Compra {
   urlDaSessao: string;
   sessaoId: string;
@@ -58,9 +68,9 @@ export interface Compra {
   poltrona: string;
 }
 
-/** Percorre o fluxo inteiro de compra e devolve o que foi comprado.
- *  Termina em /meus-ingressos, com o ingresso emitido. */
-export async function comprarUmaPoltrona(page: Page): Promise<Compra> {
+/** Escolhe uma poltrona e para na tela de pagamento, sem pagar. É o estado em
+ *  que o pedido prende a poltrona por tempo limitado. */
+export async function reservarUmaPoltrona(page: Page): Promise<Compra> {
   const urlDaSessao = await abrePrimeiraSessao(page);
   const sessaoId = urlDaSessao.split("/sessao/")[1];
   const filme = await page.getByRole("heading", { level: 1 }).innerText();
@@ -78,12 +88,20 @@ export async function comprarUmaPoltrona(page: Page): Promise<Compra> {
   await page.getByRole("button", { name: /^Continuar$/ }).click();
   await expect(page).toHaveURL(/\/pedido\//);
 
+  return { urlDaSessao, sessaoId, filme, poltrona: codigo };
+}
+
+/** Percorre o fluxo inteiro e devolve o que foi comprado.
+ *  Termina em /meus-ingressos, com o ingresso emitido. */
+export async function comprarUmaPoltrona(page: Page): Promise<Compra> {
+  const compra = await reservarUmaPoltrona(page);
+
   await page.getByLabel("Número do cartão").fill(CARTAO_QUE_APROVA);
   await page.getByLabel("Nome impresso no cartão").fill("PAULO FIGUEIREDO");
   await page.getByRole("button", { name: /^Pagar/ }).click();
   await expect(page).toHaveURL(/\/meus-ingressos/);
 
-  return { urlDaSessao, sessaoId, filme, poltrona: codigo };
+  return compra;
 }
 
 /** O código que vai no QR, lido da própria tela do cliente — é o mesmo que ele

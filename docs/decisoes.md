@@ -1059,6 +1059,74 @@ está no catálogo e no seed.
 
 ---
 
+## D42 — A confirmação sai do navegador e entra na tela
+
+**O Paulo apontou que "Cancelar pedido" não fazia nada.** Reproduzi e medi: o botão chamava
+`window.confirm`, e naquele contexto ele devolvia `false` em **zero milissegundo**, sem nunca
+aparecer. O código faz `if (!window.confirm(aviso)) return;`, então desistia em silêncio.
+
+Isolei antes de concluir: substituí `window.confirm` por uma função que responde "OK", cliquei no
+mesmo botão, e o pedido foi cancelado normalmente. **A lógica estava certa** — front e API. O que
+falhava era o diálogo.
+
+### Por que não é só "problema do painel de pré-visualização"
+
+Era, ali. Mas o `window.confirm` é suprimido em silêncio em situações comuns demais para depender
+dele numa ação destrutiva:
+
+- dentro de iframe de outra origem, onde o Chrome bloqueia;
+- depois que o navegador oferece **"impedir esta página de criar mais diálogos"** — e o painel do
+  organizador dispara vários seguidos, que é exatamente o padrão que provoca a oferta;
+- em webview de aplicativo;
+- no painel de pré-visualização do ambiente de desenvolvimento.
+
+Em todos, o botão fica **morto e sem explicação**. É a mesma forma da D40: um estado
+indeterminado se disfarçando de "nada aconteceu". Eram **cinco** pontos assim, todos destrutivos:
+excluir sessão, cancelar sessão, cancelar pedidos vendidos, cancelar compra e excluir sala.
+
+Houve um sinal que eu não li na hora: os testes de ponta a ponta precisaram de
+`page.on("dialog", d => d.accept())`. Precisar ensinar o robô a lidar com um diálogo que a
+aplicação não controla era o aviso de que a confirmação estava fora do alcance dela.
+
+**Escolhido: `<dialog>` do HTML, com `showModal()`.** É DOM comum, e não diálogo do navegador —
+ninguém o suprime. E traz pronto o que interessa: foco preso dentro, Esc para sair, fundo inerte
+e `::backdrop`. Uma `div` com `position: fixed` teria de imitar tudo isso à mão.
+
+A API do hook devolve uma promessa (`await confirmar({...})`), então os cinco pontos de chamada
+mudaram pouco — o que importava, porque mexer em cinco caminhos destrutivos de uma vez é
+justamente onde um erro sai caro.
+
+**Descartado: manter o `confirm` e detectar a supressão.** Dá para medir que ele voltou rápido
+demais, mas aí seria preciso um caminho alternativo de qualquer jeito — e o alternativo é o que
+vale a pena ter sempre.
+
+**Descartado: confirmar dentro do próprio botão** ("clique de novo para confirmar"). Custa menos
+código e é pior: não cabe o aviso do que vai acontecer, e a segunda batida de um clique duplo
+confirmaria sozinha.
+
+### O botão que destrói é preenchido, e o "Voltar" vem primeiro
+
+O `.btn--perigo` que já existia só pinta o texto de vermelho — serve numa lista, onde a ação
+destrutiva é discreta de propósito. Numa confirmação as duas opções precisam ser distinguíveis de
+relance, então o botão que destrói ganhou fundo (`.btn--destruir`).
+
+E "Voltar" vem primeiro no DOM porque o `<dialog>` foca o primeiro elemento focável: num passo
+destrutivo, um Enter sem querer deve desistir, não destruir.
+
+### O que a verificação no navegador pegou, e os testes não
+
+Os testes de ponta a ponta passaram com o diálogo **posicionado no canto superior esquerdo da
+tela**. `toBeVisible()` era verdade, o botão era clicável, o fluxo funcionava — e a aparência
+estava quebrada.
+
+A causa: o reset global `* { margin: 0 }` anula o `margin: auto` que o navegador usa para
+centralizar um `<dialog>` aberto com `showModal()`. Devolver a margem resolveu.
+
+É a lição 17 num degrau acima: lá o jsdom não via geometria; aqui o Playwright via geometria mas
+não julga aparência. **Nenhuma automação substitui olhar a tela uma vez.**
+
+---
+
 ## Decisões que estavam pendentes
 
 Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma

@@ -770,3 +770,50 @@
   color: var(--accent);
   text-decoration: underline;
 }
+
+/* ---------- Confirmação de ação destrutiva ---------- */
+
+/* `<dialog>` e não uma div flutuante: o foco fica preso dentro, o Esc fecha e o
+   resto da página vira inerte sem uma linha de JavaScript. Ver decisão D42. */
+.confirmacao {
+  /* O reset global (`* { margin: 0 }`) anula o `margin: auto` que o navegador
+     usa para centralizar um `<dialog>` aberto com showModal(), e ele vai parar
+     no canto superior esquerdo. Devolver a margem é o que o recentraliza. */
+  margin: auto;
+  max-width: 26rem;
+  width: calc(100vw - 2 * var(--space-4));
+  max-height: calc(100dvh - 2 * var(--space-5));
+  overflow-y: auto;
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.confirmacao::backdrop { background: rgb(0 0 0 / 0.6); }
+
+.confirmacao__titulo { font-size: var(--text-lg); }
+.confirmacao__texto { color: var(--text-muted); font-size: var(--text-sm); white-space: pre-line; }
+
+.confirmacao__acoes {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+/* O botão que destrói é preenchido, e não fantasma: numa confirmação as duas
+   opções precisam ser distinguíveis de relance, e a cor de perigo sozinha —
+   como no `.btn--perigo` das listas — deixaria as duas com o mesmo peso. */
+.btn--destruir {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #1a0605;
+}
+.btn--destruir:hover:not(:disabled) { background: #eb6f67; border-color: #eb6f67; color: #1a0605; }
+
+@media (max-width: 30rem) {
+  .confirmacao__acoes { flex-direction: column-reverse; }
+  .confirmacao__acoes .btn { width: 100%; }
+}
