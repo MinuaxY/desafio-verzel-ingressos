@@ -27,6 +27,13 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
 
+  // Os 5s padrão servem quando o banco está na mesma máquina. Contra um banco
+  // remoto a conta muda: de uma máquina no Brasil até a região de Oregon cada
+  // ida e volta custa ~250ms, e uma tela com oito consultas leva dois segundos
+  // sem nada estar errado. `PW_EXPECT_TIMEOUT=20000 npm run e2e` cobre esse
+  // caso sem afrouxar a suíte no dia a dia, onde demora É defeito.
+  expect: { timeout: Number(process.env.PW_EXPECT_TIMEOUT ?? 5_000) },
+
   use: {
     baseURL: ENDERECO,
     // Rastro só do que falhou, e no que falhou na primeira tentativa: é onde

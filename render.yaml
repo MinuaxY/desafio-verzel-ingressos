@@ -16,7 +16,13 @@ services:
       # expira 30 dias depois de criado e é apagado 14 dias depois disso — foi
       # o que derrubou o ambiente em outubro de 2026, com a API em ciclo de
       # reinício por não achar banco na partida. Ver decisão D43.
+      # A pooled, para o tráfego da aplicação.
       - key: DATABASE_URL
+        sync: false
+      # A direta, usada só pelas migrations na partida: DDL não é trabalho para
+      # um pooler em modo transação. Opcional — sem ela, o start.sh usa a de
+      # cima, que é o que acontece com o Postgres local do docker compose.
+      - key: DATABASE_URL_DIRECT
         sync: false
       # Gerados pelo Render e nunca vistos por ninguem. Os valores do .env
       # local sao de desenvolvimento e nao servem em producao.

@@ -6,8 +6,13 @@
 # diagnosticar. O Alembic é idempotente — se já estiver na versão, não faz nada.
 set -e
 
+# A conexão direta é usada aqui quando existe. Bancos gerenciados entregam duas
+# URLs: uma por um pooler em modo transação, para o tráfego da aplicação, e uma
+# direta. DDL não é trabalho para o pooler — a própria documentação do Neon
+# manda usar a direta em migration. Sem a variável, segue a de sempre, que é o
+# caso do Postgres local do docker compose. Ver decisão D43.
 echo "→ aplicando migrations"
-alembic upgrade head
+DATABASE_URL="${DATABASE_URL_DIRECT:-$DATABASE_URL}" alembic upgrade head
 
 # O seed é opcional e desligado por padrão. Numa avaliação, os dados de teste
 # precisam existir; num ambiente real, criar usuários com senha conhecida seria

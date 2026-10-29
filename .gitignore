@@ -29,3 +29,13 @@ desktop.ini
 web/test-results/
 web/playwright-report/
 web/blob-report/
+skills-lock.json
+.neon
+
+# Andaime do CLI do Neon: o projeto so precisa da string de conexao, que mora
+# como segredo no painel de deploy. O package.json da raiz confunde num
+# repositorio onde o de verdade e o web/package.json.
+neon.ts
+/package.json
+/package-lock.json
+.neon/
