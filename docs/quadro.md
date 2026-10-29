@@ -94,9 +94,12 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] Diagnostico da queda de outubro: o Postgres gratuito do Render expira em 30 dias
       e foi apagado. Nao era hibernacao — a API ficava em ciclo de reinicio (D43)
 - [x] render.yaml sem o banco que expira, e conferencia diaria em .github/workflows
-- [ ] Paulo: criar o banco no Neon e colar a DATABASE_URL no painel do Render
-- [ ] Paulo: agendador externo batendo na API das 6h a 1h, para nao hibernar de dia
-- [ ] Depois de tudo no ar, rodar o workflow a mao e ver a conferencia passar
+- [x] Banco no Neon (us-west-2, mesma regiao da API), DATABASE_URL e DATABASE_URL_DIRECT
+      no painel do Render. Site de volta ao ar em 29/10, com 96 sessoes servidas
+- [ ] Paulo: agendador externo (cron-job.org) batendo em /health a cada 10 min, das 6h a 1h.
+      A janela nao e so pelas 750h/mes: o reinicio diario faz o seed repor o cartaz, que
+      senao esvaziaria em dez dias
+- [x] Conferencia rodada a mao com tudo no ar: front 200, /health 200, /sessions 200 total=96
 
 
 ## Falta o Paulo fazer

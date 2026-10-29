@@ -764,3 +764,69 @@ ponta, `npm run e2e` — o `globalSetup` confere a API e o cartaz antes de come�
 comando exato a rodar se faltar alguma coisa.
 
 **E o comando de tipos é `npm run typecheck`, não `npx tsc --noEmit`.** O segundo passa sempre.
+
+---
+
+## 29/10 — O site estava morto havia três semanas
+
+**Descoberto por acaso.** O Paulo foi abrir o link para um recrutador e não carregou. A suspeita
+dele era a hibernação conhecida do Render; a medição disse outra coisa.
+
+O front respondeu em 0,46s. A API não respondeu em **150 segundos** — nem cabeçalho. DNS
+resolvia, o TLS fechava, o pedido era enviado e nada voltava. O Postgres gratuito do Render
+expira 30 dias depois de criado: o nosso nasceu em 20/08, expirou em ~20/09 e foi apagado em
+~04/10. Como a API roda migrations na partida, ela não achava banco, morria e reiniciava em
+ciclo. O registro inteiro está na D43.
+
+### O que foi feito
+
+Banco novo no Neon, em `aws-us-west-2` — a mesma região da API, porque banco e aplicação em
+regiões diferentes somam latência em toda consulta e a região de um projeto Neon não muda depois
+de criada.
+
+**Verifiquei antes de tocar no painel do Render**, e essa ordem importou: as 10 migrations
+aplicadas, `btree_gist` 1.7 instalado, `ex_session_room_overlap` criada, seed com 97 sessões, e
+os 33 testes de ponta a ponta rodados contra o banco na nuvem. A restrição de exclusão da D37
+era o que eu mais temia não ser aceito — se o Neon não a suportasse, a descoberta teria vindo no
+meio do deploy, com o site ainda fora do ar.
+
+`start.sh` passou a usar `DATABASE_URL_DIRECT` nas migrations quando ela existe. A documentação
+do Neon é explícita: aplicação pela pooled, DDL pela direta.
+
+### Os testes falharam, e não era defeito
+
+Dez dos 33 falharam na primeira execução contra o Neon, todos no mesmo ponto: criar o pedido
+estourava os 5 segundos de espera. Medi uma consulta trivial daqui até Oregon — **247 ms**. Uma
+tela que faz oito consultas custa dois segundos só de rede.
+
+Com o limite ajustado, 32 passaram e o último passou sozinho na repetição. Em produção a conta é
+outra: API e banco ficam os dois em Oregon. O `playwright.config` ganhou `PW_EXPECT_TIMEOUT` para
+esse caso, mantendo os 5s no dia a dia, onde demora **é** defeito.
+
+### O ganho que não estava no plano
+
+O `start.sh` roda o seed a cada partida do contêiner, e o seed é rolante: repõe dez dias a partir
+de hoje e pula o que já existe.
+
+Com o ping em janela — das 6h à 1h, escolhido pela aritmética das 750 horas mensais do plano
+gratuito —, o serviço hiberna de madrugada e sobe de manhã. Ou seja, **o cartaz se renova
+sozinho todo dia**. Mantendo o serviço acordado 24 horas o processo nunca reiniciaria, e a
+programação iria esvaziando até o site mostrar "nenhuma sessão em cartaz" em dez dias.
+
+A janela que eu recomendei por causa do limite de horas resolve, por acidente, um problema que eu
+não tinha visto.
+
+### O que não tinha dono
+
+Três semanas fora do ar e ninguém soube. São 433 testes, e nenhum deles apontaria isso: eles
+provam que o código funciona, não que o servidor está vivo. Entrou uma conferência diária em
+`.github/workflows/saude.yml`, que bate em três camadas e abre uma issue quando algo cai.
+
+A terceira camada é a que importa: `/health` devolve `"ok"` **sem encostar no banco**, então um
+monitor apontado só para ele teria dado verde durante boa parte desta queda. O `/sessions` lê
+dados de verdade.
+
+Rodada à mão depois de tudo no ar: `front: 200`, `/health: 200`, `/sessions: 200, total=96`.
+
+### Decisões tomadas
+D43.
