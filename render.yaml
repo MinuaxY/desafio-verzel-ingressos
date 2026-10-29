@@ -12,10 +12,12 @@ services:
     region: oregon
     healthCheckPath: /health
     envVars:
+      # Banco fora do Render, preenchido no painel. O Postgres gratuito daqui
+      # expira 30 dias depois de criado e é apagado 14 dias depois disso — foi
+      # o que derrubou o ambiente em outubro de 2026, com a API em ciclo de
+      # reinício por não achar banco na partida. Ver decisão D43.
       - key: DATABASE_URL
-        fromDatabase:
-          name: verzel-ingressos-db
-          property: connectionString
+        sync: false
       # Gerados pelo Render e nunca vistos por ninguem. Os valores do .env
       # local sao de desenvolvimento e nao servem em producao.
       - key: JWT_SECRET
@@ -34,8 +36,7 @@ services:
       - key: SEED_ON_START
         value: "true"
 
-databases:
-  - name: verzel-ingressos-db
-    plan: free
-    region: oregon
-    postgresMajorVersion: "16"
+# Sem bloco `databases:` de propósito. O banco é um Postgres gerenciado fora do
+# Render, que não tem prazo de validade; a URL de conexão entra como segredo no
+# painel. `docker compose up` continua subindo um Postgres local para
+# desenvolvimento, sem depender de nada disso.

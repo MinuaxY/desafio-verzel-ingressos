@@ -1,0 +1,129 @@
+# Confere, uma vez por dia, se o ambiente publicado ainda está de pé — e abre
+# uma issue quando não está.
+#
+# Existe por um episódio concreto: o Postgres gratuito do Render expira 30 dias
+# depois de criado, e o nosso foi apagado em outubro de 2026. A API entrou em
+# ciclo de reinício, o site ficou fora do ar por três semanas e ninguém soube.
+# Falha silenciosa é a pior forma de falhar, e esta é a única parte do projeto
+# que nenhum teste alcança: a suíte prova que o código funciona, não que o
+# servidor está vivo.
+name: Saúde do ambiente publicado
+
+on:
+  schedule:
+    # 11:10 UTC ≈ 08:10 em Brasília. Minuto quebrado de propósito: o agendador
+    # do GitHub enfileira na hora cheia e atrasa mais ali.
+    - cron: "10 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+env:
+  API: https://verzel-ingressos-api.onrender.com
+  SITE: https://desafio-verzel-ingressos.vercel.app
+
+jobs:
+  conferir:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir as três camadas
+        id: conferir
+        run: |
+          set -uo pipefail
+          falhas=""
+
+          # O plano gratuito hiberna e a primeira chamada custa até um minuto.
+          # A folga evita acusar queda quando é só sono.
+          #
+          # O `-w` já imprime 000 quando a chamada falha; o `:-000` cobre só o
+          # caso de o curl morrer antes de escrever qualquer coisa. Somar um
+          # `|| echo 000` aqui duplicaria o valor e relataria "HTTP 000000".
+          bater() {
+            local codigo
+            codigo=$(curl -s -o resposta.txt -w "%{http_code}" --max-time 180 "$1") || true
+            echo "${codigo:-000}"
+          }
+
+          echo "::group::front"
+          front=$(bater "$SITE")
+          echo "front: $front"
+          echo "::endgroup::"
+          [ "$front" = "200" ] || falhas="${falhas}- O front não respondeu (HTTP \`$front\`) em $SITE"$'\n'
+
+          echo "::group::processo da API"
+          saude=$(bater "$API/health")
+          echo "/health: $saude"
+          echo "::endgroup::"
+          [ "$saude" = "200" ] || falhas="${falhas}- A API não respondeu (HTTP \`$saude\`) em $API/health"$'\n'
+
+          # O passo que de fato importa: `/health` devolve "ok" sem encostar no
+          # banco, então sozinho ele daria verde com o banco morto. O cartaz lê
+          # dados de verdade — é o que o visitante vê ao abrir o site.
+          echo "::group::banco e dados"
+          cartaz=$(bater "$API/sessions?per_page=1")
+          total=$(grep -o '"total":[0-9]*' resposta.txt | head -1 | cut -d: -f2 || true)
+          echo "/sessions: $cartaz, total=${total:-?}"
+          echo "::endgroup::"
+          if [ "$cartaz" != "200" ]; then
+            falhas="${falhas}- O cartaz não respondeu (HTTP \`$cartaz\`) — provável banco fora do ar"$'\n'
+          elif [ "${total:-0}" = "0" ]; then
+            falhas="${falhas}- O cartaz respondeu, mas sem nenhuma sessão: o banco subiu vazio e o seed não rodou"$'\n'
+          fi
+
+          {
+            echo "falhas<<FIM"
+            printf '%s' "$falhas"
+            echo ""
+            echo "FIM"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Abrir issue quando algo caiu
+        if: steps.conferir.outputs.falhas != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FALHAS: ${{ steps.conferir.outputs.falhas }}
+        run: |
+          set -euo pipefail
+          # Uma issue aberta por vez: sem isto, um mês fora do ar renderia
+          # trinta issues iguais e nenhuma seria lida.
+          jaAberta=$(gh issue list --label "fora-do-ar" --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$jaAberta" ]; then
+            echo "Issue #$jaAberta já está aberta; nada a fazer."
+            exit 0
+          fi
+
+          gh label create "fora-do-ar" --color B60205 \
+            --description "Ambiente publicado não respondeu à conferência diária" 2>/dev/null || true
+
+          gh issue create \
+            --title "Ambiente publicado fora do ar em $(date -u +%d/%m/%Y)" \
+            --label "fora-do-ar" \
+            --body "$(cat <<CORPO
+          A conferência diária encontrou problema:
+
+          $FALHAS
+          ## Onde olhar primeiro
+
+          O suspeito mais provável é o banco. O Postgres gratuito do Render expira
+          30 dias depois de criado — foi o que derrubou o ambiente em outubro de
+          2026. Hoje o banco mora fora do Render justamente por isso, então
+          confira a validade do plano e a variável \`DATABASE_URL\` no painel.
+
+          Se o banco estiver de pé e vazio, falta rodar o seed: \`SEED_ON_START\`
+          repovoa na partida, mas só num banco novo.
+
+          [Execução que abriu esta issue](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          CORPO
+          )"
+
+      - name: Fechar a issue quando voltar
+        if: steps.conferir.outputs.falhas == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for n in $(gh issue list --label "fora-do-ar" --state open --json number --jq '.[].number'); do
+            gh issue comment "$n" --body "Voltou ao ar: a conferência de $(date -u +%d/%m/%Y) passou nas três camadas."
+            gh issue close "$n"
+          done

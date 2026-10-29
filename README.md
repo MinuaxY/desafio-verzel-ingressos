@@ -18,11 +18,11 @@ por link. Na entrada, a portaria lê o QR pela câmera e libera, ou recusa com o
 
 Entre pelo acesso rápido na tela de login — não é preciso digitar credencial.
 
-> **A primeira visita pode demorar até um minuto.** A API está no plano gratuito do Render,
-> que hiberna o serviço depois de alguns minutos sem tráfego. A demora é o servidor
-> acordando, não a aplicação sendo lenta: depois da primeira requisição, tudo responde
-> normalmente. Se a tela disser que não conseguiu falar com o servidor, recarregue após
-> alguns segundos.
+> **Fora do horário comercial, a primeira visita pode demorar até um minuto.** A API está
+> no plano gratuito do Render, que hiberna o serviço depois de 15 minutos sem tráfego. Um
+> monitor externo o mantém acordado durante o dia; de madrugada, a demora é o servidor
+> acordando, e não a aplicação sendo lenta. Se a tela disser que não conseguiu falar com o
+> servidor, recarregue após alguns segundos.
 
 > A **câmera da portaria** funciona no ambiente publicado, porque ele é HTTPS. Em celular,
 > o navegador vai pedir permissão de câmera na primeira leitura.
@@ -514,7 +514,7 @@ sessão da porta, o ingresso de outra sala passa a receber "Pode entrar"; trocan
 desafio-verzel-ingressos/
 ├── docker-compose.yml
 ├── docs/
-│   ├── decisoes.md          as 42 decisões técnicas, e o que foi descartado em cada uma
+│   ├── decisoes.md          as 43 decisões técnicas, e o que foi descartado em cada uma
 │   ├── backlog.md           requisitos, o que foi entregue e o que ficou fora do escopo
 │   ├── diario.md            o que aconteceu em ordem, incluindo o que deu errado
 │   ├── quadro.md            o kanban ao fim do projeto
@@ -572,9 +572,13 @@ O que **não** está pronto, ou está pronto pela metade:
 - **A câmera da portaria exige HTTPS** fora de `localhost`. É restrição do navegador, não do
   código. No ambiente publicado isso está resolvido; rodando local em rede, use a digitação
   manual, que existe justamente para isso.
-- **O ambiente publicado usa o plano gratuito do Render**, que hiberna após alguns minutos
-  sem tráfego. A primeira requisição depois disso leva até um minuto. O banco gratuito
-  também tem prazo de validade — o link não vive para sempre.
+- **O ambiente publicado roda em plano gratuito**, com duas consequências. A API hiberna
+  depois de 15 minutos sem tráfego, e acordar custa cerca de um minuto; um monitor externo
+  mantém o serviço acordado durante o dia, então na prática isso só aparece de madrugada.
+  E o banco mora fora do Render de propósito: o Postgres gratuito de lá expira 30 dias
+  depois de criado, e em outubro de 2026 ele foi apagado e derrubou o ambiente por três
+  semanas sem que ninguém percebesse. Daí também a conferência diária em
+  [`.github/workflows/saude.yml`](.github/workflows/saude.yml). Ver decisão D43.
 - **Elegibilidade para assento acessível não é validada.** O sistema não tem como conferir
   laudo, e cinemas reais checam na entrada. Marcar sem verificar é o comportamento do mundo real.
 - **Meia-entrada não foi implementada.** Abriria uma frente de regra de preço que não cabia no
@@ -596,7 +600,7 @@ o projeto foi conduzido — que é o que este desafio diz avaliar.
 
 | | |
 |---|---|
-| [`decisoes.md`](docs/decisoes.md) | As **42 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
+| [`decisoes.md`](docs/decisoes.md) | As **43 decisões técnicas**, cada uma com o que foi **descartado** e por quê |
 | [`diario.md`](docs/diario.md) | O que aconteceu em ordem, **incluindo o que deu errado** — o dia perdido, o defeito no cancelamento, os erros que o deploy encontrou |
 | [`backlog.md`](docs/backlog.md) | Requisitos do enunciado, o que foi entregue, o que foi feito por iniciativa e o que ficou fora do escopo de propósito |
 | [`quadro.md`](docs/quadro.md) | O kanban ao fim do projeto, com uma coluna para o que foi **avaliado e descartado** |

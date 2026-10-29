@@ -89,6 +89,16 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
       destrutivos (D42). O passeio dele achou o que 29 testes verdes nao acharam
 
 
+## Ambiente publicado
+
+- [x] Diagnostico da queda de outubro: o Postgres gratuito do Render expira em 30 dias
+      e foi apagado. Nao era hibernacao — a API ficava em ciclo de reinicio (D43)
+- [x] render.yaml sem o banco que expira, e conferencia diaria em .github/workflows
+- [ ] Paulo: criar o banco no Neon e colar a DATABASE_URL no painel do Render
+- [ ] Paulo: agendador externo batendo na API das 6h a 1h, para nao hibernar de dia
+- [ ] Depois de tudo no ar, rodar o workflow a mao e ver a conferencia passar
+
+
 ## Falta o Paulo fazer
 
 - [ ] Ler e validar o docs/ia.md — escrito na sua voz

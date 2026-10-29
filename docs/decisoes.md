@@ -1127,6 +1127,77 @@ não julga aparência. **Nenhuma automação substitui olhar a tela uma vez.**
 
 ---
 
+## D43 — O banco sai do Render, e alguém passa a olhar se o site está vivo
+
+**O site ficou três semanas fora do ar e nós descobrimos por acaso.** O Paulo foi abrir o link
+para um recrutador e não carregou. A suspeita dele era a hibernação conhecida; a medição disse
+outra coisa.
+
+O front na Vercel respondeu em 0,46s. A API não respondeu em **150 segundos** — nem cabeçalho.
+DNS resolvia, o TLS fechava, o pedido era enviado e nada voltava: a assinatura do roteador do
+Render esperando por um processo que nunca sobe.
+
+A causa é uma linha da documentação do Render: *"Free Render Postgres databases expire 30 days
+after creation"*, com 14 dias de carência e exclusão dos dados em seguida. O banco nasceu em
+20/08, expirou em ~20/09 e foi apagado em ~04/10. Como a API roda as migrations na partida, ela
+não achava banco, morria, reiniciava e repetia.
+
+**Perder os dados não custou nada** — era seed, e `SEED_ON_START` repovoa um banco novo sozinho.
+O que custou foram as três semanas de link morto no LinkedIn.
+
+### São dois problemas, e só um deles era conhecido
+
+**O banco expira.** Qualquer Postgres gratuito do Render morre em 30 dias, então o ambiente
+publicado tinha prazo de validade embutido desde o primeiro dia. **Escolhido: tirar o banco do
+Render**, para um Postgres gerenciado sem prazo, com a URL entrando como segredo no painel. O
+`render.yaml` perdeu o bloco `databases:` e ganhou o porquê escrito em cima da variável, para
+quem for reproduzir o deploy não repetir o erro.
+
+**O serviço hiberna** depois de 15 minutos sem tráfego, e acordar custa cerca de um minuto. Esse
+já estava declarado no README desde a entrega. **Escolhido: um monitor externo batendo na API em
+janela de horário**, e não o dia inteiro.
+
+A aritmética decidiu a janela: o plano gratuito dá **750 horas de instância por mês**, e um mês
+de 31 dias tem 744. Manter acordado 24 horas cabe — por seis horas de margem. Estourar significa
+o Render **suspender o serviço até o mês virar**, que é um desastre maior do que dormir de
+madrugada. Com janela das 6h à 1h, são ~589 horas e sobra folga de verdade, cobrindo o dia no
+Brasil, a manhã na Europa e a tarde nos Estados Unidos.
+
+### O monitor confere o cartaz, e não só o `/health`
+
+Este é o detalhe que decide se a conferência serve para alguma coisa. O `/health` devolve
+`{"status": "ok"}` **sem encostar no banco** — um monitor apontado só para ele teria dado verde
+durante boa parte de uma queda causada justamente pelo banco. A conferência bate em três
+camadas: o front, o `/health` e o `/sessions`, que lê dados de verdade e é o que o visitante vê
+ao abrir o site. E distingue "o cartaz não respondeu" de "o cartaz respondeu vazio", que são
+defeitos diferentes com conserto diferente.
+
+**Descartado: GitHub Actions como mecanismo de ping.** O agendador atrasa de 5 a 30 minutos sob
+carga e às vezes pula execuções — com o limite de 15 minutos do Render, um ping atrasado não
+impede nada. Para a conferência diária o atraso é irrelevante, então ela fica lá; o ping precisa
+de um agendador externo.
+
+**Descartado: pagar os US$ 7/mês do plano Starter**, que resolveria a hibernação sem contorno
+nenhum. Foi a minha recomendação e o Paulo preferiu manter o custo zero, o que é uma escolha
+legítima: o contorno funciona e a decisão fica registrada aqui para quando o custo deixar de
+importar.
+
+**Descartado: uma demonstração sem back-end**, com dados fixos no front. Resolveria a
+disponibilidade matando o que o projeto tem de melhor — a concorrência resolvida no banco e a
+portaria validando ingresso de verdade.
+
+### A parte que nenhum teste alcançava
+
+São 433 testes, e nenhum deles teria apontado isto. Eles provam que o código funciona; não
+provam que o servidor está vivo. A conferência diária é a primeira coisa no projeto que olha
+para o ambiente publicado em vez de olhar para o código — e abre uma issue quando algo cai, com
+uma issue aberta por vez, para um mês fora do ar não virar trinta avisos que ninguém lê.
+
+É a mesma regra que já valia dentro do sistema, agora aplicada do lado de fora: **falha
+silenciosa é a pior forma de falhar.**
+
+---
+
 ## Decisões que estavam pendentes
 
 Estavam abertas quando este registro começou. Ficam aqui com o desfecho, e não apagadas: uma
