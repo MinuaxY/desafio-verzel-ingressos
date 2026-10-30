@@ -830,3 +830,58 @@ Rodada à mão depois de tudo no ar: `front: 200`, `/health: 200`, `/sessions: 2
 
 ### Decisões tomadas
 D43.
+
+---
+
+## Onde paramos — 29/10, fim do dia
+
+**O site voltou ao ar, e agora tem quem avise quando cair.**
+
+### O que mudou de verdade
+
+Não foi só consertar: as três fragilidades que causaram a queda foram removidas, cada uma com um
+motivo diferente.
+
+- **O banco tinha prazo de validade.** Agora é um Postgres gerenciado no Neon, em `us-west-2`,
+  a mesma região da API — banco e aplicação em regiões diferentes somariam latência em toda
+  consulta, e região de projeto Neon não muda depois de criada.
+- **O serviço hibernava em 15 minutos.** Um agendador externo bate em `/health` a cada 10
+  minutos, em janela de horário.
+- **Ninguém olhava.** Conferência diária em `.github/workflows/saude.yml`, em três camadas.
+
+### Verificado, e não suposto
+
+Antes de tocar no painel do Render: 10 migrations aplicadas no Neon, `btree_gist` 1.7,
+`ex_session_room_overlap` criada, seed com 97 sessões, e os 33 testes de ponta a ponta rodados
+contra o banco na nuvem.
+
+Depois de tudo no ar: front 200, `/health` 200, cartaz com 96 sessões, login emitindo token. E a
+conferência acionada à mão no GitHub, medindo `front: 200`, `/health: 200`,
+`/sessions: 200, total=96`.
+
+### A única coisa que falta conferir
+
+**Amanhã de manhã**, por volta das 8h: se a API responder rápido sem ninguém ter visitado antes,
+a janela do agendador funcionou. Se demorar um minuto, o fuso ou o agendamento saiu errado.
+
+### Continua em aberto
+
+- A passada estética da 3.1: responsividade das outras telas, espaçamento, consistência dos
+  formulários.
+- A portaria pertencer a um organizador — a única pendência que é regra de negócio faltando, e
+  não melhoria. Apareceu na D34.
+- `/gate/sessions` devolvendo três dias de sessões; o seletor não indicar a sessão em andamento;
+  `occupies_until` não exposto na API; `test_melhorias.py` com 78 testes de cinco assuntos.
+- Do Paulo: regenerar a chave do TMDb e validar o `docs/ia.md`.
+
+### Para retomar o ambiente
+
+Nada mudou no desenvolvimento local: Docker Desktop, `docker compose up -d db`, `uvicorn` na
+8000 e `npm run dev` na 5173. O `start.sh` só usa a conexão direta quando `DATABASE_URL_DIRECT`
+existe, e localmente ela não existe.
+
+Para rodar a suíte de ponta a ponta contra um banco remoto, `PW_EXPECT_TIMEOUT=25000 npm run
+e2e` — sem isso, a latência derruba dez testes que não têm nada de errado.
+
+**E o comando de tipos continua sendo `npm run typecheck`, não `npx tsc --noEmit`**, que passa
+sempre sem olhar para arquivo nenhum.

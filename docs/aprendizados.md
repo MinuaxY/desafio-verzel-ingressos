@@ -394,6 +394,31 @@ testes verdes não acusavam nada.
 
 ---
 
+## 22. Monitore o que o usuário depende, não o que é fácil de checar.
+
+**O que aconteceu:** o site ficou três semanas fora do ar e ninguém soube. Ao escrever a
+conferência que deveria ter avisado, o reflexo foi apontá-la para `/health` — é o endereço que
+existe para isso, responde rápido e devolve `{"status": "ok"}`.
+
+Fui ler a implementação antes de confiar nela. **O `/health` não encosta no banco.** Ele prova
+que o processo subiu, e nada além disso. Durante uma queda causada justamente pelo banco, ele
+teria dado verde em boa parte do tempo — o alarme instalado para pegar aquele defeito seria cego
+exatamente para ele.
+
+A conferência passou a bater em três camadas, e a que importa é a terceira: o cartaz, que lê
+dados de verdade e é o que o visitante vê ao abrir o site. Ela também distingue "o cartaz não
+respondeu" de "o cartaz respondeu vazio" — defeitos diferentes, consertos diferentes.
+
+**A lição:** um indicador de saúde tende a medir o que é barato de medir, e o barato costuma ser
+a camada mais rasa. A pergunta certa não é *"o serviço está no ar?"*, é **"o que a pessoa veio
+fazer aqui ainda funciona?"**. Se as duas respostas podem divergir, o monitor está olhando para
+o lugar errado.
+
+É a mesma família das lições 17 e 21 — cada ferramenta é cega para alguma coisa —, mas num
+degrau diferente: ali o ponto cego era da ferramenta de teste, aqui é do próprio alvo escolhido.
+
+---
+
 ## O que faria diferente no próximo
 
 1. **Perguntar sobre o não-escrito no dia 1**, não no dia 3.
@@ -420,3 +445,5 @@ testes verdes não acusavam nada.
     teste que separa as duas — não um em que ambas concordam.
 13. **Olhar a tela uma vez, sempre**, mesmo com tudo verde — e perguntar de cada camada de
     teste para o que ela é cega, em vez de somar ferramentas achando que somam cobertura.
+14. **Apontar o monitor para o que o usuário usa**, e conferir se o indicador de saúde
+    escolhido chega a tocar na parte que costuma quebrar.
