@@ -96,9 +96,11 @@ Instantâneo do kanban ao fim do projeto. As colunas viraram seções.
 - [x] render.yaml sem o banco que expira, e conferencia diaria em .github/workflows
 - [x] Banco no Neon (us-west-2, mesma regiao da API), DATABASE_URL e DATABASE_URL_DIRECT
       no painel do Render. Site de volta ao ar em 29/10, com 96 sessoes servidas
-- [ ] Paulo: agendador externo (cron-job.org) batendo em /health a cada 10 min, das 6h a 1h.
-      A janela nao e so pelas 750h/mes: o reinicio diario faz o seed repor o cartaz, que
-      senao esvaziaria em dez dias
+- [x] Agendador externo no cron-job.org batendo em /health a cada 10 min, em janela de
+      horario. A janela nao e so pelas 750h/mes do Render: o reinicio diario faz o seed
+      repor o cartaz, que senao esvaziaria em dez dias
+- [ ] Conferir amanha de manha se a janela funcionou: o sinal e a API responder rapido
+      sem ninguem ter visitado antes
 - [x] Conferencia rodada a mao com tudo no ar: front 200, /health 200, /sessions 200 total=96
 
 
